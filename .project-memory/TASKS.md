@@ -36,14 +36,14 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 
 ---
 
-## Phase 2: Local Runtime Engine (PLANNED)
+## Phase 2: Local Runtime Engine (ACTIVE - COMPLETED)
 
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-201** | PHP-FPM Multi-Version Process Supervisor | Critical | LOCKED | Senior Rust Eng | Phase 1 Acceptance | `crates/runtime` FPM lifecycle manager |
-| **TASK-202** | Nginx Reverse Proxy & Loopback Virtual Hosts | High | LOCKED | Systems Engineer | TASK-201 | Non-root Nginx template & configuration builder |
-| **TASK-203** | MariaDB Lifecycle & Isolated User Databases | High | LOCKED | Systems Engineer | TASK-201 | MariaDB process manager & data directory guards |
-| **TASK-204** | Runtime Health Probes & Port Conflict Resolver | Medium | LOCKED | Backend / Rust Eng | TASK-201..203 | TCP/HTTP health probes & conflict diagnostics |
+| **TASK-201** | PHP-FPM Multi-Version Process Supervisor | Critical | COMPLETED | Senior Rust Eng | Phase 1 Acceptance | `crates/runtime` FPM lifecycle manager |
+| **TASK-202** | Nginx Reverse Proxy & Loopback Virtual Hosts | High | COMPLETED | Systems Engineer | TASK-201 | Non-root Nginx template & configuration builder |
+| **TASK-203** | MariaDB Lifecycle & Isolated User Databases | High | COMPLETED | Systems Engineer | TASK-201 | MariaDB process manager & data directory guards |
+| **TASK-204** | Runtime Health Probes & Port Conflict Resolver | Medium | COMPLETED | Backend / Rust Eng | TASK-201..203 | TCP/HTTP health probes & conflict diagnostics |
 
 ---
 

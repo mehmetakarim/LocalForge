@@ -22,7 +22,8 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-009** | Cargo Workspace Linter | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Rust Toolchain | **PASS** | Zero clippy errors or warnings across entire workspace. |
 | **TEST-010** | Frontend Build & Type Check | `npm run build` (`tsc && vite build`) | Node 20.19.5 | **PASS** | TypeScript strict mode passed; Vite bundle generated successfully in `dist/`. |
 | **TEST-011** | Full Tauri Desktop App Check | `cargo check --workspace` (with `localforge-desktop`) | Tauri 2 & Cargo | **PASS** | Tauri 2 application and macOS backend compiled cleanly without errors. |
-| **TEST-012** | Local Runtime Engine Tests | Multi-version PHP-FPM supervisor | Systems Layer | **NOT RUN** | Scheduled for Phase 2 (TASK-201). |
+| **TEST-012** | Local Runtime Engine Tests | `cargo test -p localforge-runtime` | Rust Cargo 1.94.0 | **PASS** | Health probe port find, MariaDB paths, PHP-FPM pool config, and Nginx config tests passed. |
+| **TEST-013** | Deployment & Checksum Ledger | `cargo test -p localforge-deployment` | Rust Toolchain | **NOT RUN** | Scheduled for Phase 3 (TASK-301). |
 
 ---
 

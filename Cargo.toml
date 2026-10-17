@@ -4,6 +4,7 @@ members = [
     "crates/platform",
     "crates/storage",
     "crates/project-manager",
+    "crates/runtime",
     "apps/desktop/src-tauri",
 ]
 resolver = "2"

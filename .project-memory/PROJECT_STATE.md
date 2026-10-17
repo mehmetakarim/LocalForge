@@ -6,12 +6,12 @@ This document tracks the current technical and operational state of the LocalFor
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase 1 — Desktop Foundation & Workspace Storage**
+- **Active Phase**: **Phase 2 — Local Runtime Engine**
 - **Phase Status**: ACTIVE (Implementation in progress following PO Approval)
-- **Active Feature Branch**: `phase-1/desktop-foundation`
+- **Active Feature Branch**: `phase-2/runtime-engine`
 - **Target Branch**: `main`
-- **Latest Commit**: Initialized Phase 0 foundation baseline (`a34e794`)
-- **Authorized Scope**: Phase 1 only (Tauri 2 desktop shell, Cargo workspace, core crates, APFS external storage resilience, SQLite metadata). No Phase 2 runtime work.
+- **Latest Commit**: Initialized Phase 1 desktop foundation baseline (`45f75aa`)
+- **Authorized Scope**: Phase 2 only (`crates/runtime`, PHP-FPM supervisors, loopback Nginx, user-level MariaDB, health probes). No Phase 3 deployment work.
 
 ---
 

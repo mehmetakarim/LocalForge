@@ -39,13 +39,18 @@ This document mirrors and indexes the active engineering tasks across project ph
 
 ---
 
-## Future Phases (LOCKED)
+## Phase 2: Local Runtime Engine (ACTIVE)
 
-### Phase 2: Local Runtime Engine (PLANNED)
-- **TASK-201**: PHP-FPM Lifecycle & Multi-Version Manager
-- **TASK-202**: Nginx Reverse Proxy & Loopback Virtual Hosts
-- **TASK-203**: MariaDB Lifecycle & Database Manager
-- **TASK-204**: Runtime Health Probes & Port Conflict Resolver
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-201** | PHP-FPM Lifecycle & Multi-Version Manager | Critical | COMPLETED | Senior Rust Eng | `crates/runtime` FPM lifecycle supervisor |
+| **TASK-202** | Nginx Reverse Proxy & Loopback Virtual Hosts | High | COMPLETED | Systems Engineer | Non-root Nginx config builder & loopback proxy |
+| **TASK-203** | MariaDB Lifecycle & Database Manager | High | COMPLETED | Systems Engineer | MariaDB process manager & data directory guards |
+| **TASK-204** | Runtime Health Probes & Port Conflict Resolver | Medium | COMPLETED | Backend / Rust Eng | HTTP/TCP health probes & conflict diagnostics |
+
+---
+
+## Future Phases (LOCKED)
 
 ### Phase 3: Smart Deployment & CLI / MCP Integration (PLANNED)
 - **TASK-301**: Git-Aware Change Detection & Deployment Checksums

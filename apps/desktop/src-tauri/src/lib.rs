@@ -120,8 +120,7 @@ fn update_project_status(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let db_path = PathBuf::from(home)
-        .join("Library/Application Support/LocalForge/localforge.db");
+    let db_path = PathBuf::from(home).join("Library/Application Support/LocalForge/localforge.db");
 
     let metadata_store = Arc::new(
         MetadataStore::open(&db_path).unwrap_or_else(|_| MetadataStore::open_in_memory().unwrap()),

@@ -1,0 +1,24 @@
+[package]
+name = "localforge-runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+localforge-core = { path = "../core" }
+localforge-platform = { path = "../platform" }
+localforge-storage = { path = "../storage" }
+localforge-project-manager = { path = "../project-manager" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+dunce.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
