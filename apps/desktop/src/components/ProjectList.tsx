@@ -1,125 +1,220 @@
 import React from "react";
-import { Folder, Globe, Play, Square, AlertOctagon, ExternalLink, Cpu } from "lucide-react";
+import {
+  Globe,
+  Play,
+  Square,
+  AlertTriangle,
+  ExternalLink,
+  Cpu,
+  HardDrive,
+  Copy,
+  Check,
+  Sparkles,
+} from "lucide-react";
 import { ProjectRecord } from "../types";
 
 interface ProjectListProps {
   projects: ProjectRecord[];
   onToggleStatus: (id: string, currentStatus: string) => void;
+  onOpenCreate: () => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, onToggleStatus }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({
+  projects,
+  onToggleStatus,
+  onOpenCreate,
+}) => {
+  const [copiedId, setCopiedId] = React.useState<string | null>(null);
+
+  const copyUrl = (domain: string, id: string) => {
+    navigator.clipboard.writeText(`http://${domain}:8080`);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/40 text-center">
-        <Folder className="w-12 h-12 text-slate-600 mb-3" />
-        <h3 className="text-lg font-medium text-slate-200">No Projects Yet</h3>
-        <p className="text-sm text-slate-400 max-w-sm mt-1">
-          Create a new project or import an existing PHP workspace directly from your internal SSD or external drive.
+      <div className="flex flex-col items-center justify-center py-20 px-6 rounded-3xl border border-dashed border-white/10 apple-glass text-center">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-500/20 via-indigo-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center text-blue-400 mb-4 shadow-xl shadow-blue-500/5">
+          <Sparkles className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-semibold text-white tracking-tight">Kayıtlı Proje Bulunamadı</h3>
+        <p className="text-sm text-neutral-400 max-w-md mt-1.5 leading-relaxed">
+          Harici SSD veya dahili diskinizdeki mevcut PHP projelerinizi tek tıklamayla içe aktarın veya sıfırdan modern bir çalışma alanı başlatın.
         </p>
+        <button
+          onClick={onOpenCreate}
+          className="mt-6 px-5 py-2.5 rounded-xl text-xs font-semibold text-white apple-button-primary flex items-center gap-2"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          İlk Projeyi Oluştur
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
       {projects.map((p) => {
         const isDisconnected = p.status === "disconnected";
         const isRunning = p.status === "running";
+        const isExternal = p.path.startsWith("/Volumes");
+
+        // Generate monogram initials
+        const initials = p.name
+          .split(/[\s-_]+/)
+          .map((n) => n[0])
+          .slice(0, 2)
+          .join("")
+          .toUpperCase() || "LF";
 
         return (
           <div
             key={p.id}
-            className={`flex flex-col justify-between p-5 rounded-xl border transition-all duration-200 ${
+            className={`group relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
               isDisconnected
-                ? "bg-rose-950/20 border-rose-900/50 shadow-sm"
+                ? "bg-gradient-to-b from-rose-950/20 via-neutral-900/60 to-neutral-950/80 border-rose-500/30 shadow-lg shadow-rose-950/20"
                 : isRunning
-                ? "bg-slate-900/90 border-indigo-500/50 shadow-indigo-500/10 shadow-lg"
-                : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                ? "bg-gradient-to-b from-neutral-800/60 via-neutral-900/70 to-neutral-950/90 border-blue-500/35 shadow-xl shadow-blue-500/5"
+                : "apple-card hover:border-white/15"
             }`}
           >
+            {/* Top Row: Monogram, Title, Status Indicator */}
             <div>
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-base text-slate-100 truncate" title={p.name}>
-                  {p.name}
-                </h3>
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${
-                    isRunning
-                      ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                      : isDisconnected
-                      ? "bg-rose-950 text-rose-400 border border-rose-800"
-                      : "bg-slate-800 text-slate-400 border border-slate-700"
-                  }`}
-                >
-                  {p.status}
-                </span>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {/* Apple Style Gradient Monogram */}
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm tracking-wider shadow-inner transition-transform group-hover:scale-105 duration-200 ${
+                      isRunning
+                        ? "bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-blue-400/20"
+                        : isDisconnected
+                        ? "bg-gradient-to-tr from-rose-700 to-orange-700 text-white"
+                        : "bg-gradient-to-tr from-neutral-700 via-neutral-800 to-neutral-900 text-neutral-300 border border-white/10"
+                    }`}
+                  >
+                    {initials}
+                  </div>
+
+                  <div className="overflow-hidden">
+                    <h3 className="font-semibold text-sm text-white tracking-tight truncate group-hover:text-blue-400 transition-colors" title={p.name}>
+                      {p.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[11px] font-mono text-neutral-400 truncate">
+                        {p.local_domain}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Pill */}
+                <div className="flex items-center">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase border transition-all ${
+                      isRunning
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-xs shadow-emerald-500/20"
+                        : isDisconnected
+                        ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                        : "bg-neutral-800/80 text-neutral-400 border-white/5"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isRunning
+                          ? "bg-emerald-400 animate-pulse"
+                          : isDisconnected
+                          ? "bg-rose-400"
+                          : "bg-neutral-500"
+                      }`}
+                    />
+                    {isRunning ? "Çalışıyor" : isDisconnected ? "Bağlantı Yok" : "Durduruldu"}
+                  </span>
+                </div>
               </div>
 
-              <div className="mt-3 space-y-1.5 text-xs text-slate-400">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Globe className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                  <a
-                    href={`http://${p.local_domain}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-400 hover:underline truncate"
-                  >
-                    {p.local_domain}
-                  </a>
+              {/* Specs & Storage Metadata */}
+              <div className="mt-4 pt-3 border-t border-white/[0.06] grid grid-cols-2 gap-2 text-[11px]">
+                <div className="flex items-center gap-1.5 text-neutral-400">
+                  <Cpu className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                  <span className="font-medium text-neutral-300">PHP {p.php_version}</span>
+                  <span className="text-neutral-500 text-[10px]">(FPM)</span>
                 </div>
 
-                <div className="flex items-center gap-1.5 truncate" title={p.path}>
-                  <Folder className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                  <span className="truncate">{p.path}</span>
+                <div className="flex items-center gap-1.5 text-neutral-400 truncate">
+                  <HardDrive className={`w-3.5 h-3.5 flex-shrink-0 ${isExternal ? "text-amber-400" : "text-neutral-500"}`} />
+                  <span className="truncate text-neutral-300">
+                    {isExternal ? "Harici SSD" : "Dahili Disk"}
+                  </span>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                  <span>PHP {p.php_version}</span>
-                </div>
+              {/* Workspace Directory Path */}
+              <div className="mt-2 text-[10px] font-mono text-neutral-400 truncate bg-neutral-950/40 p-2 rounded-lg border border-white/[0.04]" title={p.path}>
+                <span className="text-neutral-400 select-none">root: </span>
+                <span className="text-neutral-300">{p.path}</span>
               </div>
             </div>
 
-            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            {/* Bottom Actions Row */}
+            <div className="mt-5 pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2">
               {isDisconnected ? (
-                <div className="flex items-center gap-1.5 text-xs text-rose-400 font-medium">
-                  <AlertOctagon className="w-4 h-4 flex-shrink-0" />
-                  <span>Storage volume disconnected</span>
+                <div className="flex items-center gap-2 text-xs text-rose-300 font-medium">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                  <span className="text-[11px]">Harici disk ayrıldı (Güvenli kilit)</span>
                 </div>
               ) : (
-                <button
-                  onClick={() => onToggleStatus(p.id, p.status)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    isRunning
-                      ? "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white"
-                  }`}
-                >
-                  {isRunning ? (
-                    <>
-                      <Square className="w-3.5 h-3.5 fill-current" />
-                      <span>Stop</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Start</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onToggleStatus(p.id, p.status)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      isRunning
+                        ? "bg-neutral-800 hover:bg-neutral-700/80 text-rose-300 border border-white/10"
+                        : "apple-button-primary text-white"
+                    }`}
+                  >
+                    {isRunning ? (
+                      <>
+                        <Square className="w-3 h-3 fill-current" />
+                        <span>Durdur</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Başlat</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => copyUrl(p.local_domain, p.id)}
+                    className="p-1.5 rounded-lg text-neutral-400 hover:text-white apple-button-ghost transition-colors"
+                    title="Yerel URL'yi Kopyala (http://...:8080)"
+                  >
+                    {copiedId === p.id ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
               )}
 
-              <a
-                href={`http://${p.local_domain}`}
-                target="_blank"
-                rel="noreferrer"
-                className={`p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors ${
-                  isDisconnected ? "opacity-30 pointer-events-none" : ""
-                }`}
-                title="Open in Browser"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
+              <div className="flex items-center gap-1">
+                <a
+                  href={`http://${p.local_domain}:8080`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:text-white apple-button-ghost transition-colors ${
+                    isDisconnected || !isRunning ? "opacity-35 pointer-events-none" : ""
+                  }`}
+                  title="Tarayıcıda Aç"
+                >
+                  <Globe className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Aç</span>
+                  <ExternalLink className="w-3 h-3 text-neutral-400 ml-0.5" />
+                </a>
+              </div>
             </div>
           </div>
         );
