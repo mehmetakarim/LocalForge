@@ -10,10 +10,10 @@ Welcome to the centralized project brain of **LocalForge**. This file serves as 
 |---|---|
 | **Project Name** | LocalForge |
 | **Repo** | `mehmetakarim/LocalForge` |
-| **Active Branch** | `phase-0/foundation` (targeting `main`) |
-| **Current Phase** | **Phase 0 — Foundation & Project Memory** |
-| **Phase Status** | IN PROGRESS (Technical scaffolding & documentation) |
-| **Next Phase** | Phase 1 — Desktop Foundation (PENDING PO APPROVAL) |
+| **Active Branch** | `phase-1/desktop-foundation` (targeting `main`) |
+| **Current Phase** | **Phase 1 — Desktop Foundation & Workspace Storage** |
+| **Phase Status** | ACTIVE (PO Approved, implementation in progress) |
+| **Next Phase** | Phase 2 — Local Runtime Engine (LOCKED) |
 | **Primary Platform** | macOS Apple Silicon (`arm64`) |
 | **Core Architecture** | Tauri 2 (Desktop UI) + Shared Rust Core + CLI + MCP Server |
 

@@ -47,3 +47,34 @@ This document records the chronological engineering log for all development sess
 - Confirmed strict phase discipline: no application code scaffolded in Phase 0.
 - Confirmed APFS hardware UUID volume tracking pattern.
 - Confirmed SQLite internal metadata storage policy with user project separation.
+
+---
+
+## Session 002 — Phase 1 Desktop Foundation & Workspace Storage
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Desktop Engineer, Lead Agent
+- **Authorized Phase**: **Phase 1 — Desktop Foundation & Workspace Storage**
+- **Git Branch**: `phase-1/desktop-foundation`
+
+### Summary of Activities
+1. **Approval & Governance Transition**:
+   - Product Owner formally approved Phase 1 transition and dual Apache-2.0 / MIT licensing.
+   - Added `LICENSE-MIT` and `LICENSE-APACHE`.
+   - Updated ADR-0005 to ACCEPTED status.
+2. **Modular Cargo Workspace (TASK-102)**:
+   - Configured root `Cargo.toml` with `crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager`, `apps/desktop/src-tauri`.
+   - Implemented `crates/core` with typed `ProjectId`, `VolumeId`, `VolumeInfo`, `ProjectStatus`, and `LocalForgeError`.
+   - Implemented `crates/platform` with `VolumeManager` and `CredentialStore` traits, plus native macOS Apple Silicon implementations (`diskutil` and `security` Keychain).
+   - Implemented `crates/storage` with `MetadataStore` (SQLite WAL mode), `sanitize_project_path` (lexical & path traversal protection), and `VolumeBarrier` (guarding against unmounted external folder recreation).
+   - Implemented `crates/project-manager` with `ProjectManifest` (YAML parsing and serialization for `.localforge/project.yaml`) and `ProjectService`.
+3. **Tauri 2 Desktop Shell (TASK-101 & TASK-105)**:
+   - Initialized `apps/desktop` with React 19, TypeScript, Vite, and Tailwind CSS.
+   - Built UI components: `ProjectList`, `DriveStatusBadge`, `CreateProjectModal`, and main `App.tsx`.
+   - Wired Tauri 2 backend IPC handlers (`get_volumes`, `get_projects`, `sync_projects`, `create_project`, `import_project`, `update_project_status`).
+   - Generated application icons in `src-tauri/icons/`.
+4. **Verification & Testing (TASK-106)**:
+   - `cargo test --workspace`: PASS (All unit tests passed).
+   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).
+   - `npm run build`: PASS (TypeScript strict validation and Vite production build successful).
+   - `cargo check --workspace`: PASS (Full Tauri 2 app compiled cleanly).

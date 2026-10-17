@@ -26,14 +26,20 @@ This document mirrors and indexes the active engineering tasks across project ph
 
 ---
 
-## Future Phases (LOCKED - PENDING PRODUCT OWNER APPROVAL)
+## Phase 1: Desktop Foundation & Workspace Storage (ACTIVE)
 
-### Phase 1: Desktop Foundation & Workspace Storage (PLANNED)
-- **TASK-101**: Tauri 2 & React + Vite Scaffolding
-- **TASK-102**: Core Crates Setup (`crates/core`, `crates/platform`, `crates/storage`)
-- **TASK-103**: External Volume Detection & Safety Guards
-- **TASK-104**: Project Registration & SQLite Metadata Store
-- **TASK-105**: Desktop UI Project Browser & Volume Health Indicator
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-101** | Tauri 2 & React + Vite Scaffolding | High | COMPLETED | Desktop Engineer | `apps/desktop/` with React 19 & Tailwind |
+| **TASK-102** | Core Crates Setup (`crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager`) | High | COMPLETED | Senior Rust Eng | Root Cargo workspace & typed domain primitives |
+| **TASK-103** | External Volume Detection & Safety Guards | Critical | COMPLETED | Systems Engineer | Diskutil / IOKit bindings & volume disconnect barrier |
+| **TASK-104** | Project Registration & SQLite Metadata Store | High | COMPLETED | Backend / Rust Eng | `.localforge/project.yaml` parser & SQLite schema |
+| **TASK-105** | Desktop UI Project Browser & Volume Health Indicator | Medium | COMPLETED | Frontend Engineer | Project list view & disk health badge |
+| **TASK-106** | Phase 1 Automated Test Suite & Acceptance Audit | Critical | COMPLETED | Auditor Agent | Unit/integration tests & Phase 1 closure report |
+
+---
+
+## Future Phases (LOCKED)
 
 ### Phase 2: Local Runtime Engine (PLANNED)
 - **TASK-201**: PHP-FPM Lifecycle & Multi-Version Manager

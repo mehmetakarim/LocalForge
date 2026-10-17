@@ -18,9 +18,11 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-005** | Storage Audit | Active working directory filesystem and mount inspection (`df -h`, `mount`) | External APFS SSD | **PASS** | Volume `/Volumes/Mac Harici Disk` confirmed APFS, journaled, 135 GiB free. |
 | **TEST-006** | Git Setup | Git initialization and branch configuration (`git status`, `git branch`) | Git CLI 2.56.0 | **PASS** | Repo initialized, `main` set, `phase-0/foundation` branch active. |
 | **TEST-007** | Document Integrity | Markdown link and cross-reference check script execution | Repository root | **PASS** | All relative file links verified existing on disk. |
-| **TEST-008** | Cargo Workspace Build | `cargo check --workspace` | Rust Cargo | **NOT RUN** | Expected: No source code permitted in Phase 0. Scheduled for Phase 1. |
-| **TEST-009** | Desktop App Launch | `npm run tauri dev` | Tauri Desktop | **NOT RUN** | Scheduled for Phase 1 (Desktop Foundation). |
-| **TEST-010** | External Disconnect Test | Physical drive unmount simulation | Systems Layer | **NOT RUN** | Scheduled for Phase 1 (TASK-103). |
+| **TEST-008** | Cargo Workspace Build & Test | `cargo test --workspace` | Rust Cargo 1.94.0 | **PASS** | All unit tests passed across core, platform, storage, project-manager, and desktop lib. |
+| **TEST-009** | Cargo Workspace Linter | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Rust Toolchain | **PASS** | Zero clippy errors or warnings across entire workspace. |
+| **TEST-010** | Frontend Build & Type Check | `npm run build` (`tsc && vite build`) | Node 20.19.5 | **PASS** | TypeScript strict mode passed; Vite bundle generated successfully in `dist/`. |
+| **TEST-011** | Full Tauri Desktop App Check | `cargo check --workspace` (with `localforge-desktop`) | Tauri 2 & Cargo | **PASS** | Tauri 2 application and macOS backend compiled cleanly without errors. |
+| **TEST-012** | Local Runtime Engine Tests | Multi-version PHP-FPM supervisor | Systems Layer | **NOT RUN** | Scheduled for Phase 2 (TASK-201). |
 
 ---
 

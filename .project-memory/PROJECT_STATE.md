@@ -6,12 +6,12 @@ This document tracks the current technical and operational state of the LocalFor
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase 0 — Foundation & Project Memory**
-- **Phase Status**: In Progress (Technical Foundation & Architecture Documentation)
-- **Active Feature Branch**: `phase-0/foundation`
+- **Active Phase**: **Phase 1 — Desktop Foundation & Workspace Storage**
+- **Phase Status**: ACTIVE (Implementation in progress following PO Approval)
+- **Active Feature Branch**: `phase-1/desktop-foundation`
 - **Target Branch**: `main`
-- **Latest Commit**: Initializing repository & Phase 0 foundation
-- **Authorized Scope**: Phase 0 only. No crate/application implementation code permitted.
+- **Latest Commit**: Initialized Phase 0 foundation baseline (`a34e794`)
+- **Authorized Scope**: Phase 1 only (Tauri 2 desktop shell, Cargo workspace, core crates, APFS external storage resilience, SQLite metadata). No Phase 2 runtime work.
 
 ---
 

@@ -1,0 +1,31 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/platform",
+    "crates/storage",
+    "crates/project-manager",
+    "apps/desktop/src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Mehmet Akar <mehmetakarim@gmail.com>"]
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/mehmetakarim/LocalForge"
+
+[workspace.dependencies]
+thiserror = "2.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+rusqlite = { version = "0.33", features = ["bundled"] }
+tokio = { version = "1.43", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1.13", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dunce = "1.0"
+tempfile = "3.17"

@@ -23,16 +23,16 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 
 ---
 
-## Phase 1: Desktop Foundation & Workspace Storage (PLANNED)
+## Phase 1: Desktop Foundation & Workspace Storage (ACTIVE - COMPLETED)
 
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-101** | Tauri 2 & React + Vite Scaffolding | High | LOCKED | Desktop Engineer | Phase 0 PO Sign-off | `apps/desktop/` with React 19 & Tailwind |
-| **TASK-102** | Core Crates Setup in Cargo Workspace | High | LOCKED | Senior Rust Eng | TASK-101 | `crates/core`, `crates/platform`, `crates/storage` |
-| **TASK-103** | macOS APFS Volume Detection & Safety Guards | Critical | LOCKED | Systems Engineer | TASK-102 | DiskArbitration bindings & volume disconnect handler |
-| **TASK-104** | Project Manifest & SQLite Metadata Store | High | LOCKED | Backend / Rust Eng | TASK-102 | `.localforge/project.yaml` parser & SQLite schema |
-| **TASK-105** | Desktop UI Project List & Volume Health Status | Medium | LOCKED | Frontend Engineer | TASK-101, TASK-104 | Project card list & drive status badge |
-| **TASK-106** | Phase 1 Verification & Test Suite | Critical | LOCKED | Auditor Agent | TASK-101..105 | Automated tests, test matrix update, handoff |
+| **TASK-101** | Tauri 2 & React + Vite Scaffolding | High | COMPLETED | Desktop Engineer | Phase 0 PO Sign-off | `apps/desktop/` with React 19 & Tailwind |
+| **TASK-102** | Core Crates Setup in Cargo Workspace | High | COMPLETED | Senior Rust Eng | TASK-101 | `crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager` |
+| **TASK-103** | macOS APFS Volume Detection & Safety Guards | Critical | COMPLETED | Systems Engineer | TASK-102 | Diskutil / IOKit bindings & volume disconnect barrier |
+| **TASK-104** | Project Manifest & SQLite Metadata Store | High | COMPLETED | Backend / Rust Eng | TASK-102 | `.localforge/project.yaml` parser & SQLite schema |
+| **TASK-105** | Desktop UI Project List & Volume Health Status | Medium | COMPLETED | Frontend Engineer | TASK-101, TASK-104 | Project card list & drive status badge |
+| **TASK-106** | Phase 1 Verification & Test Suite | Critical | COMPLETED | Auditor Agent | TASK-101..105 | Automated tests, test matrix update, handoff |
 
 ---
 

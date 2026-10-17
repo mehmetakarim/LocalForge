@@ -1,9 +1,9 @@
 # ADR-0005: Runtime Distribution and Isolated PHP-FPM Architecture
 
-- **Status**: PROPOSED (Requires Product Owner Review)
+- **Status**: ACCEPTED
 - **Date**: 2026-10-18
-- **Deciders**: Principal Software Architect, Senior Rust Engineer, Systems Engineer
-- **Approval Requirement**: Product Owner Approval Required
+- **Deciders**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Product Owner
+- **Approval Requirement**: Product Owner Approval (Granted)
 
 ---
 
