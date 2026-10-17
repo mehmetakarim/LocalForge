@@ -1,0 +1,26 @@
+[package]
+name = "localforge-mcp-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "localforge-mcp"
+path = "src/main.rs"
+
+[dependencies]
+localforge-core = { path = "../../crates/core" }
+localforge-storage = { path = "../../crates/storage" }
+localforge-platform = { path = "../../crates/platform" }
+localforge-project-manager = { path = "../../crates/project-manager" }
+localforge-runtime = { path = "../../crates/runtime" }
+localforge-deployment = { path = "../../crates/deployment" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+dunce.workspace = true

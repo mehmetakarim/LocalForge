@@ -19,7 +19,6 @@ impl Default for MacOSVolumeManager {
 
 impl VolumeManager for MacOSVolumeManager {
     fn list_volumes(&self) -> Result<Vec<VolumeInfo>> {
-        // Parse /Volumes and root /
         let mut volumes = Vec::new();
 
         // 1. Root volume
@@ -27,14 +26,32 @@ impl VolumeManager for MacOSVolumeManager {
             volumes.push(root_vol);
         }
 
-        // 2. /Volumes/* entries
+        // 2. Discover mounts via 'mount' command for macOS
+        if let Ok(output) = Command::new("mount").output() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                if let Some(on_idx) = line.find(" on /Volumes/") {
+                    let rest = &line[on_idx + 4..];
+                    if let Some(paren_idx) = rest.find(" (") {
+                        let mount_str = &rest[..paren_idx].trim();
+                        let vol_path = PathBuf::from(mount_str);
+                        if let Ok(Some(vol)) = self.inspect_volume(&vol_path) {
+                            if !volumes.iter().any(|v| v.uuid == vol.uuid) {
+                                volumes.push(vol);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback: inspect /Volumes/* directory entries
         let volumes_dir = Path::new("/Volumes");
         if let Ok(entries) = std::fs::read_dir(volumes_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
                     if let Ok(Some(vol)) = self.inspect_volume(&path) {
-                        // Avoid duplicates if root is somehow symlinked
                         if !volumes.iter().any(|v| v.uuid == vol.uuid) {
                             volumes.push(vol);
                         }
@@ -123,6 +140,9 @@ impl MacOSVolumeManager {
                     "Removable Media" => {
                         is_removable = val.to_lowercase().contains("yes")
                             || val.to_lowercase().contains("removable");
+                    }
+                    "Device Location" => {
+                        is_internal = !val.to_lowercase().contains("external");
                     }
                     "Internal" => {
                         is_internal = val.to_lowercase().contains("yes");

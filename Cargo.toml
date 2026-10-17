@@ -5,7 +5,10 @@ members = [
     "crates/storage",
     "crates/project-manager",
     "crates/runtime",
+    "crates/deployment",
     "apps/desktop/src-tauri",
+    "tools/cli",
+    "tools/mcp-server",
 ]
 resolver = "2"
 
@@ -30,3 +33,4 @@ uuid = { version = "1.13", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dunce = "1.0"
 tempfile = "3.17"
+clap = { version = "4.5", features = ["derive"] }

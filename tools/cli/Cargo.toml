@@ -1,0 +1,27 @@
+[package]
+name = "localforge-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "localforge"
+path = "src/main.rs"
+
+[dependencies]
+localforge-core = { path = "../../crates/core" }
+localforge-storage = { path = "../../crates/storage" }
+localforge-platform = { path = "../../crates/platform" }
+localforge-project-manager = { path = "../../crates/project-manager" }
+localforge-runtime = { path = "../../crates/runtime" }
+localforge-deployment = { path = "../../crates/deployment" }
+clap.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dunce.workspace = true
+anyhow.workspace = true

@@ -32,3 +32,12 @@ This document tracks known issues, technical defects, environmental constraints,
 - **Impact**: Inconsistent runtime behavior if relying solely on user's pre-existing Homebrew packages.
 - **Resolution Plan / Mitigation**: Documented in ADR-0005. Phase 2 will support Homebrew discovery with explicit path and version validation, paving the way for self-contained, pre-compiled LocalForge runtime bottles.
 - **Status**: MITIGATION DESIGNED (Phase 2)
+
+### ISSUE-004: APFS External Drive Detection via diskutil Output
+- **Classification**: Host Platform Quirk
+- **Discovered In**: Phase 3 (CLI/Platform live verification)
+- **Component**: `crates/platform/src/macos/volume.rs`
+- **Description**: macOS `diskutil info` on modern APFS containers outputs `Device Location: External` instead of an `Internal: No` line. Older parsers defaulted `is_internal` to `true`, incorrectly labeling external APFS SSDs as internal.
+- **Impact**: External drives were marked as `[Internal SSD]` or failed external-specific badges.
+- **Resolution Plan / Mitigation**: Enhanced parser in `MacOSVolumeManager::inspect_volume` to inspect `Device Location` and properly classify `Device Location: External` as `is_internal = false`.
+- **Status**: RESOLVED (Tested and verified with `/Volumes/Mac Harici Disk`).

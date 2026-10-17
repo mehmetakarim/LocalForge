@@ -10,10 +10,12 @@ export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [volumes, setVolumes] = useState<VolumeInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       // Check if Tauri is available
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
@@ -61,8 +63,9 @@ export const App: React.FC = () => {
           },
         ]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load LocalForge data:", err);
+      setErrorMsg(err?.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -156,6 +159,13 @@ export const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+        {errorMsg && (
+          <div className="mb-4 p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-200 text-xs">
+            <span className="font-bold">Initialization Notice: </span>
+            {errorMsg}
+          </div>
+        )}
+
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Active Workspaces</h1>

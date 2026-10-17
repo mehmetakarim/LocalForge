@@ -19,6 +19,32 @@ impl PhpFpmSupervisor {
         }
     }
 
+    /// Discovers all available installed PHP versions on the host.
+    pub fn discover_installed_versions() -> Vec<String> {
+        let mut versions = Vec::new();
+        let common = ["8.4", "8.3", "8.2", "8.1", "8.0", "7.4"];
+        for v in common {
+            if Self::find_php_fpm_binary(v).is_ok() {
+                versions.push(v.to_string());
+            }
+        }
+        if versions.is_empty() {
+            if let Ok(output) = Command::new("php")
+                .arg("-r")
+                .arg("echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
+                .output()
+            {
+                if output.status.success() {
+                    let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !v.is_empty() {
+                        versions.push(v);
+                    }
+                }
+            }
+        }
+        versions
+    }
+
     /// Discovers the path to php-fpm on macOS Apple Silicon.
     pub fn find_php_fpm_binary(version: &str) -> Result<PathBuf> {
         let candidates = vec![

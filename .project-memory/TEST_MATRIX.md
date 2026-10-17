@@ -23,7 +23,9 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-010** | Frontend Build & Type Check | `npm run build` (`tsc && vite build`) | Node 20.19.5 | **PASS** | TypeScript strict mode passed; Vite bundle generated successfully in `dist/`. |
 | **TEST-011** | Full Tauri Desktop App Check | `cargo check --workspace` (with `localforge-desktop`) | Tauri 2 & Cargo | **PASS** | Tauri 2 application and macOS backend compiled cleanly without errors. |
 | **TEST-012** | Local Runtime Engine Tests | `cargo test -p localforge-runtime` | Rust Cargo 1.94.0 | **PASS** | Health probe port find, MariaDB paths, PHP-FPM pool config, and Nginx config tests passed. |
-| **TEST-013** | Deployment & Checksum Ledger | `cargo test -p localforge-deployment` | Rust Toolchain | **NOT RUN** | Scheduled for Phase 3 (TASK-301). |
+| **TEST-013** | Deployment & Checksum Ledger | `cargo test -p localforge-deployment` | Rust Toolchain | **PASS** | Exclusions (.env, .localforge), SHA-256 computation, and approval token gate tested & passed. |
+| **TEST-014** | Headless CLI Operations | `./target/debug/localforge status / volumes / --help` | macOS Apple Silicon | **PASS** | Evaluated loopback ports, detected external APFS disk with UUID, showed clean diagnostics. |
+| **TEST-015** | MCP Server JSON-RPC Stdio | Echo pipe `tools/list`, `tools/call` into `localforge-mcp` | JSON-RPC 2.0 Stdio | **PASS** | Successfully listed 5 tools, ran diagnostics, diff preview, and approval gate token execution. |
 
 ---
 

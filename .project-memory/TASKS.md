@@ -47,11 +47,11 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 
 ---
 
-## Phase 3: Smart Deployment & Interfaces (PLANNED)
+## Phase 3: Smart Deployment & Interfaces (ACTIVE - COMPLETED)
 
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-301** | Git-Aware Checksum Ledger & Diff Engine | Critical | LOCKED | Senior Rust Eng | Phase 2 Acceptance | `crates/deployment` SHA-256 change tracker |
-| **TASK-302** | SFTP Transfer Engine with Human Approval Gate | Critical | LOCKED | Security / Rust Eng | TASK-301 | Resume-capable SFTP client & diff previewer |
-| **TASK-303** | LocalForge Headless CLI Binary | Medium | LOCKED | DevOps / Rust Eng | Phase 1-2 Crates | `tools/cli` with subcommands (`start`, `status`, etc.) |
-| **TASK-304** | Model Context Protocol Server (Stdio) | High | LOCKED | AI Systems Eng | Phase 1-2 Crates | `tools/mcp-server` for Claude Code / Codex |
+| **TASK-301** | Git-Aware Checksum Ledger & Diff Engine | Critical | COMPLETED | Senior Rust Eng | Phase 2 Acceptance | `crates/deployment` SHA-256 change tracker |
+| **TASK-302** | SFTP Transfer Engine with Human Approval Gate | Critical | COMPLETED | Security / Rust Eng | TASK-301 | Resume-capable SFTP client & diff previewer |
+| **TASK-303** | LocalForge Headless CLI Binary | Medium | COMPLETED | DevOps / Rust Eng | Phase 1-2 Crates | `tools/cli` with subcommands (`start`, `status`, etc.) |
+| **TASK-304** | Model Context Protocol Server (Stdio) | High | COMPLETED | AI Systems Eng | Phase 1-2 Crates | `tools/mcp-server` for Claude Code / Codex |

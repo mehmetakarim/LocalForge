@@ -110,3 +110,32 @@ This document records the chronological engineering log for all development sess
 5. **Verification & Test Suite**:
    - `cargo test --workspace`: PASS (8 tests passed, 0 failed).
    - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).
+
+---
+
+## Session 004 — Phase 3 Smart Deployment & Interfaces
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Phase**: **Phase 3 — Smart Deployment & CLI / MCP Integration**
+- **Git Branch**: `phase-3/deployment-and-interfaces`
+
+### Summary of Activities
+1. **Cryptographic Deployment Ledger & Change Tracker (TASK-301)**:
+   - Implemented `crates/deployment/src/ledger.rs`: SHA-256 file hashing and persistent deployment ledgers (`.localforge/deployments/<target>.json`).
+   - Implemented `crates/deployment/src/filter.rs`: Strict exclusion engine automatically rejecting `.env*` (except `.env.example`), `.git/`, SSH keys, private certificates, `.ds_store`, and `.localforge/` metadata.
+   - Implemented `crates/deployment/src/diff.rs`: Working-tree scanner computing `Added`, `Modified`, `Deleted`, and `Unchanged` sets against recorded ledger.
+2. **Transfer Engine with Human Approval Gate (TASK-302)**:
+   - Implemented `crates/deployment/src/preview.rs`: Generates cryptographic deployment preview and UUID-based approval token (`prev_...`).
+   - Implemented `crates/deployment/src/sftp.rs`: Validates human approval token before executing file synchronization or modifying ledger.
+3. **LocalForge Headless CLI Binary (TASK-303)**:
+   - Implemented `tools/cli`: Standalone binary `localforge` with `list`, `status`, `start`, `stop`, `volumes`, and `deploy` (`preview` & `apply`).
+   - Enhanced `crates/platform/src/macos/volume.rs` to detect `Device Location: External` in APFS container outputs, accurately classifying `/Volumes/Mac Harici Disk`.
+4. **Model Context Protocol Server (TASK-304)**:
+   - Implemented `tools/mcp-server`: Stdio JSON-RPC 2.0 MCP server (`localforge-mcp`) exposing typed tools (`localforge_list_projects`, `localforge_project_status`, `localforge_runtime_diagnostics`, `localforge_deploy_preview`, `localforge_deploy_execute`).
+   - Enforces human approval token gate for automated deployment tool calls.
+5. **Verification & Test Suite**:
+   - `cargo test --workspace`: PASS (11/11 tests passed across all 7 workspace crates).
+   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).
+   - Live CLI runtime validation: `localforge status` and `localforge volumes` verified.
+   - Live MCP server stdio validation: JSON-RPC `initialize`, `tools/list`, and `tools/call` verified.

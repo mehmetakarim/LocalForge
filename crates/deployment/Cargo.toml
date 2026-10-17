@@ -1,0 +1,25 @@
+[package]
+name = "localforge-deployment"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+localforge-core = { path = "../core" }
+localforge-storage = { path = "../storage" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+dunce.workspace = true
+
+# Cryptographic SHA-256 calculation
+sha2 = "0.10"
+walkdir = "2.5"
+
+[dev-dependencies]
+tempfile.workspace = true

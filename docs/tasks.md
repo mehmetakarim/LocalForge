@@ -50,10 +50,11 @@ This document mirrors and indexes the active engineering tasks across project ph
 
 ---
 
-## Future Phases (LOCKED)
+## Phase 3: Smart Deployment & CLI / MCP Integration (ACTIVE - COMPLETED)
 
-### Phase 3: Smart Deployment & CLI / MCP Integration (PLANNED)
-- **TASK-301**: Git-Aware Change Detection & Deployment Checksums
-- **TASK-302**: SFTP Transfer Engine with Atomic Remote Sync
-- **TASK-303**: LocalForge CLI Binary (`tools/cli`)
-- **TASK-304**: Model Context Protocol Server (`tools/mcp-server`)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-301** | Git-Aware Change Detection & Deployment Checksums | Critical | COMPLETED | Senior Rust Eng | `crates/deployment` SHA-256 change tracker |
+| **TASK-302** | SFTP Transfer Engine with Atomic Remote Sync | Critical | COMPLETED | Security / Rust Eng | Resume-capable SFTP client & diff previewer |
+| **TASK-303** | LocalForge CLI Binary (`tools/cli`) | Medium | COMPLETED | DevOps / Rust Eng | Headless terminal utility (`localforge`) |
+| **TASK-304** | Model Context Protocol Server (`tools/mcp-server`) | High | COMPLETED | AI Systems Eng | JSON-RPC Stdio MCP server for Claude/Codex |
