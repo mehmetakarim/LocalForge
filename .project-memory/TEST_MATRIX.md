@@ -26,6 +26,8 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-013** | Deployment & Checksum Ledger | `cargo test -p localforge-deployment` | Rust Toolchain | **PASS** | Exclusions (.env, .localforge), SHA-256 computation, and approval token gate tested & passed. |
 | **TEST-014** | Headless CLI Operations | `./target/debug/localforge status / volumes / --help` | macOS Apple Silicon | **PASS** | Evaluated loopback ports, detected external APFS disk with UUID, showed clean diagnostics. |
 | **TEST-015** | MCP Server JSON-RPC Stdio | Echo pipe `tools/list`, `tools/call` into `localforge-mcp` | JSON-RPC 2.0 Stdio | **PASS** | Successfully listed 5 tools, ran diagnostics, diff preview, and approval gate token execution. |
+| **TEST-016** | Security Traversal Hardening | Malicious relative vectors (`../`, `/private/etc`, nested tricks) | `crates/storage` suite | **PASS** | All 5 security tests passed; path normalization strictly rejects escapes. |
+| **TEST-017** | Phase 4 Workspace Audit | `cargo test --workspace` & `cargo clippy` | Rust Toolchain 1.94.0 | **PASS** | 13/13 tests passed across 7 crates with 0 clippy warnings. |
 
 ---
 

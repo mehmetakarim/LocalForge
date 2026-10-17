@@ -50,7 +50,7 @@ This document mirrors and indexes the active engineering tasks across project ph
 
 ---
 
-## Phase 3: Smart Deployment & CLI / MCP Integration (ACTIVE - COMPLETED)
+## Phase 3: Smart Deployment & CLI / MCP Integration (COMPLETED)
 
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
@@ -58,3 +58,15 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-302** | SFTP Transfer Engine with Atomic Remote Sync | Critical | COMPLETED | Security / Rust Eng | Resume-capable SFTP client & diff previewer |
 | **TASK-303** | LocalForge CLI Binary (`tools/cli`) | Medium | COMPLETED | DevOps / Rust Eng | Headless terminal utility (`localforge`) |
 | **TASK-304** | Model Context Protocol Server (`tools/mcp-server`) | High | COMPLETED | AI Systems Eng | JSON-RPC Stdio MCP server for Claude/Codex |
+
+---
+
+## Phase 4: Hardening, Packaging & Open-Source Release (ACTIVE - COMPLETED)
+
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-401** | GitHub Actions CI/CD & Automated Release Pipelines | High | COMPLETED | DevOps / Release Eng | `.github/workflows/ci.yml`, `release.yml` |
+| **TASK-402** | Security Hardening & Edge-Case Traversal Tests | Critical | COMPLETED | Security Engineer | `crates/storage/src/paths.rs` security suite |
+| **TASK-403** | macOS DMG Packaging & Hardened Runtime Setup | High | COMPLETED | Desktop Engineer | `tauri.conf.json` with overlay titlebar & DMG |
+| **TASK-404** | Open-Source Community Health Suite | Medium | COMPLETED | Product Owner | `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue & PR templates |
+| **TASK-405** | Final Phase 4 Verification & Closure Audit | Critical | COMPLETED | Auditor Agent | 13/13 tests PASS, 0 clippy warnings, handoff |

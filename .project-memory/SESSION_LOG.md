@@ -139,3 +139,30 @@ This document records the chronological engineering log for all development sess
    - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).
    - Live CLI runtime validation: `localforge status` and `localforge volumes` verified.
    - Live MCP server stdio validation: JSON-RPC `initialize`, `tools/list`, and `tools/call` verified.
+
+---
+
+## Session 005 — Phase 4 Hardening, Packaging & Open-Source Release
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Phase**: **Phase 4 — Hardening, Packaging & Open-Source Release**
+- **Git Branch**: `phase-4/hardening-and-release`
+
+### Summary of Activities
+1. **GitHub Actions CI/CD & Automated Release Pipelines (TASK-401)**:
+   - Created `.github/workflows/ci.yml`: Automated macOS-14 Apple Silicon pipeline running `cargo check`, `cargo clippy -D warnings`, `cargo test`, and `npm run build`.
+   - Created `.github/workflows/release.yml`: Automated release pipeline building Tauri DMG, CLI, and MCP standalone binaries with SHA-256 checksums and GitHub releases.
+2. **Security Hardening & Adversarial Fuzzing Tests (TASK-402)**:
+   - Extended `crates/storage/src/paths.rs` with comprehensive traversal attack vectors (`../`, `/private/etc/hosts`, nested directory tricks).
+   - Validated that all path traversal attempts are strictly caught and rejected with `LocalForgeError::PathTraversalViolation`.
+3. **macOS DMG Packaging & Hardened Runtime Setup (TASK-403)**:
+   - Configured `apps/desktop/src-tauri/tauri.conf.json` with macOS overlay titlebar, DMG dimensions, bundle targets (`dmg`, `app`), icons, and `hardenedRuntime: true`.
+4. **Open-Source Community Health Suite (TASK-404)**:
+   - Created `SECURITY.md` detailing vulnerability disclosure and reporting guidelines.
+   - Created `CODE_OF_CONDUCT.md` adopting Contributor Covenant v2.1.
+   - Created `.github/ISSUE_TEMPLATE/bug_report.yml` and `feature_request.yml`.
+   - Created `.github/PULL_REQUEST_TEMPLATE.md` with architectural invariants checklist.
+5. **Phase 4 Verification & Test Suite (TASK-405)**:
+   - `cargo test --workspace`: PASS (13/13 tests passed across all 7 workspace crates).
+   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).

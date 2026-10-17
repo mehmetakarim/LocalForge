@@ -98,7 +98,7 @@ This document outlines the sequential phases, primary objectives, dependencies, 
   - Claude Code / Codex can inspect project status and generate deployment preview via MCP without root privileges.
 
 ### Phase 4: Hardening & Distribution
-- **Status**: *PLANNED (LOCKED)*
+- **Status**: **COMPLETED**
 - **Dependencies**: Phase 3 completion and acceptance.
 - **Objectives**:
   - Apple Developer ID code signing and notarization pipeline.

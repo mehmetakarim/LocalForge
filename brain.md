@@ -10,10 +10,10 @@ Welcome to the centralized project brain of **LocalForge**. This file serves as 
 |---|---|
 | **Project Name** | LocalForge |
 | **Repo** | `mehmetakarim/LocalForge` |
-| **Active Branch** | `phase-3/deployment-and-interfaces` (targeting `main`) |
-| **Current Phase** | **Phase 3 — Smart Deployment & CLI / MCP Integration** |
-| **Phase Status** | COMPLETED (PO Approved, fully implemented & tested) |
-| **Next Phase** | Phase 4 — Hardening, Packaging & Release (LOCKED) |
+| **Active Branch** | `phase-4/hardening-and-release` (targeting `main`) |
+| **Current Phase** | **Phase 4 — Hardening, Packaging & Open-Source Release** |
+| **Phase Status** | COMPLETED (PO Approved, fully implemented, tested & hardened) |
+| **Release State** | Ready for v0.1.0 Tag & Main Merge |
 | **Primary Platform** | macOS Apple Silicon (`arm64`) |
 | **Core Architecture** | Tauri 2 (Desktop UI) + Shared Rust Core + CLI + MCP Server |
 

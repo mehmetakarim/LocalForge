@@ -6,12 +6,12 @@
 
 ## 1. Current Status
 
-- **Current Phase**: **Phase 3 — Smart Deployment & CLI / MCP Integration**
-- **Phase Technical Status**: **COMPLETED (All 11 automated tests pass, zero warnings, live CLI & MCP server verified)**
-- **Active Git Branch**: `phase-3/deployment-and-interfaces`
+- **Current Phase**: **Phase 4 — Hardening, Packaging & Open-Source Release**
+- **Phase Technical Status**: **COMPLETED (All 13 automated tests pass, zero clippy warnings, CI/CD and release pipelines verified)**
+- **Active Git Branch**: `phase-4/hardening-and-release`
 - **Target Remote**: `origin/main` (`https://github.com/mehmetakarim/LocalForge.git`)
-- **Latest Completed Tasks**: TASK-301..304 — Smart Deployment, CLI (`localforge`), and MCP Server (`localforge-mcp`)
-- **Next Permitted Phase**: Phase 4 — Hardening, Packaging & Release Automation — Awaiting PO Approval
+- **Latest Completed Tasks**: TASK-401..405 — CI/CD, DMG packaging, security hardening, and community health files
+- **Next Permitted Action**: Pull request review, tag release `v0.1.0`, and merge to `main`
 
 ---
 

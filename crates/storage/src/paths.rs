@@ -62,4 +62,45 @@ mod tests {
             other => panic!("Expected PathTraversalViolation, got: {:?}", other),
         }
     }
+
+    #[test]
+    fn test_tricky_nested_traversal_bypass_attempts() {
+        let dir = tempdir().unwrap();
+        let malicious_vectors = [
+            "public/../../../../etc/passwd",
+            "assets/./.././../../secret",
+            "/private/etc/hosts",
+            "/var/root",
+            "nested/dir/../../../..",
+        ];
+
+        for vec in malicious_vectors {
+            let res = sanitize_project_path(dir.path(), Path::new(vec));
+            assert!(
+                res.is_err(),
+                "Malicious vector '{}' should have been blocked",
+                vec
+            );
+        }
+    }
+
+    #[test]
+    fn test_valid_nested_and_normalized_subpaths() {
+        let dir = tempdir().unwrap();
+        let valid_vectors = [
+            "public/index.php",
+            "app/Http/Controllers/./Controller.php",
+            "storage/logs/../cache/config.php",
+        ];
+
+        for vec in valid_vectors {
+            let res = sanitize_project_path(dir.path(), Path::new(vec));
+            assert!(
+                res.is_ok(),
+                "Valid subpath '{}' within project root should succeed",
+                vec
+            );
+            assert!(res.unwrap().starts_with(dunce::canonicalize(dir.path()).unwrap()));
+        }
+    }
 }

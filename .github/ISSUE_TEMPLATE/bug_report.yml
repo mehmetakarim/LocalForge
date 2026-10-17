@@ -1,0 +1,49 @@
+name: Bug Report
+description: Create a report to help us improve LocalForge
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please ensure you have tested with the latest release of LocalForge.
+  - type: input
+    id: version
+    attributes:
+      label: LocalForge Version
+      description: What version of LocalForge are you using? (e.g. 0.1.0)
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System & Architecture
+      options:
+        - macOS Apple Silicon (arm64)
+        - macOS Intel (x86_64)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Open LocalForge
+        2. Click 'New Project' on external SSD
+        3. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostic Logs
+      description: Output from `localforge status` or terminal logs.
+      render: shell
