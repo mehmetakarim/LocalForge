@@ -6,50 +6,27 @@
 
 ## 1. Current Status
 
-- **Current Phase**: **Recovery Phase R0 — Safety Stabilization & CI Repair**
-- **Phase Technical Status**: **COMPLETED (All 18 automated tests pass, zero clippy warnings, fail-closed deployment active, CI/CD repaired)**
+- **Current State**: **Spatial Studio Design Direction & Recovery Phase R1 Planning Completed**
+- **Underlying Phase**: **Recovery Phase R0 (Conditionally Accepted, 18/18 Tests Pass, CI Green)**
 - **Active Git Branch**: `recovery/r0-safety-stabilization`
 - **Target Remote**: `origin/recovery/r0-safety-stabilization`
-- **Latest Completed Tasks**:
-  - `TASK-R0-01`: Fail-Closed Deployment (`crates/deployment/src/sftp.rs`)
-  - `TASK-R0-02`: MCP Human Approval Security (`tools/mcp-server/src/main.rs`, `ADR-0009`)
-  - `TASK-R0-03`: GitHub Actions CI Repair (`crates/runtime/src/php.rs`, `.github/workflows/ci.yml`)
-  - `TASK-R0-04`: Project Memory Suite Reconciliation (`PROJECT_STATE.md`, `ROADMAP.md`, `TASKS.md`, `HANDOFF.md`, `brain.md`, `docs/tasks.md`)
-  - `TASK-R0-05`: Security Regression Test Suite (18 tests passing)
-- **Next Permitted Action**: Push branch, verify GitHub Actions CI run, and submit closure report for Product Owner acceptance.
+- **Latest Deliverables Produced**:
+  - `docs/design/SPATIAL_STUDIO_VISION.md` — Spatial Studio product philosophy & visual character
+  - `docs/design/DESIGN_SYSTEM.md` — Tokens, typography scale, materials, status colors, accessibility
+  - `docs/design/INFORMATION_ARCHITECTURE.md` — 7 primary modules, 4 roadmap modules, dual-mode flows
+  - `docs/design/COMPONENT_SPECIFICATIONS.md` — SpatialCard, FloatingDock, AICommandCapsule, etc.
+  - `docs/design/MOTION_AND_MATERIALS.md` — Spring physics, glass refraction, reduced motion
+  - `docs/product/FUTURE_MONITORING_VISION.md` — Uptime, SSL, CPU/RAM, incident timeline vision
+  - `docs/phases/R1_RUNTIME_INTEGRATION_PLAN.md` — Unprivileged process supervision, HTTP loopback scenario
+  - `docs/phases/R1_TEST_MATRIX.md` — 11-step verification matrix (unit, integration, edge-case, hardware)
+  - `ADR-0010` & `ADR-0011` — Spatial Studio UI and Real Process Supervision records
+- **Next Permitted Action**: Await Product Owner acceptance of the Spatial Studio design system and Phase R1 runtime plan before initiating UI refactoring or process integration.
 
 ---
 
-## 2. Key Remediation Summary
+## 2. Invariants & Governance
 
-1. **R0-01 (Deployment Simulation Elimination)**:
-   - Non-dry-run deployment calls reject immediately with `LocalForgeError::DeploymentNotImplemented`.
-   - Dry-run simulation reports 0 transferred files, 0 deleted files, and never mutates or persists the deployment ledger.
-2. **R0-02 (MCP Credential Isolation)**:
-   - `localforge_deploy_preview` no longer exposes `approval_token`.
-   - `localforge_deploy_execute` rejects automated execution attempts with `UNAUTHORIZED_MCP_DEPLOYMENT_EXECUTION`.
-   - Future application-mediated human approval architecture documented in `ADR-0009`.
-3. **R0-03 (CI Repair)**:
-   - Replaced redundant `format!()` calls with `.to_string()` in `crates/runtime/src/php.rs`.
-   - Added `cargo fmt --all -- --check` to CI pipeline.
-   - Expanded CI branch triggers to include `recovery/*`.
-4. **R0-04 (Memory Reconciliation)**:
-   - Resolved all phase contradictions across the documentation suite.
-
----
-
-## 3. Verification Evidence Snapshot
-
-- **Rust Formatting**: `cargo fmt --all -- --check` -> **PASS**
-- **Type Checking**: `cargo check --workspace --all-targets` -> **PASS**
-- **Clippy Linting**: `cargo clippy --workspace --all-targets -- -D warnings` -> **PASS (0 warnings)**
-- **Automated Tests**: `cargo test --workspace` -> **PASS (18 tests: 18 passed, 0 failed)**
-- **Frontend Build**: `npm run build` (`apps/desktop`) -> **PASS (TypeScript + Vite)**
-
----
-
-## 4. Invariants & Governance
-
-- **Do Not Self-Authorize**: AI agents cannot trigger remote production deployments.
-- **Do Not Rewrite History**: Incomplete phases must remain accurately labeled as partial, simulated, or unverified.
-- **Do Not Auto-Merge to Main**: R0 branch must remain isolated on `recovery/r0-safety-stabilization` until formal Product Owner acceptance.
+1. **Strict Design & Plan Only**: Zero production source code was modified during this session. The existing codebase remains clean and passing.
+2. **Fail-Closed Security Maintained**: Non-dry-run deployment execution remains strictly disabled (`LocalForgeError::DeploymentNotImplemented`).
+3. **No Phantom Monitoring**: Monitoring specifications explicitly distinguish local in-app polling from background daemons.
+4. **No Premature Main Merge**: Branch remains isolated on `recovery/r0-safety-stabilization`.

@@ -17,6 +17,8 @@ This index tracks all Architecture Decision Records (ADRs) established for the L
 | [**ADR-0007**](../docs/architecture/adr/ADR-0007-project-manifest-metadata-model.md) | Project Manifest (`project.yaml`) & SQLite Architecture | ACCEPTED | 2026-10-18 | Portable, version-controlled `.localforge/project.yaml` without secrets; fast local queries via internal SQLite store. |
 | [**ADR-0008**](../docs/architecture/adr/ADR-0008-project-memory-and-phase-governance.md) | File-Based Project Memory & Sequential Phase Governance | ACCEPTED | 2026-10-18 | Cross-session continuity for Claude Code, Codex, and multi-agent teams with strict write isolation and honest verification. |
 | [**ADR-0009**](../docs/architecture/adr/ADR-0009-application-mediated-human-approval.md) | Application-Mediated Human Approval & AI Agent Authorization Boundary | ACCEPTED | 2026-10-18 | Prevents AI agents from self-authorizing remote mutations; mandates out-of-band application-mediated approval. |
+| [**ADR-0010**](../docs/architecture/adr/ADR-0010-spatial-studio-design-system.md) | Spatial Studio Design System Architecture & Dual-Mode UI | ACCEPTED | 2026-10-18 | Atmospheric 2.5D spatial depth, floating vertical dock, AI command capsule, and dual Spatial Studio/Native Workspace modes. |
+| [**ADR-0011**](../docs/architecture/adr/ADR-0011-real-runtime-process-supervision.md) | Real Runtime Process Supervision & Non-Root Lifecycle Architecture | ACCEPTED | 2026-10-18 | Unprivileged child process spawning, async tokio supervision tree, FastCGI unix sockets, and orphan prevention. |
 
 ---
 
