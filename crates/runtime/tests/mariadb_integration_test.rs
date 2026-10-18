@@ -128,29 +128,37 @@ fn test_r1_2_02_database_user_provisioning_and_safety() {
         "Self-authorization using database name as token must be rejected"
     );
 
-    // 4. Invalid/unissued token must fail closed
-    let bad_drop = sup.drop_project_database(db_name, "wrong_token");
-    assert!(
-        bad_drop.is_err(),
-        "Dropping database with invalid token must fail"
-    );
-
-    // 5. Explicit application-mediated approval token allows deletion
-    let approval = sup
+    // 4. Request deletion handle (returns audit request_id, NOT authorization decision)
+    let req = sup
         .request_database_deletion_approval(db_name, "integration_test_ui")
-        .expect("Failed to request approval");
-    let good_drop = sup.drop_project_database(db_name, &approval.token);
+        .expect("Failed to request deletion handle");
+    assert!(req.request_id.starts_with("del_req_"));
+
+    // 5. Caller attempting to self-authorize using request_id must be rejected
+    let self_req_drop = sup.drop_project_database(db_name, &req.request_id);
     assert!(
-        good_drop.is_ok(),
-        "Dropping database with valid approval token must succeed: {:?}",
-        good_drop
+        self_req_drop.is_err(),
+        "Self-authorization using request_id must be rejected"
     );
 
-    // 6. Token reuse must fail closed (single-use)
-    let reuse_drop = sup.drop_project_database(db_name, &approval.token);
+    // 6. Database deletion is explicitly disabled in Phase R1.2B pending trusted desktop human approval
+    let disabled_drop = sup.drop_project_database(db_name, "arbitrary_token");
     assert!(
-        reuse_drop.is_err(),
-        "Reusing consumed approval token must be rejected"
+        disabled_drop.is_err(),
+        "Database deletion must be explicitly disabled in R1.2B"
+    );
+    assert!(matches!(
+        disabled_drop.unwrap_err(),
+        localforge_runtime::RuntimeError::DatabaseDeletionUnavailable(_)
+    ));
+
+    // Database remains intact (not deleted)
+    let check_db = sup
+        .execute_query(&format!("SHOW DATABASES LIKE '{db_name}';"))
+        .unwrap();
+    assert!(
+        check_db.contains(db_name),
+        "Database must remain intact in R1.2B"
     );
 
     sup.stop().expect("Failed to stop MariaDB");
@@ -759,20 +767,145 @@ fn test_r1_2a_11_deletion_authorization_tampering_and_expiry() {
     assert!(self_auth
         .unwrap_err()
         .to_string()
-        .contains("Self-authorization rejected"));
+        .contains("Self-authorization rejected: using database name as confirmation token is strictly prohibited"));
 
-    // 2. Request token for db_a, attempt to use on db_b -> must be rejected
-    let approval_a = sup
+    // 2. Request deletion handle for db_a
+    let req_a = sup
         .request_database_deletion_approval("db_a", "ui_admin")
         .unwrap();
-    let mismatch = sup.drop_project_database("db_b", &approval_a.token);
-    assert!(mismatch.is_err());
-    assert!(mismatch
+    assert!(req_a.request_id.starts_with("del_req_db_a_"));
+
+    // 3. Attempting to self-authorize using request_id must be rejected
+    let req_auth = sup.drop_project_database("db_a", &req_a.request_id);
+    assert!(req_auth.is_err());
+    assert!(req_auth
         .unwrap_err()
         .to_string()
-        .contains("issued for database 'db_a', but deletion was requested for 'db_b'"));
+        .contains("Self-authorization rejected: a deletion request identifier is not a trusted human approval decision"));
 
-    // 3. Token cannot be reused (consumed upon lookup/mismatch)
-    let reuse = sup.drop_project_database("db_a", &approval_a.token);
-    assert!(reuse.is_err());
+    // 4. Any arbitrary token fails closed because deletion is explicitly disabled in R1.2B
+    let disabled = sup.drop_project_database("db_a", "arbitrary_token");
+    assert!(disabled.is_err());
+    assert!(matches!(
+        disabled.unwrap_err(),
+        localforge_runtime::RuntimeError::DatabaseDeletionUnavailable(_)
+    ));
+}
+
+#[test]
+fn test_r1_2b_12_restore_fail_closed_occupied_destination_and_interrupted_restores() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+    let binaries_found = MariaDbSupervisor::discover_binaries().is_ok();
+    if !binaries_found {
+        eprintln!("Skipping MariaDB restore fail-closed test: binaries not found");
+        return;
+    }
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let db_port = localforge_runtime::find_available_port(13820, 50).unwrap_or(13820);
+    let sup = MariaDbSupervisor::new(dir.path().to_path_buf(), db_port, pm);
+
+    sup.start().expect("Failed to start MariaDB");
+
+    // 1. Setup occupied destination database
+    let occupied_db = "db_occupied_dest";
+    sup.create_project_database(occupied_db, "occ_user", "pass123")
+        .unwrap();
+    sup.execute_query(&format!(
+        "USE `{occupied_db}`; CREATE TABLE existing_t (id INT PRIMARY KEY); INSERT INTO existing_t VALUES (42);"
+    ))
+    .unwrap();
+
+    // 2. Create a valid SQL dump file
+    let valid_dump = dir.path().join("valid_dump.sql");
+    std::fs::write(
+        &valid_dump,
+        "-- MariaDB dump\nCREATE TABLE new_t (id INT PRIMARY KEY);\nINSERT INTO new_t VALUES (100);\n",
+    )
+    .unwrap();
+
+    // 3. Restore into occupied destination MUST fail closed without modifying destination
+    let occupied_err = sup.restore_database(occupied_db, &valid_dump);
+    assert!(
+        occupied_err.is_err(),
+        "Must fail closed when destination is non-empty"
+    );
+    let err_str = occupied_err.unwrap_err().to_string();
+    assert!(
+        err_str.contains("contains 1 tables. Refusing to restore into non-empty database"),
+        "Unexpected error: {err_str}"
+    );
+
+    // Verify existing data was untouched
+    let check_existing = sup
+        .execute_query(&format!(
+            "USE `{occupied_db}`; SELECT COUNT(*) FROM existing_t;"
+        ))
+        .unwrap();
+    assert!(
+        check_existing.contains('1'),
+        "Original table must remain intact"
+    );
+
+    // 4. Test interrupted / corrupted dump restore into empty database
+    let partial_db = "db_partial_dest";
+    let partial_dump = dir.path().join("partial_broken.sql");
+    std::fs::write(
+        &partial_dump,
+        "-- MariaDB dump\nCREATE TABLE part1 (id INT PRIMARY KEY);\nINSERT INTO part1 VALUES (1);\nINVALID_SQL_SYNTAX_ERROR_ABORT;\nCREATE TABLE part2 (id INT PRIMARY KEY);\n",
+    )
+    .unwrap();
+
+    let partial_err = sup.restore_database(partial_db, &partial_dump);
+    assert!(
+        partial_err.is_err(),
+        "Must fail closed on malformed / interrupted dump"
+    );
+    let part_err_str = partial_err.unwrap_err().to_string();
+    assert!(
+        part_err_str.contains("Database restore failed partially"),
+        "Must report partial restore accurately: {part_err_str}"
+    );
+    assert!(
+        part_err_str.contains("Warning: 1 tables were created before failure"),
+        "Must record exact table count created: {part_err_str}"
+    );
+    assert!(
+        part_err_str.contains("Note: MariaDB DDL operations execute with implicit commits"),
+        "Must document DDL implicit commit limitation: {part_err_str}"
+    );
+
+    sup.stop().expect("Failed to stop MariaDB");
+}
+
+#[test]
+fn test_r1_2b_13_application_support_storage_safety() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+
+    // 1. Verify Application Support resolution returns non-empty path
+    let app_support = localforge_runtime::resolve_application_support_dir();
+    assert!(app_support.is_ok(), "Directory resolution must succeed");
+    let p = app_support.unwrap();
+    assert!(
+        p.ends_with("Library/Application Support/LocalForge"),
+        "Path must end in Library/Application Support/LocalForge, got: {:?}",
+        p
+    );
+
+    // 2. Verify MariaDB base dir is under Application Support
+    let mariadb_dir = localforge_runtime::resolve_mariadb_base_dir().unwrap();
+    assert_eq!(mariadb_dir, p.join("mariadb"));
+
+    // 3. Verify MariaDbSupervisor::create_default resolves correctly
+    let pm = Arc::new(MacOSProcessManager::new());
+    let default_sup = MariaDbSupervisor::create_default(pm, 13890);
+    assert!(
+        default_sup.is_ok(),
+        "create_default must succeed with valid Application Support: {:?}",
+        default_sup.err()
+    );
+    let sup = default_sup.unwrap();
+    assert_eq!(sup.data_dir(), mariadb_dir.join("data"));
+    assert_eq!(sup.run_dir(), mariadb_dir.join("run"));
 }

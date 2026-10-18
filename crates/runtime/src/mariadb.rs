@@ -28,7 +28,18 @@ pub struct DatabaseHealthStatus {
     pub message: String,
 }
 
-/// Cryptographically random, time-bounded approval token required for destructive database operations.
+/// Unapproved database deletion request handle.
+/// NOTE: A deletion request ID is an audit handle, NOT an authorization credential.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseDeletionRequest {
+    pub request_id: String,
+    pub database_name: String,
+    pub requested_at_secs: u64,
+    pub expires_at_secs: u64,
+    pub requesting_context: String,
+}
+
+/// Kept for backward compatibility with existing interfaces.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DatabaseDeletionApproval {
     pub database_name: String,
@@ -36,6 +47,52 @@ pub struct DatabaseDeletionApproval {
     pub issued_at_secs: u64,
     pub expires_at_secs: u64,
     pub requesting_context: String,
+}
+
+/// Reliably resolves the current user's Application Support directory without hardcoded usernames.
+/// Priority:
+/// 1. $HOME environment variable if non-empty and valid.
+/// 2. POSIX / Darwin system user database (`libc::getpwuid(libc::getuid())`).
+/// 3. Fail-closed: returns RuntimeError::ConfigurationError if neither can be resolved.
+pub fn resolve_application_support_dir() -> Result<PathBuf> {
+    if let Ok(home_val) = std::env::var("HOME") {
+        let trimmed = home_val.trim();
+        if !trimmed.is_empty() {
+            let p = PathBuf::from(trimmed);
+            return Ok(p
+                .join("Library")
+                .join("Application Support")
+                .join("LocalForge"));
+        }
+    }
+
+    #[cfg(unix)]
+    unsafe {
+        let uid = libc::getuid();
+        let pw = libc::getpwuid(uid);
+        if !pw.is_null() && !(*pw).pw_dir.is_null() {
+            if let Ok(dir_str) = std::ffi::CStr::from_ptr((*pw).pw_dir).to_str() {
+                let trimmed = dir_str.trim();
+                if !trimmed.is_empty() {
+                    let p = PathBuf::from(trimmed);
+                    return Ok(p
+                        .join("Library")
+                        .join("Application Support")
+                        .join("LocalForge"));
+                }
+            }
+        }
+    }
+
+    Err(RuntimeError::ConfigurationError(
+        "Failed to resolve current user Application Support directory: neither $HOME nor getpwuid() produced a valid home directory.".into(),
+    ))
+}
+
+/// Resolves default MariaDB storage directory under user Application Support.
+pub fn resolve_mariadb_base_dir() -> Result<PathBuf> {
+    let app_support = resolve_application_support_dir()?;
+    Ok(app_support.join("mariadb"))
 }
 
 pub struct MariaDbSupervisor {
@@ -48,7 +105,7 @@ pub struct MariaDbSupervisor {
     config_file: PathBuf,
     process_manager: Arc<dyn ProcessManager>,
     master_process: Mutex<Option<(ProcessIdentity, Option<Child>)>>,
-    active_approvals: Mutex<HashMap<String, DatabaseDeletionApproval>>,
+    pending_deletion_requests: Mutex<HashMap<String, DatabaseDeletionRequest>>,
     pub terminate_on_drop: bool,
 }
 
@@ -74,7 +131,7 @@ impl MariaDbSupervisor {
             config_file,
             process_manager,
             master_process: Mutex::new(None),
-            active_approvals: Mutex::new(HashMap::new()),
+            pending_deletion_requests: Mutex::new(HashMap::new()),
             terminate_on_drop: false,
         }
     }
@@ -93,16 +150,13 @@ impl MariaDbSupervisor {
     }
 
     /// Default constructor pointing to internal storage under macOS Application Support.
-    pub fn create_default(process_manager: Arc<dyn ProcessManager>, preferred_port: u16) -> Self {
-        let home = std::env::var("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/Users/mehmetakar"));
-        let base_dir = home
-            .join("Library")
-            .join("Application Support")
-            .join("LocalForge")
-            .join("mariadb");
-        Self::new(base_dir, preferred_port, process_manager)
+    /// Fails safely if user Application Support directory cannot be resolved.
+    pub fn create_default(
+        process_manager: Arc<dyn ProcessManager>,
+        preferred_port: u16,
+    ) -> Result<Self> {
+        let base_dir = resolve_mariadb_base_dir()?;
+        Ok(Self::new(base_dir, preferred_port, process_manager))
     }
 
     pub fn base_dir(&self) -> &Path {
@@ -840,13 +894,17 @@ FLUSH PRIVILEGES;
         Ok(())
     }
 
-    /// Requests a cryptographic approval token for dropping a database.
-    /// Approval is strictly bound to the exact database, requesting context, and expires in 60 seconds.
+    /// Submits a database deletion request for review.
+    ///
+    /// SECURITY INVARIANT:
+    /// Returns a `DatabaseDeletionRequest` with a `request_id`.
+    /// The `request_id` is an audit handle, NOT an authorization decision.
+    /// The requesting caller CANNOT self-authorize deletion with this handle.
     pub fn request_database_deletion_approval(
         &self,
         db_name: &str,
         requesting_context: &str,
-    ) -> Result<DatabaseDeletionApproval> {
+    ) -> Result<DatabaseDeletionRequest> {
         Self::validate_identifier(db_name)?;
         if requesting_context.trim().is_empty() {
             return Err(RuntimeError::DatabaseUnauthorized(
@@ -859,69 +917,54 @@ FLUSH PRIVILEGES;
             .unwrap_or_default()
             .as_secs();
 
-        let token = format!("del_{}_{}", db_name, uuid::Uuid::new_v4().simple());
-        let approval = DatabaseDeletionApproval {
+        let req_id = format!("del_req_{}_{}", db_name, uuid::Uuid::new_v4().simple());
+        let request = DatabaseDeletionRequest {
+            request_id: req_id.clone(),
             database_name: db_name.to_string(),
-            token: token.clone(),
-            issued_at_secs: now,
+            requested_at_secs: now,
             expires_at_secs: now + 60,
             requesting_context: requesting_context.to_string(),
         };
 
-        let mut lock = self.active_approvals.lock().unwrap();
-        // Clean expired approvals
+        let mut lock = self.pending_deletion_requests.lock().unwrap();
+        // Clean expired requests
         lock.retain(|_, v| v.expires_at_secs >= now);
-        lock.insert(token, approval.clone());
+        lock.insert(req_id, request.clone());
 
-        Ok(approval)
+        Ok(request)
     }
 
-    /// Drops project database strictly requiring a valid, unexpired, single-use approval token.
-    /// Direct database name confirmation is strictly rejected to prevent self-authorization.
+    /// Drops project database strictly requiring verified out-of-band human authorization.
+    ///
+    /// SECURITY INVARIANTS:
+    /// 1. Self-authorization using the database name (`approval_token == db_name`) is strictly rejected.
+    /// 2. Self-authorization using an unapproved request ID (`approval_token.starts_with("del_req_")`) is strictly rejected.
+    /// 3. In Phase R1.2B, because a trusted desktop human approval interface has not yet been
+    ///    integrated (scheduled for Phase R1.3 Spatial Studio), database deletion is explicitly kept DISABLED.
+    /// 4. Returns a typed `DatabaseDeletionUnavailable` or `DatabaseUnauthorized` error.
+    /// 5. No database will be dropped in Phase R1.2B.
     pub fn drop_project_database(&self, db_name: &str, approval_token: &str) -> Result<()> {
         Self::validate_identifier(db_name)?;
 
-        // Explicitly catch and reject self-approval attempt (using database name as confirmation token)
+        // 1. Explicitly catch and reject self-approval attempt (using database name as confirmation token)
         if db_name == approval_token {
             return Err(RuntimeError::DatabaseUnauthorized(
-                "Self-authorization rejected: using database name as confirmation token is strictly prohibited. An application-mediated approval token must be requested.".into(),
+                "Self-authorization rejected: using database name as confirmation token is strictly prohibited.".into(),
             ));
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        let mut lock = self.active_approvals.lock().unwrap();
-        let approval = match lock.remove(approval_token) {
-            Some(app) => app,
-            None => {
-                return Err(RuntimeError::DatabaseUnauthorized(
-                    "Invalid, unissued, or previously consumed database deletion approval token."
-                        .into(),
-                ));
-            }
-        };
-
-        if approval.database_name != db_name {
-            return Err(RuntimeError::DatabaseUnauthorized(format!(
-                "Approval token was issued for database '{}', but deletion was requested for '{}'",
-                approval.database_name, db_name
-            )));
-        }
-
-        if now > approval.expires_at_secs {
+        // 2. Explicitly reject attempts to self-authorize using a deletion request handle
+        if approval_token.starts_with("del_req_") {
             return Err(RuntimeError::DatabaseUnauthorized(
-                "Database deletion approval token has expired.".into(),
+                "Self-authorization rejected: a deletion request identifier is not a trusted human approval decision. Separate approval requests from approval decisions.".into(),
             ));
         }
 
-        drop(lock);
-
-        let sql = format!("DROP DATABASE IF EXISTS `{db_name}`;");
-        self.execute_query(&sql)?;
-        Ok(())
+        // 3. Fail-closed: Phase R1.2B keeps database deletion explicitly disabled
+        // pending trusted desktop human approval interface integration.
+        Err(RuntimeError::DatabaseDeletionUnavailable(format!(
+            "Database deletion is disabled in Phase R1.2B for target '{db_name}'. A trusted desktop human approval interface is required and will be integrated in Phase R1.3 Spatial Studio."
+        )))
     }
 
     /// Performs logical database dump to target file with atomic temp file and immediate 0600 permissions.
@@ -1101,24 +1144,36 @@ FLUSH PRIVILEGES;
         }
         drop(check_file);
 
-        // 3. Check if target database already exists and contains tables
+        // 3. Inspect target database occupancy (FAIL-CLOSED)
         let check_sql = format!(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{db_name}';"
         );
-        if let Ok(count_output) = self.execute_query(&check_sql) {
-            let count_num = count_output
-                .lines()
-                .last()
-                .unwrap_or("0")
-                .trim()
-                .parse::<u64>()
-                .unwrap_or(0);
+        let count_output = self.execute_query(&check_sql).map_err(|e| {
+            RuntimeError::RestoreError(format!(
+                "Failed to inspect target database occupancy before restore: {e}. Refusing to restore into unverified destination."
+            ))
+        })?;
 
-            if count_num > 0 {
-                return Err(RuntimeError::RestoreError(format!(
-                    "Target database '{db_name}' already exists and contains {count_num} tables. Refusing to overwrite existing data automatically."
-                )));
-            }
+        let count_line = count_output
+            .lines()
+            .last()
+            .ok_or_else(|| {
+                RuntimeError::RestoreError(
+                    "Database inspection returned empty output; cannot verify destination occupancy.".into(),
+                )
+            })?
+            .trim();
+
+        let count_num: u64 = count_line.parse().map_err(|e| {
+            RuntimeError::RestoreError(format!(
+                "Failed to parse database table count '{count_line}': {e}. Cannot guarantee destination is empty."
+            ))
+        })?;
+
+        if count_num > 0 {
+            return Err(RuntimeError::RestoreError(format!(
+                "Target database '{db_name}' already exists and contains {count_num} tables. Refusing to restore into non-empty database automatically."
+            )));
         }
 
         // 4. Ensure target database exists
@@ -1157,9 +1212,27 @@ FLUSH PRIVILEGES;
 
         if !output.status.success() {
             let err = String::from_utf8_lossy(&output.stderr);
-            return Err(RuntimeError::RestoreError(format!(
-                "Database restore exited with error: {err}"
-            )));
+            // Check if partial restore occurred
+            let partial_count = match self.execute_query(&check_sql) {
+                Ok(out) => out
+                    .lines()
+                    .last()
+                    .and_then(|l| l.trim().parse::<u64>().ok())
+                    .unwrap_or(0),
+                Err(_) => 0,
+            };
+
+            if partial_count > 0 {
+                return Err(RuntimeError::RestoreError(format!(
+                    "Database restore failed partially (exit status {}): {err}. Warning: {partial_count} tables were created before failure. Note: MariaDB DDL operations execute with implicit commits and cannot be rolled back transactionally.",
+                    output.status
+                )));
+            } else {
+                return Err(RuntimeError::RestoreError(format!(
+                    "Database restore exited with error (exit status {}): {err}",
+                    output.status
+                )));
+            }
         }
 
         Ok(())
@@ -1304,17 +1377,50 @@ mod tests {
         // 2. Unissued token must be rejected
         let unissued = sup.drop_project_database("my_test_db", "fake_token_123");
         assert!(unissued.is_err());
+        assert!(matches!(
+            unissued.unwrap_err(),
+            RuntimeError::DatabaseDeletionUnavailable(_)
+        ));
 
-        // 3. Request approval
-        let approval = sup
+        // 3. Request deletion handle (returns audit request_id, NOT authorization decision)
+        let req = sup
             .request_database_deletion_approval("my_test_db", "unit_test_ui")
             .unwrap();
-        assert_eq!(approval.database_name, "my_test_db");
-        assert!(approval.token.starts_with("del_my_test_db_"));
-        assert!(approval.expires_at_secs > approval.issued_at_secs);
+        assert_eq!(req.database_name, "my_test_db");
+        assert!(req.request_id.starts_with("del_req_my_test_db_"));
+        assert!(req.expires_at_secs > req.requested_at_secs);
 
-        // 4. Token bound to wrong database must be rejected
-        let mismatch = sup.drop_project_database("other_db", &approval.token);
-        assert!(mismatch.is_err());
+        // 4. Requesting caller attempting to self-authorize using request_id must be strictly rejected
+        let self_req_auth = sup.drop_project_database("my_test_db", &req.request_id);
+        assert!(self_req_auth.is_err());
+        assert!(matches!(
+            self_req_auth.unwrap_err(),
+            RuntimeError::DatabaseUnauthorized(_)
+        ));
+
+        // 5. Destructive database operations are disabled in Phase R1.2B pending trusted desktop human approval
+        let disabled_res = sup.drop_project_database("my_test_db", "arbitrary_token");
+        assert!(disabled_res.is_err());
+        assert!(matches!(
+            disabled_res.unwrap_err(),
+            RuntimeError::DatabaseDeletionUnavailable(_)
+        ));
+    }
+
+    #[test]
+    fn test_application_support_directory_resolution() {
+        // 1. Standard resolution should succeed in a normal environment
+        let resolved = resolve_application_support_dir();
+        assert!(
+            resolved.is_ok(),
+            "Directory resolution should succeed: {:?}",
+            resolved
+        );
+        let path = resolved.unwrap();
+        assert!(path.ends_with("Library/Application Support/LocalForge"));
+
+        // 2. Base MariaDB dir should reside under LocalForge/mariadb
+        let mariadb_base = resolve_mariadb_base_dir().unwrap();
+        assert_eq!(mariadb_base, path.join("mariadb"));
     }
 }

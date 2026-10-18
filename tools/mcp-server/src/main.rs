@@ -32,8 +32,9 @@ struct JsonRpcResponse {
 }
 
 fn open_metadata_store() -> MetadataStore {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let db_path = PathBuf::from(home).join("Library/Application Support/LocalForge/localforge.db");
+    let base = localforge_runtime::resolve_application_support_dir()
+        .unwrap_or_else(|_| PathBuf::from("Library/Application Support/LocalForge"));
+    let db_path = base.join("localforge.db");
     MetadataStore::open(&db_path).unwrap_or_else(|_| MetadataStore::open_in_memory().unwrap())
 }
 

@@ -156,8 +156,8 @@ fn update_project_status(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let base = PathBuf::from(&home).join("Library/Application Support/LocalForge");
+    let base = localforge_runtime::resolve_application_support_dir()
+        .unwrap_or_else(|_| PathBuf::from("Library/Application Support/LocalForge"));
     let _ = std::fs::create_dir_all(&base);
     let db_path = base.join("localforge.db");
     let runtime_base = base.join("runtime");

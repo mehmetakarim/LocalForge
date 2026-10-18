@@ -32,6 +32,12 @@ pub enum RuntimeError {
     #[error("Database destructive operation unauthorized: {0}")]
     DatabaseUnauthorized(String),
 
+    #[error("Database destructive operation disabled / unavailable: {0}")]
+    DatabaseDeletionUnavailable(String),
+
+    #[error("Runtime configuration error: {0}")]
+    ConfigurationError(String),
+
     #[error("Database backup creation failed: {0}")]
     BackupError(String),
 

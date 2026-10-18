@@ -45,7 +45,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.2-05** | Multi-Project FastCGI & Database Concurrency | Critical | COMPLETED | Senior Rust Eng | TASK-R1.2-01..04 | Site Alpha & Site Beta concurrent execution, independent FastCGI pools, shared Nginx |
 | **TASK-R1.2-06** | External Storage Resilience & VolumeBarrier Guard | Critical | COMPLETED | Systems Engineer | TASK-R1.2-04 | Simulated/unmounted drive fail-closed protection, zero fallback writes to boot disk |
 
-### Subphase R1.2A: Database Security Remediation (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.2A: Database Security Remediation (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.2A-01** | SQL Credential Escaping & Redaction | Critical | COMPLETED | Security Specialist | R1.2 Review | `escape_sql_string_literal`, null byte rejection, secret redaction from logs |
@@ -54,6 +54,14 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.2A-04** | Safe Restore & Non-Empty Database Protection | Critical | COMPLETED | Database Architect | TASK-R1.2A-02 | Rejection of non-empty target databases, streaming stdin, header validation |
 | **TASK-R1.2A-05** | Datadir Ownership & Graceful Termination | High | COMPLETED | Systems Engineer | TASK-R1.2A-01 | Ownership validation (`uid == geteuid()`), `mysqladmin` & SIGTERM before SIGKILL |
 | **TASK-R1.2A-06** | Adversarial Security Test Suite | Critical | COMPLETED | QA Lead | TASK-R1.2A-01..05 | 5 new adversarial tests covering SQL injection, symlinks, replay, corrupt dumps |
+
+### Subphase R1.2B: Final Database Safety Gate (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.2B-01** | Deletion Authorization Separation & UI Gate | Critical | COMPLETED | Security Specialist | R1.2A Findings | Separate `DatabaseDeletionRequest`, reject `del_req_` self-approval, disable deletion in R1.2B |
+| **TASK-R1.2B-02** | Fail-Closed Restore Verification & Partial Diagnostics | Critical | COMPLETED | Database Architect | TASK-R1.2B-01 | Replaced `if let Ok`, strict parse, partial restore detection, DDL rollback note |
+| **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | TASK-R1.2B-01 | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
+| **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | TASK-R1.2B-01..03 | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
 ### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |

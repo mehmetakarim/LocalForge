@@ -237,3 +237,33 @@ This document records the chronological engineering log for all development sess
    - `cargo test --workspace`: PASS (37/37 tests passed).
    - `cargo clippy --workspace --all-targets -- -D warnings`: PASS (Zero warnings).
    - `npm --prefix apps/desktop run build`: PASS (Exit code 0).
+
+---
+
+## Session 008 — Phase R1.2B Final Database Safety Gate
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Rust Security Engineer, Database Reliability Engineer, QA Lead, Lead Agent
+- **Authorized Phase**: **Phase R1.2B — Final Database Safety Gate**
+- **Git Branch**: `phase-r1/r1-2b-final-database-safety`
+
+### Summary of Activities
+1. **Separation of Deletion Request and Decision (TASK-R1.2B-01)**:
+   - Separated approval requests (`DatabaseDeletionRequest` with `request_id`) from approval decisions.
+   - Self-authorization using `db_name` or `request_id` fails closed (`DatabaseUnauthorized`).
+   - Kept database deletion explicitly disabled system-wide in Phase R1.2B with typed error `DatabaseDeletionUnavailable` pending trusted desktop UI integration.
+2. **Fail-Closed Database Restore (TASK-R1.2B-02)**:
+   - Eliminated `if let Ok(...)` occupancy check; any query or parsing error aborts restoration immediately.
+   - Non-empty destinations rejected before any modification.
+   - Subprocess failures trigger diagnostic table count checks, accurately recording partial restores and documenting DDL implicit commit limitations.
+3. **Darwin Application Support Resolution (TASK-R1.2B-03)**:
+   - Implemented `resolve_application_support_dir()` querying `$HOME` and `libc::getpwuid(libc::getuid())`.
+   - Eliminated all hardcoded `/Users/mehmetakar` fallbacks across runtime, desktop app, CLI, and MCP server.
+4. **Verification & Tests (TASK-R1.2B-04)**:
+   - Added `test_r1_2b_12_restore_fail_closed_occupied_destination_and_interrupted_restores` and `test_r1_2b_13_application_support_storage_safety`.
+   - All 13 MariaDB integration tests: PASS.
+   - Full workspace tests: PASS (40/40 tests).
+   - `cargo clippy --workspace --all-targets -- -D warnings`: PASS (Zero warnings).
+   - `cargo fmt --all -- --check`: PASS.
+   - `npm --prefix apps/desktop run build`: PASS (Vite v6.4.4 exit code 0).
+

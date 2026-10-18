@@ -45,7 +45,7 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.2-02** | Concurrent Multi-Version PHP Project Execution | Critical | COMPLETED | Senior Rust Eng | Project A & B live side-by-side |
 | **TASK-R1.2-03** | External APFS Volume Disconnect Resilience | Critical | COMPLETED | Systems Engineer | Physical/simulated disconnect safety without write fallback |
 
-### Subphase R1.2A: Database Security Remediation (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.2A: Database Security Remediation (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
 | **TASK-R1.2A-01** | SQL Credential Escaping & Redaction | Critical | COMPLETED | Security Specialist | `escape_sql_string_literal`, null byte rejection, secret scrubbing |
@@ -54,6 +54,14 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.2A-04** | Safe Restore & Non-Empty Database Protection | Critical | COMPLETED | Database Architect | Rejection of non-empty target databases, streaming stdin |
 | **TASK-R1.2A-05** | Datadir Ownership & Graceful Termination | High | COMPLETED | Systems Engineer | Datadir UID validation, `mysqladmin` & SIGTERM before SIGKILL |
 | **TASK-R1.2A-06** | Adversarial Security Test Suite | Critical | COMPLETED | QA Lead | 5 new adversarial tests covering SQL injection, symlinks, replay |
+
+### Subphase R1.2B: Final Database Safety Gate (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.2B-01** | Deletion Authorization Separation & UI Gate | Critical | COMPLETED | Security Specialist | Separate `DatabaseDeletionRequest`, reject self-approval, disable deletion in R1.2B |
+| **TASK-R1.2B-02** | Fail-Closed Restore Verification & Partial Diagnostics | Critical | COMPLETED | Database Architect | Replaced `if let Ok`, strict parse, partial restore detection, DDL rollback note |
+| **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
+| **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
 ### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |

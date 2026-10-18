@@ -6,14 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.2A — Database Security Remediation**
+- **Active Phase**: **Phase R1.2B — Final Database Safety Gate**
 - **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-2a-database-security`
-- **Target Remote**: `origin/phase-r1/r1-2a-database-security`
-- **Previous Phase Status**: **Phase R1.2 — CONDITIONALLY ACCEPTED**
+- **Active Branch**: `phase-r1/r1-2b-final-database-safety`
+- **Target Remote**: `origin/phase-r1/r1-2b-final-database-safety`
+- **Previous Phase Status**: **Phase R1.2A — COMPLETED & VERIFIED**
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Conditionally Accepted), R1.2A (Database Security Remediation - Completed), R1.3 (Spatial Studio UI - Locked).
-- **Test Matrix Status**: 37/37 automated tests pass across 8 crates (including 11 MariaDB integration & adversarial security tests, 7 runtime integration tests, 5 storage tests, 9 runtime unit tests, and 5 core tests), zero Clippy warnings, clean Vite production build.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Conditionally Accepted), R1.2A (Database Security Remediation - Completed), R1.2B (Final Database Safety Gate - Completed), R1.3 (Spatial Studio UI - Locked).
+- **Test Matrix Status**: 40/40 automated tests pass across 8 crates (including 13 MariaDB integration & adversarial security tests, 7 runtime integration tests, 5 storage tests, 10 runtime unit tests, and 5 core tests), zero Clippy warnings, clean Vite production build.
 
 ---
 
@@ -23,7 +23,7 @@ This document tracks the canonical technical and operational state of the LocalF
 |---|---|---|---|
 | **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED | Specifications, memory structure, and ADRs established. |
 | **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compile; physical disconnect verification staged in R1.2. |
-| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1/R1.2/R1.2A) | Live unprivileged Darwin kernel verified FPM, MariaDB & shared Nginx loopback gateway. E2E HTTP 200 PDO PASS. |
+| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1/R1.2/R1.2B) | Live unprivileged Darwin kernel verified FPM, MariaDB & shared Nginx loopback gateway. E2E HTTP 200 PDO PASS. |
 | **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | Non-dry-run SFTP rejected with `DeploymentNotImplemented`. MCP self-approval bypass eliminated. Real transport deferred. |
 | **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39142354888` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
 | **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
@@ -32,6 +32,7 @@ This document tracks the canonical technical and operational state of the LocalF
 | **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | ACCEPTED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
 | **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | CONDITIONALLY ACCEPTED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
 | **Phase R1.2A: Database Security** | SECURITY HARDENING | COMPLETED | SQL credential escaping & redaction, single-use deletion authorization, 0600 atomic stream backups, non-empty restore guard, datadir ownership validation. |
+| **Phase R1.2B: Final Database Safety** | FINAL SAFETY GATE | COMPLETED | Deletion self-authorization eliminated, deletion kept explicitly disabled in R1.2B pending UI gate, fail-closed restore occupancy check, partial restore tracking, Darwin getpwuid directory resolution. |
 
 ---
 
@@ -46,36 +47,27 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ---
 
-## 4. Phase R1.2A Security Achievements
+## 4. Phase R1.2B Achievements
 
-1. **SQL Credential Safety**:
-   - Eliminated unsafe string formatting in `create_project_database`.
-   - Implemented `escape_sql_string_literal` with null byte rejection (`\0`), quote escaping (`''`), backslash escaping (`\\`), and length constraints.
-   - Password scrubbed from stderr in error reports.
-2. **Database Deletion Authorization**:
-   - Self-authorization strictly eliminated: `approval_token == db_name` immediately returns `DatabaseUnauthorized`.
-   - Single-use cryptographic UUIDv4 token with 60s TTL via `request_database_deletion_approval`.
-3. **Secure Backup Creation**:
-   - `0o600` permissions enforced atomically via `OpenOptionsExt::mode(0o600)` at creation time.
-   - Refuses to overwrite existing files.
-   - Destination path canonicalized and symlinks rejected.
-   - Streaming stdout directly to file descriptor (O(1) memory).
-   - Validates non-empty SQL header (`--`, `/*`, `CREATE`) and renames temporary file atomically.
-4. **Safe Restore**:
-   - Destination database checked for existing tables (`information_schema.tables == 0`); refuses restore into non-empty database.
-   - Symlinks and empty/corrupt files rejected.
-   - Streams dump file directly into client stdin.
-5. **Lifecycle & Datadir Safety**:
-   - Datadir ownership verified: `meta.uid() == libc::getuid()`.
-   - Unknown existing non-empty directory protected from overwrite.
-   - Graceful shutdown via `mysqladmin` and `SIGTERM` before fallback `SIGKILL`.
+1. **Separation of Deletion Request and Approval**:
+   - `request_database_deletion_approval` returns an audit `request_id`, not an authorization decision.
+   - Self-authorization using `db_name` or `request_id` strictly fails closed.
+   - Database deletion is explicitly disabled in Phase R1.2B with typed error `DatabaseDeletionUnavailable`, preventing destructive actions until Phase R1.3 Spatial Studio UI is integrated.
+2. **Fail-Closed Database Restore**:
+   - Eliminated `if let Ok(...)` occupancy check; any query or parse failure halts restore immediately.
+   - Non-empty destinations are rejected.
+   - Subprocess failures trigger diagnostic table count inspection, accurately recording partial restores and documenting DDL implicit commit limitations.
+3. **Robust Darwin Application Support Resolution**:
+   - Removed all hardcoded `/Users/mehmetakar` paths.
+   - Implemented `resolve_application_support_dir()` querying `$HOME` and `libc::getpwuid(libc::getuid())`.
+   - Propagated to runtime supervisor, desktop app, CLI, and MCP server.
 
 ---
 
 ## 5. Security & Architectural Invariants
 
 - **Fail-Closed Default**: Remote deployments remain strictly disabled (`DeploymentNotImplemented`).
-- **AI Agent Boundary**: AI models via MCP cannot self-authorize production executions.
+- **AI Agent Boundary**: AI models via MCP cannot self-authorize production executions or destructive database operations.
 - **Process Safety**: Never signal a PID without verifying executable identity and launch timestamp.
 - **Database Integrity**: MariaDB data stays on internal storage until external disconnect resilience is proven.
 - **Non-Root Execution**: Development runtimes (PHP-FPM, Nginx, MariaDB) execute under user permissions on unprivileged ports.

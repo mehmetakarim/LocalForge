@@ -85,8 +85,8 @@ enum DeployCommands {
 }
 
 fn open_metadata_store() -> MetadataStore {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let base = PathBuf::from(home).join("Library/Application Support/LocalForge");
+    let base = localforge_runtime::resolve_application_support_dir()
+        .unwrap_or_else(|_| PathBuf::from("Library/Application Support/LocalForge"));
     let _ = std::fs::create_dir_all(&base);
     let db_path = base.join("localforge.db");
     MetadataStore::open(&db_path).unwrap_or_else(|_| MetadataStore::open_in_memory().unwrap())
@@ -97,8 +97,9 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
 
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let runtime_base = PathBuf::from(&home).join("Library/Application Support/LocalForge/runtime");
+    let base = localforge_runtime::resolve_application_support_dir()
+        .unwrap_or_else(|_| PathBuf::from("Library/Application Support/LocalForge"));
+    let runtime_base = base.join("runtime");
 
     let store = Arc::new(open_metadata_store());
     let volume_manager = Arc::new(MacOSVolumeManager::new());
