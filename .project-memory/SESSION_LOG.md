@@ -166,3 +166,36 @@ This document records the chronological engineering log for all development sess
 5. **Phase 4 Verification & Test Suite (TASK-405)**:
    - `cargo test --workspace`: PASS (13/13 tests passed across all 7 workspace crates).
    - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: PASS (Zero warnings).
+
+---
+
+## Session 006 — Phase R1.2 MariaDB Integration, Storage Resilience & Multi-Project Verification
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Security Specialist, QA Lead, Lead Agent
+- **Authorized Phase**: **Phase R1.2 — MariaDB Integration, Storage Resilience & Multi-Project Verification**
+- **Git Branch**: `phase-r1/r1-2-database-and-resilience`
+
+### Summary of Activities
+1. **Unprivileged MariaDB Process Orchestration (TASK-R1.2-01)**:
+   - Implemented `crates/runtime/src/mariadb.rs`: `MariaDbSupervisor` managing user-level `mariadbd` (Homebrew 13.0.2).
+   - Dedicated internal datadir (`~/Library/Application Support/LocalForge/mariadb/data/`), private Unix domain socket by default, and dynamic unprivileged loopback TCP port.
+2. **Authenticated Health Probe & SQL Probing (TASK-R1.2-02)**:
+   - Replaced port-only checks with authenticated `SELECT 1;` socket probes and `mysqladmin ping` latency measurements. Never report RUNNING solely because port is bound.
+   - Implemented automated database/user creation (`create_project_database`) with identifier validation and token-matching drop safety guard (`drop_project_database`).
+3. **Database Backup & Recovery (TASK-R1.2-03)**:
+   - Implemented `dump_database` via `mariadb-dump` enforcing POSIX `0o600` permissions.
+   - Implemented `restore_database` restoring full SQL archives.
+4. **End-to-End PHP PDO Execution on External APFS (TASK-R1.2-04)**:
+   - Tested real PHP application on `/Volumes/Mac Harici Disk/.../scratch/test_pdo_e2e` via PHP-FPM + Nginx + PDO.
+   - Verified row insertion and persistence across PHP-FPM pool restart.
+5. **Multi-Project Concurrency (TASK-R1.2-05)**:
+   - Concurrently ran Site Alpha and Site Beta on shared Nginx with independent FastCGI pools and database credentials.
+   - Stopping Alpha left Beta and MariaDB unharmed and fully operational.
+6. **Storage Resilience & VolumeBarrier Guard (TASK-R1.2-06)**:
+   - Validated unmounted external volume disconnect guard with zero internal fallback writes.
+7. **Verification & CI**:
+   - `cargo test --workspace`: PASS (32/32 tests passed across 8 crates).
+   - `cargo clippy --workspace --all-targets -- -D warnings`: PASS (Zero warnings).
+   - `npm --prefix apps/desktop run build`: PASS (Vite & TypeScript exit code 0).
+   - GitHub Actions CI Run `39148541047`: PASS (Green on macOS Apple Silicon).
