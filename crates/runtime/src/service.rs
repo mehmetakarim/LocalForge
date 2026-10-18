@@ -24,6 +24,101 @@ pub struct ProjectRuntimeStatus {
     pub message: String,
 }
 
+/// Detailed health assessment of an HTTP probe on the loopback gateway.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GatewayHealthAssessment {
+    /// FastCGI and application executed successfully (HTTP 200..=399).
+    RunningHealthy { status_code: u16, message: String },
+    /// Gateway and FastCGI are alive, but application route was not found or client error (HTTP 400..=499).
+    /// Common for generic PHP applications without a default '/' index.
+    RunningWithClientStatus { status_code: u16, message: String },
+    /// PHP-FPM executed, but PHP application raised a 500 Internal Server Error (syntax/fatal error).
+    DegradedApplicationError { status_code: u16, message: String },
+    /// Nginx gateway received request, but FastCGI upstream communication failed (502 Bad Gateway / 504 Timeout).
+    DegradedFastCgiFailure { status_code: u16, message: String },
+    /// Service Unavailable (503).
+    DegradedServiceUnavailable { status_code: u16, message: String },
+    /// Other HTTP server error.
+    DegradedHttpError { status_code: u16, message: String },
+    /// Loopback TCP connection failed, timed out, or response was malformed.
+    TransportError { message: String },
+}
+
+impl GatewayHealthAssessment {
+    pub fn project_status(&self) -> ProjectStatus {
+        match self {
+            Self::RunningHealthy { .. } | Self::RunningWithClientStatus { .. } => {
+                ProjectStatus::Running
+            }
+            Self::DegradedApplicationError { .. }
+            | Self::DegradedFastCgiFailure { .. }
+            | Self::DegradedServiceUnavailable { .. }
+            | Self::DegradedHttpError { .. }
+            | Self::TransportError { .. } => ProjectStatus::Degraded,
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        match self {
+            Self::RunningHealthy { message, .. }
+            | Self::RunningWithClientStatus { message, .. }
+            | Self::DegradedApplicationError { message, .. }
+            | Self::DegradedFastCgiFailure { message, .. }
+            | Self::DegradedServiceUnavailable { message, .. }
+            | Self::DegradedHttpError { message, .. }
+            | Self::TransportError { message } => message.as_str(),
+        }
+    }
+}
+
+pub fn classify_probe_result(
+    probe_result: std::result::Result<(u16, String), RuntimeError>,
+) -> GatewayHealthAssessment {
+    match probe_result {
+        Ok((code, _)) => match code {
+            200..=399 => GatewayHealthAssessment::RunningHealthy {
+                status_code: code,
+                message: format!("Runtime active and verified (HTTP {code})."),
+            },
+            404 => GatewayHealthAssessment::RunningWithClientStatus {
+                status_code: 404,
+                message: "Runtime active and verified (HTTP 404 at root route; application is running without default root handler).".into(),
+            },
+            403 => GatewayHealthAssessment::RunningWithClientStatus {
+                status_code: 403,
+                message: "Runtime active and verified (HTTP 403 at root route; check directory permissions or index configuration).".into(),
+            },
+            400..=499 => GatewayHealthAssessment::RunningWithClientStatus {
+                status_code: code,
+                message: format!("Runtime active and verified (HTTP {code} client response)."),
+            },
+            500 => GatewayHealthAssessment::DegradedApplicationError {
+                status_code: 500,
+                message: "Infrastructure operational, but PHP application returned server error (HTTP 500). Inspect PHP error log.".into(),
+            },
+            502 => GatewayHealthAssessment::DegradedFastCgiFailure {
+                status_code: 502,
+                message: "Gateway upstream error: FastCGI communication failed (HTTP 502 Bad Gateway). PHP-FPM socket may be unresponsive or worker crashed.".into(),
+            },
+            504 => GatewayHealthAssessment::DegradedFastCgiFailure {
+                status_code: 504,
+                message: "Gateway upstream error: FastCGI request timed out (HTTP 504 Gateway Timeout).".into(),
+            },
+            503 => GatewayHealthAssessment::DegradedServiceUnavailable {
+                status_code: 503,
+                message: "Gateway service temporarily unavailable (HTTP 503).".into(),
+            },
+            other => GatewayHealthAssessment::DegradedHttpError {
+                status_code: other,
+                message: format!("Gateway returned unexpected server error (HTTP {other})."),
+            },
+        },
+        Err(e) => GatewayHealthAssessment::TransportError {
+            message: format!("Gateway transport error: failed to establish loopback HTTP connection: {e}"),
+        },
+    }
+}
+
 pub struct ProjectRuntimeService {
     metadata_store: Arc<MetadataStore>,
     volume_manager: Arc<dyn VolumeManager>,
@@ -152,33 +247,52 @@ impl ProjectRuntimeService {
             return Err(e);
         }
 
-        // 6. Real HTTP Health Probe (allow 50ms for worker reload)
+        // 6. Independent process and socket health verification before probing
+        let fpm_alive = self.php_supervisor.is_pool_alive(&project.id);
+        let socket_alive = crate::health::is_unix_socket_alive(&socket_path);
+        let nginx_alive = self.nginx_supervisor.is_gateway_alive();
+
+        if !fpm_alive || !socket_alive {
+            let _ = self
+                .metadata_store
+                .update_project_status(&project.id, ProjectStatus::Failed);
+            return Err(RuntimeError::ServiceUnhealthy {
+                service: format!("php-fpm-{}", project.id),
+                reason: "PHP-FPM worker or FastCGI socket failed immediately upon startup".into(),
+            });
+        }
+
+        if !nginx_alive {
+            let _ = self
+                .metadata_store
+                .update_project_status(&project.id, ProjectStatus::Failed);
+            return Err(RuntimeError::ServiceUnhealthy {
+                service: "nginx".into(),
+                reason: "Nginx gateway master process is unresponsive or failed to launch".into(),
+            });
+        }
+
+        // 7. Real HTTP Health Probe (allow 50ms for worker reload)
         std::thread::sleep(std::time::Duration::from_millis(50));
-        let local_url = format!("http://{}:{}", project.local_domain, self.gateway_port);
-        let loopback_host = format!("{}:{}", project.local_domain, self.gateway_port);
+        let local_url = format!("http://127.0.0.1:{}", self.gateway_port);
 
-        let probe_result = probe_http_health(self.gateway_port, &loopback_host, "/");
-        let message = match probe_result {
-            Ok((status_code, _)) => {
-                format!("Runtime active and verified. HTTP response status: {status_code}")
+        let mut probe_result = probe_http_health(self.gateway_port, &project.local_domain, "/");
+        if probe_result.is_err() {
+            let loopback_host = format!("{}:{}", project.local_domain, self.gateway_port);
+            let retry = probe_http_health(self.gateway_port, &loopback_host, "/");
+            if retry.is_ok() {
+                probe_result = retry;
             }
-            Err(e) => {
-                // Also try plain local domain without port in Host header
-                match probe_http_health(self.gateway_port, &project.local_domain, "/") {
-                    Ok((status_code, _)) => {
-                        format!("Runtime active and verified. HTTP response status: {status_code}")
-                    }
-                    Err(_) => {
-                        format!("Runtime processes active; HTTP probe warning: {e}")
-                    }
-                }
-            }
-        };
+        }
 
-        // 7. Mark project RUNNING in metadata store
+        let assessment = classify_probe_result(probe_result);
+        let final_status = assessment.project_status();
+        let message = assessment.message().to_string();
+
+        // 8. Update verified status in metadata store (never false RUNNING)
         let _ = self
             .metadata_store
-            .update_project_status(&project.id, ProjectStatus::Running);
+            .update_project_status(&project.id, final_status);
 
         let fpm_id = self.php_supervisor.get_pool_identity(&project.id);
         let nginx_id = self.nginx_supervisor.get_gateway_identity();
@@ -186,7 +300,7 @@ impl ProjectRuntimeService {
         Ok(ProjectRuntimeStatus {
             project_id: project.id,
             name: project.name,
-            status: ProjectStatus::Running,
+            status: final_status,
             php_version: project.php_version,
             php_fpm_pid: fpm_id.map(|i| i.pid),
             socket_path: Some(socket_path),
@@ -231,7 +345,7 @@ impl ProjectRuntimeService {
             nginx_pid: self.nginx_supervisor.get_gateway_identity().map(|i| i.pid),
             gateway_port: self.gateway_port,
             local_domain: project.local_domain.clone(),
-            local_url: format!("http://{}:{}", project.local_domain, self.gateway_port),
+            local_url: format!("http://127.0.0.1:{}", self.gateway_port),
             message: "Project runtime stopped cleanly.".into(),
         })
     }
@@ -264,35 +378,52 @@ impl ProjectRuntimeService {
                 nginx_pid: None,
                 gateway_port: self.gateway_port,
                 local_domain: project.local_domain.clone(),
-                local_url: format!("http://{}:{}", project.local_domain, self.gateway_port),
+                local_url: format!("http://127.0.0.1:{}", self.gateway_port),
                 message: "External storage volume unmounted or missing.".into(),
             });
         }
 
         let fpm_alive = self.php_supervisor.is_pool_alive(&project.id);
+        let sock_path = self.php_supervisor.socket_path(&project.id);
+        let sock_alive = crate::health::is_unix_socket_alive(&sock_path);
         let nginx_alive = self.nginx_supervisor.is_gateway_alive();
 
         let fpm_id = self.php_supervisor.get_pool_identity(&project.id);
         let nginx_id = self.nginx_supervisor.get_gateway_identity();
 
-        let (verified_status, message) = if fpm_alive && nginx_alive {
-            (
-                ProjectStatus::Running,
-                "Runtime active and healthy.".to_string(),
-            )
-        } else if !fpm_alive && project.status == ProjectStatus::Running {
-            // Process crashed while recorded as running
-            (
-                ProjectStatus::Failed,
-                "PHP-FPM process terminated unexpectedly.".to_string(),
-            )
-        } else if fpm_alive && !nginx_alive {
+        let (verified_status, message) = if !fpm_alive || !sock_alive {
+            if project.status == ProjectStatus::Running
+                || project.status == ProjectStatus::Degraded
+                || project.status == ProjectStatus::Starting
+            {
+                (
+                    ProjectStatus::Failed,
+                    "PHP-FPM process or FastCGI socket terminated unexpectedly.".to_string(),
+                )
+            } else {
+                (ProjectStatus::Stopped, "Runtime stopped.".to_string())
+            }
+        } else if !nginx_alive {
             (
                 ProjectStatus::Degraded,
                 "PHP-FPM active, but Nginx gateway is unresponsive.".to_string(),
             )
         } else {
-            (ProjectStatus::Stopped, "Runtime stopped.".to_string())
+            // Both PHP-FPM process, socket, and Nginx are alive.
+            // Probe HTTP loopback to classify actual operational health.
+            let mut probe_result = probe_http_health(self.gateway_port, &project.local_domain, "/");
+            if probe_result.is_err() {
+                let loopback_host = format!("{}:{}", project.local_domain, self.gateway_port);
+                let retry = probe_http_health(self.gateway_port, &loopback_host, "/");
+                if retry.is_ok() {
+                    probe_result = retry;
+                }
+            }
+            let assessment = classify_probe_result(probe_result);
+            (
+                assessment.project_status(),
+                assessment.message().to_string(),
+            )
         };
 
         // Sync verified status to SQLite if it diverged
@@ -308,15 +439,15 @@ impl ProjectRuntimeService {
             status: verified_status,
             php_version: project.php_version,
             php_fpm_pid: fpm_id.map(|i| i.pid),
-            socket_path: if fpm_alive {
-                Some(self.php_supervisor.socket_path(&project.id))
+            socket_path: if fpm_alive && sock_alive {
+                Some(sock_path)
             } else {
                 None
             },
             nginx_pid: nginx_id.map(|i| i.pid),
             gateway_port: self.gateway_port,
             local_domain: project.local_domain.clone(),
-            local_url: format!("http://{}:{}", project.local_domain, self.gateway_port),
+            local_url: format!("http://127.0.0.1:{}", self.gateway_port),
             message,
         })
     }

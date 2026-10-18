@@ -6,19 +6,20 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.1 — Real PHP-FPM & Nginx Runtime Integration Completed**
-- **Active Git Branch**: `phase-r1/r1-1-runtime-implementation`
-- **Target Remote**: `origin/phase-r1/r1-1-runtime-implementation`
+- **Current State**: **Phase R1.1A — Targeted Acceptance Remediation Completed**
+- **Active Git Branch**: `phase-r1/r1-1a-runtime-remediation`
+- **Target Remote**: `origin/phase-r1/r1-1a-runtime-remediation`
 - **Previous Milestone Status**:
   - **Recovery Phase R0**: CONDITIONALLY ACCEPTED (18/18 tests pass, CI Green).
   - **Recovery Phase R1.0**: ACCEPTED by Product Owner.
-  - **Phase R1.1**: COMPLETED & FULLY VERIFIED (25/25 automated tests pass, zero Clippy warnings, live HTTP 200 FastCGI execution on external APFS volume).
-- **Completed Tasks in R1.1**:
-  - `TASK-R1.1-01`: Unprivileged PHP-FPM child process spawning, isolated pool configs, 104-byte Unix socket path limit mitigation.
-  - `TASK-R1.1-02`: Shared unprivileged Nginx loopback gateway (`127.0.0.1:8080`), modular virtual host generation (`conf.d/{id}.conf`), atomic `nginx -t` validation before activation/reload.
-  - `TASK-R1.1-03`: Darwin kernel verified process identity (`libc::proc_pidinfo` / `proc_bsdinfo` timestamp + binary canonical path), PID reuse race condition defense, graceful termination.
-  - `TASK-R1.1-04`: End-to-end loopback HTTP 200 FastCGI verification, dynamic JSON response payload (`PHP 8.5.3`), multi-project isolation test (`test_r1_1_06_multi_project_isolation`).
-- **Next Permitted Action**: Present R1.1 acceptance report to Product Owner and await explicit authorization for Phase R1.2 (MariaDB & Storage Resilience).
+  - **Phase R1.1**: CONDITIONALLY ACCEPTED (subject to R1.1A acceptance remediation).
+  - **Phase R1.1A**: COMPLETED & FULLY VERIFIED (26/26 automated tests pass across 8 crates, zero Clippy warnings, live HTTP 200 FastCGI verified on external APFS volume).
+- **Completed Tasks in R1.1A**:
+  - `TASK-R1.1A-01`: Eliminated false `RUNNING` status; separated infrastructure health from application routing status; 502/504 FastCGI gateway errors produce `Degraded`.
+  - `TASK-R1.1A-02`: Hardened process identity and ownership verification; eliminated unsafe basename fallback; checked process UID; prevented signaling own process group.
+  - `TASK-R1.1A-03`: Honest local URL reporting (`http://127.0.0.1:8080`); marked `.test` resolver as pending across CLI and Desktop UI; added 1-click curl copy action.
+  - `TASK-R1.1A-04`: Added negative security tests and regression tests covering probe classification, dead sockets, and process spoofing.
+- **Next Permitted Action**: Present R1.1A acceptance report to Product Owner and await explicit authorization for Phase R1.2 (MariaDB & Storage Resilience).
 
 ---
 

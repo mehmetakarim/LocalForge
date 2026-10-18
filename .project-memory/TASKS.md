@@ -19,13 +19,21 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.0-05** | R1 Subphase Governance & Spec Documents | Critical | COMPLETED | Principal Architect | R0 Acceptance | `R1_0_ARCHITECTURE_REFINEMENT.md` through `R1_3` |
 | **TASK-R1.0-06** | Architecture Decision Records (ADR 10–12) | Critical | COMPLETED | Principal Architect | TASK-R1.0-01..05 | `ADR-0010`, `ADR-0011` (amended), `ADR-0012` |
 
-### Subphase R1.1: Real PHP-FPM & Nginx Integration (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.1: Real PHP-FPM & Nginx Integration (COMPLETED / CONDITIONALLY ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.1-01** | Unprivileged PHP-FPM Child Process Spawning | Critical | COMPLETED | Senior Rust Eng | R1.0 Approval | FastCGI unix sockets, dedicated pool configs, 104-byte limit mitigation |
 | **TASK-R1.1-02** | Shared Nginx Loopback Master Process Gateway | High | COMPLETED | Systems Engineer | TASK-R1.1-01 | Unprivileged port 8080 routing, dynamic vhost reloads, `nginx -t` validation |
 | **TASK-R1.1-03** | Verified Process Identity & Registry Engine | Critical | COMPLETED | Senior Rust Eng | TASK-R1.1-01 | Darwin `libc::proc_pidinfo` + `proc_bsdinfo` timestamp + path PID reuse defense |
 | **TASK-R1.1-04** | End-to-End Loopback HTTP 200 Verification | Critical | COMPLETED | QA Lead | TASK-R1.1-01..03 | Automated HTTP GET verification against live socket, dynamic JSON payload |
+
+### Subphase R1.1A: Targeted Acceptance Remediation (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.1A-01** | Eliminate False RUNNING Status | Critical | COMPLETED | Senior Rust Eng | R1.1 Findings | `GatewayHealthAssessment`, 502/504 -> Degraded, 404 routing separation |
+| **TASK-R1.1A-02** | Harden Process Ownership Verification | Critical | COMPLETED | Security Specialist | R1.1 Findings | Removed basename fallback; verify UID; isolate PGID against own group |
+| **TASK-R1.1A-03** | Honest Local URL Reporting | High | COMPLETED | Desktop/CLI Eng | R1.1 Findings | Report `127.0.0.1:8080`, mark `.test` pending, curl copy action |
+| **TASK-R1.1A-04** | Negative Security & Regression Suite | Critical | COMPLETED | QA Lead | TASK-R1.1A-01..03 | 7 regression tests covering probe classification, dead sockets, spoofing |
 
 ### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |

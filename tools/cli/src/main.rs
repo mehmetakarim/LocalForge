@@ -130,10 +130,10 @@ async fn main() -> Result<()> {
             }
 
             println!(
-                "{:<20} {:<32} {:<18} {:<14} URL",
+                "{:<20} {:<32} {:<18} {:<14} GATEWAY & VIRTUAL HOST",
                 "PROJECT ID", "NAME", "STATUS", "PHP VERSION"
             );
-            println!("{:-<100}", "");
+            println!("{:-<110}", "");
             for p in statuses {
                 let status_str = match p.status {
                     ProjectStatus::Running => "\x1b[32m● Running\x1b[0m",
@@ -145,9 +145,10 @@ async fn main() -> Result<()> {
                     ProjectStatus::Failed => "\x1b[31m✖ Failed\x1b[0m",
                     ProjectStatus::Unknown => "\x1b[90m? Unknown\x1b[0m",
                 };
+                let host_info = format!("{} (Host: {})", p.local_url, p.local_domain);
                 println!(
                     "{:<20} {:<32} {:<27} {:<14} {}",
-                    p.project_id.0, p.name, status_str, p.php_version, p.local_url
+                    p.project_id.0, p.name, status_str, p.php_version, host_info
                 );
             }
         }
@@ -196,13 +197,20 @@ async fn main() -> Result<()> {
                         println!("Volume UUID:   {}", p.volume_uuid.0);
                         println!("Document Root: {}", p.document_root);
                         println!("PHP Version:   {}", p.php_version);
-                        println!("Local Domain:  {}", p.local_domain);
                         println!("Status:        {:?}", st.status);
                         println!("PHP-FPM PID:   {:?}", st.php_fpm_pid);
                         println!("Socket Path:   {:?}", st.socket_path);
                         println!("Nginx PID:     {:?}", st.nginx_pid);
                         println!("Gateway Port:  {}", st.gateway_port);
-                        println!("Local URL:     {}", st.local_url);
+                        println!("Loopback URL:  {}", st.local_url);
+                        println!(
+                            "Virtual Host:  {} (system .test resolver pending)",
+                            st.local_domain
+                        );
+                        println!(
+                            "Access Test:   curl -H 'Host: {}' {}/",
+                            st.local_domain, st.local_url
+                        );
                         println!("Diagnostics:   {}", st.message);
                     }
                     None => {
@@ -226,10 +234,27 @@ async fn main() -> Result<()> {
                 .start_project(&target.id)
                 .context("Failed to start project runtime")?;
 
-            println!(
-                "\x1b[32m✓ Successfully started runtime for project '{}'\x1b[0m",
-                target.name
-            );
+            match st.status {
+                ProjectStatus::Running => {
+                    println!(
+                        "\x1b[32m✓ Successfully started runtime for project '{}' (RUNNING)\x1b[0m",
+                        target.name
+                    );
+                }
+                ProjectStatus::Degraded => {
+                    println!(
+                        "\x1b[33m⚠ Runtime started with warnings for project '{}' (DEGRADED)\x1b[0m",
+                        target.name
+                    );
+                }
+                other => {
+                    println!(
+                        "\x1b[31m✖ Runtime failed verification for project '{}' ({:?})\x1b[0m",
+                        target.name, other
+                    );
+                }
+            }
+
             if let Some(pid) = st.php_fpm_pid {
                 println!("  PHP-FPM PID:      {}", pid);
             }
@@ -239,7 +264,15 @@ async fn main() -> Result<()> {
             if let Some(pid) = st.nginx_pid {
                 println!("  Nginx Master PID: {}", pid);
             }
-            println!("  Local Gateway:    {}", st.local_url);
+            println!("  Loopback Gateway: {}", st.local_url);
+            println!(
+                "  Virtual Host:     {} (system .test resolver pending)",
+                st.local_domain
+            );
+            println!(
+                "  Access Command:   curl -H 'Host: {}' {}/",
+                st.local_domain, st.local_url
+            );
             println!("  Diagnostics:      {}", st.message);
         }
         Commands::Stop { project } => {

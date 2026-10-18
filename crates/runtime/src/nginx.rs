@@ -275,10 +275,7 @@ fastcgi_param  REDIRECT_STATUS    200;
                             let nginx_bin = Self::find_nginx_binary()?;
                             let canonical_bin =
                                 dunce::canonicalize(&nginx_bin).unwrap_or(nginx_bin);
-                            if identity.executable_path() == canonical_bin
-                                || identity.executable_path().file_name()
-                                    == canonical_bin.file_name()
-                            {
+                            if identity.executable_path() == canonical_bin {
                                 // Port 8080 is bound by our LocalForge Nginx master process!
                                 *lock = Some((identity, None));
                                 return self.reload();

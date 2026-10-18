@@ -56,6 +56,13 @@ impl ProcessManager for MacOSProcessManager {
 
         let bsdinfo = unsafe { bsdinfo.assume_init() };
 
+        // Process UID verification: Must belong to current user
+        let current_uid = unsafe { libc::getuid() };
+        if bsdinfo.pbi_uid != current_uid {
+            // Process belongs to another user (e.g. root or system user); fail closed
+            return Ok(None);
+        }
+
         let mut path_buf = [0u8; PROC_PIDPATHINFO_MAXSIZE];
         let path_ret = unsafe {
             proc_pidpath(
@@ -87,6 +94,7 @@ impl ProcessManager for MacOSProcessManager {
         Ok(Some(ProcessIdentity {
             pid,
             pgid: bsdinfo.pbi_pgid,
+            uid: bsdinfo.pbi_uid,
             std_path: canonical_path,
             start_time_secs: bsdinfo.pbi_start_tvsec,
             start_time_usecs: bsdinfo.pbi_start_tvusec as u32,
@@ -102,20 +110,25 @@ impl ProcessManager for MacOSProcessManager {
     ) -> bool {
         match self.inspect_process(pid) {
             Ok(Some(identity)) => {
-                // Check start time: exactly matches
+                // 1. Verify owner UID matches current process UID
+                let current_uid = unsafe { libc::getuid() };
+                if identity.uid != current_uid {
+                    return false;
+                }
+
+                // 2. Strict start time verification: exactly matches
                 if identity.start_time_secs != expected_start_secs
                     || identity.start_time_usecs != expected_start_usecs
                 {
                     return false;
                 }
 
-                // Check executable path
+                // 3. Strict canonical executable path verification
                 let canonical_expected = dunce::canonicalize(expected_executable)
                     .unwrap_or_else(|_| expected_executable.to_path_buf());
 
-                // Match exact path or file name if canonical paths resolve symlinks
+                // Strictly match canonical path (no unsafe basename fallback!)
                 identity.executable_path() == canonical_expected
-                    || identity.executable_path().file_name() == canonical_expected.file_name()
             }
             _ => false,
         }
@@ -132,12 +145,21 @@ impl ProcessManager for MacOSProcessManager {
         let identity = match self.inspect_process(pid)? {
             Some(id) => id,
             None => {
-                // Process already terminated
+                // Process already terminated or does not belong to current user
                 return Ok(());
             }
         };
 
-        // Strict PID reuse check
+        // 1. Verify owner UID
+        let current_uid = unsafe { libc::getuid() };
+        if identity.uid != current_uid {
+            return Err(LocalForgeError::PlatformError(format!(
+                "UID mismatch for PID {pid}: process owner UID {} does not match current user {current_uid}",
+                identity.uid
+            )));
+        }
+
+        // 2. Strict PID reuse check
         if identity.start_time_secs != expected_start_secs
             || identity.start_time_usecs != expected_start_usecs
         {
@@ -147,12 +169,10 @@ impl ProcessManager for MacOSProcessManager {
             )));
         }
 
-        // Strict executable check
+        // 3. Strict canonical executable path check (NO unsafe basename fallback)
         let canonical_expected = dunce::canonicalize(expected_executable)
             .unwrap_or_else(|_| expected_executable.to_path_buf());
-        if identity.executable_path() != canonical_expected
-            && identity.executable_path().file_name() != canonical_expected.file_name()
-        {
+        if identity.executable_path() != canonical_expected {
             return Err(LocalForgeError::PlatformError(format!(
                 "Executable mismatch detected for PID {pid}: expected '{}', found '{}'",
                 canonical_expected.display(),
@@ -160,18 +180,45 @@ impl ProcessManager for MacOSProcessManager {
             )));
         }
 
-        let pgid = identity.pgid;
+        // RESIDUAL TOCTOU RISK & PLATFORM LIMITATIONS:
+        // On Unix platforms (including macOS), there is a theoretical microsecond TOCTOU window
+        // between inspecting a PID via proc_pidinfo and issuing the kill/killpg syscall.
+        // Pure atomic signal-by-token requires kernel pidfds (Linux) or Mach task ports,
+        // which macOS does not permit unprivileged processes to acquire for child daemons.
+        // LocalForge mitigates this window by:
+        // 1. Verifying UID matches current user.
+        // 2. Verifying exact kernel start timestamp (seconds + microseconds).
+        // 3. Verifying the canonical binary path (strictly rejecting basename-only matches).
+        // 4. Verifying process group containment (preventing accidental self-group signaling).
+        // 5. Checking signal syscall return values and errno.
 
-        // Stage 1: Send SIGTERM to process group or single process
-        unsafe {
-            if pgid > 1 && pgid == pid {
-                libc::killpg(pgid as i32, libc::SIGTERM);
+        let pgid = identity.pgid;
+        let my_pgid = unsafe { libc::getpgrp() as u32 };
+
+        // Process group targeting:
+        // Only target process group if pgid > 1, pgid == pid (process is group leader),
+        // and pgid is NOT our own process group (to prevent killing LocalForge itself!).
+        let use_killpg = pgid > 1 && pgid == pid && pgid != my_pgid;
+
+        // Stage 1: Send SIGTERM and check syscall result
+        let res = unsafe {
+            if use_killpg {
+                libc::killpg(pgid as i32, libc::SIGTERM)
             } else {
-                libc::kill(pid as i32, libc::SIGTERM);
+                libc::kill(pid as i32, libc::SIGTERM)
+            }
+        };
+
+        if res != 0 {
+            let err = std::io::Error::last_os_error();
+            if err.raw_os_error() != Some(libc::ESRCH) {
+                return Err(LocalForgeError::PlatformError(format!(
+                    "Failed to send SIGTERM to PID {pid} (pgid: {pgid}): {err}"
+                )));
             }
         }
 
-        // Wait up to grace_period_secs
+        // Wait up to grace_period_secs with polling
         let start = std::time::Instant::now();
         let timeout = Duration::from_secs(grace_period_secs);
         while start.elapsed() < timeout {
@@ -181,6 +228,7 @@ impl ProcessManager for MacOSProcessManager {
                     // Check if PID was recycled while waiting
                     if current.start_time_secs != expected_start_secs
                         || current.start_time_usecs != expected_start_usecs
+                        || current.uid != current_uid
                     {
                         // Process exited and PID was recycled by another process! Do not kill!
                         return Ok(());
@@ -193,16 +241,26 @@ impl ProcessManager for MacOSProcessManager {
             }
         }
 
-        // Stage 2: Bounded escalation to SIGKILL if still alive and identity still matches
+        // Stage 2: Bounded escalation to SIGKILL if still alive and identity still strictly matches
         if let Some(current) = self.inspect_process(pid)? {
             if current.start_time_secs == expected_start_secs
                 && current.start_time_usecs == expected_start_usecs
+                && current.uid == current_uid
+                && current.executable_path() == canonical_expected
             {
-                unsafe {
-                    if pgid > 1 && pgid == pid {
-                        libc::killpg(pgid as i32, libc::SIGKILL);
+                let res = unsafe {
+                    if use_killpg {
+                        libc::killpg(pgid as i32, libc::SIGKILL)
                     } else {
-                        libc::kill(pid as i32, libc::SIGKILL);
+                        libc::kill(pid as i32, libc::SIGKILL)
+                    }
+                };
+                if res != 0 {
+                    let err = std::io::Error::last_os_error();
+                    if err.raw_os_error() != Some(libc::ESRCH) {
+                        return Err(LocalForgeError::PlatformError(format!(
+                            "Failed to send SIGKILL to PID {pid}: {err}"
+                        )));
                     }
                 }
             }
@@ -253,5 +311,65 @@ mod tests {
             1,
         );
         assert!(err.is_err(), "Must fail closed on start time mismatch");
+    }
+
+    #[test]
+    fn test_executable_path_mismatch_fails_closed() {
+        let pm = MacOSProcessManager::new();
+        let pid = std::process::id();
+        let id = pm.inspect_process(pid).unwrap().unwrap();
+
+        let dummy_path = Path::new("/bin/ls");
+        let is_verified =
+            pm.verify_process_identity(pid, dummy_path, id.start_time_secs, id.start_time_usecs);
+        assert!(!is_verified, "Different executable path must be rejected");
+
+        let err = pm.terminate_process_group_verified(
+            pid,
+            dummy_path,
+            id.start_time_secs,
+            id.start_time_usecs,
+            1,
+        );
+        assert!(err.is_err(), "Must fail closed on executable path mismatch");
+    }
+
+    #[test]
+    fn test_basename_only_match_is_strictly_rejected() {
+        let pm = MacOSProcessManager::new();
+        let pid = std::process::id();
+        let id = pm.inspect_process(pid).unwrap().unwrap();
+
+        // Create a spoofed path with identical basename but different directory
+        let fake_path = Path::new("/tmp").join(id.executable_path().file_name().unwrap());
+
+        let is_verified =
+            pm.verify_process_identity(pid, &fake_path, id.start_time_secs, id.start_time_usecs);
+        assert!(
+            !is_verified,
+            "Basename-only matching must be strictly rejected (unsafe fallback removed)"
+        );
+
+        let err = pm.terminate_process_group_verified(
+            pid,
+            &fake_path,
+            id.start_time_secs,
+            id.start_time_usecs,
+            1,
+        );
+        assert!(err.is_err(), "Must fail closed on non-canonical path match");
+    }
+
+    #[test]
+    fn test_process_group_safety_avoids_self_group() {
+        let pm = MacOSProcessManager::new();
+        let pid = std::process::id();
+        let id = pm.inspect_process(pid).unwrap().unwrap();
+        let my_pgid = unsafe { libc::getpgrp() as u32 };
+
+        // Process group of current process should match getpgrp()
+        assert_eq!(id.pgid, my_pgid);
+        // The manager's safety guard ensures that even if pgid == pid,
+        // it will never call killpg on current test process group.
     }
 }

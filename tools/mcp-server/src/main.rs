@@ -169,7 +169,9 @@ fn handle_tool_call(
                                 "local_domain": p.local_domain,
                                 "status": format!("{:?}", p.status),
                                 "php_fpm_socket": p.path.join(".localforge/run/php-fpm.sock").to_string_lossy(),
-                                "local_url": format!("http://{}:8080", p.local_domain)
+                                "local_url": "http://127.0.0.1:8080",
+                                "access_command": format!("curl -H 'Host: {}' http://127.0.0.1:8080/", p.local_domain),
+                                "dns_note": "macOS system resolver for .test domains pending. Access via loopback gateway with Host header."
                             }),
                             false,
                         ),

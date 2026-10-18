@@ -1,4 +1,4 @@
-export type ProjectStatus = "running" | "stopped" | "disconnected" | "degraded";
+export type ProjectStatus = "running" | "stopped" | "starting" | "stopping" | "disconnected" | "degraded" | "failed" | "unknown";
 
 export interface ProjectRecord {
   id: string;

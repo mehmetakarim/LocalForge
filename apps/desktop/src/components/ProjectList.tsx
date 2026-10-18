@@ -4,7 +4,6 @@ import {
   Play,
   Square,
   AlertTriangle,
-  ExternalLink,
   Cpu,
   HardDrive,
   Copy,
@@ -27,7 +26,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const copyUrl = (domain: string, id: string) => {
-    navigator.clipboard.writeText(`http://${domain}:8080`);
+    navigator.clipboard.writeText(`curl -H 'Host: ${domain}' http://127.0.0.1:8080/`);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1800);
   };
@@ -58,6 +57,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       {projects.map((p) => {
         const isDisconnected = p.status === "disconnected";
         const isRunning = p.status === "running";
+        const isDegraded = p.status === "degraded";
+        const isFailed = p.status === "failed";
         const isExternal = p.path.startsWith("/Volumes");
 
         // Generate monogram initials
@@ -72,8 +73,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({
           <div
             key={p.id}
             className={`group relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
-              isDisconnected
+              isDisconnected || isFailed
                 ? "bg-gradient-to-b from-rose-950/20 via-neutral-900/60 to-neutral-950/80 border-rose-500/30 shadow-lg shadow-rose-950/20"
+                : isDegraded
+                ? "bg-gradient-to-b from-amber-950/20 via-neutral-900/60 to-neutral-950/80 border-amber-500/30 shadow-lg shadow-amber-950/20"
                 : isRunning
                 ? "bg-gradient-to-b from-neutral-800/60 via-neutral-900/70 to-neutral-950/90 border-blue-500/35 shadow-xl shadow-blue-500/5"
                 : "apple-card hover:border-white/15"
@@ -88,7 +91,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                     className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm tracking-wider shadow-inner transition-transform group-hover:scale-105 duration-200 ${
                       isRunning
                         ? "bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-blue-400/20"
-                        : isDisconnected
+                        : isDegraded
+                        ? "bg-gradient-to-tr from-amber-600 to-yellow-600 text-white"
+                        : isDisconnected || isFailed
                         ? "bg-gradient-to-tr from-rose-700 to-orange-700 text-white"
                         : "bg-gradient-to-tr from-neutral-700 via-neutral-800 to-neutral-900 text-neutral-300 border border-white/10"
                     }`}
@@ -114,6 +119,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase border transition-all ${
                       isRunning
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-xs shadow-emerald-500/20"
+                        : isDegraded
+                        ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                        : isFailed
+                        ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
                         : isDisconnected
                         ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
                         : "bg-neutral-800/80 text-neutral-400 border-white/5"
@@ -123,12 +132,22 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                       className={`w-1.5 h-1.5 rounded-full ${
                         isRunning
                           ? "bg-emerald-400 animate-pulse"
-                          : isDisconnected
+                          : isDegraded
+                          ? "bg-amber-400"
+                          : isFailed || isDisconnected
                           ? "bg-rose-400"
                           : "bg-neutral-500"
                       }`}
                     />
-                    {isRunning ? "Çalışıyor" : isDisconnected ? "Bağlantı Yok" : "Durduruldu"}
+                    {isRunning
+                      ? "Çalışıyor"
+                      : isDegraded
+                      ? "Bozuk (Degraded)"
+                      : isFailed
+                      ? "Başarısız"
+                      : isDisconnected
+                      ? "Bağlantı Yok"
+                      : "Durduruldu"}
                   </span>
                 </div>
               </div>
@@ -188,32 +207,32 @@ export const ProjectList: React.FC<ProjectListProps> = ({
 
                   <button
                     onClick={() => copyUrl(p.local_domain, p.id)}
-                    className="p-1.5 rounded-lg text-neutral-400 hover:text-white apple-button-ghost transition-colors"
-                    title="Yerel URL'yi Kopyala (http://...:8080)"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:text-white apple-button-ghost transition-colors border border-white/5 hover:border-white/10"
+                    title="Loopback curl komutunu panoya kopyala: curl -H 'Host: ...' http://127.0.0.1:8080/"
                   >
                     {copiedId === p.id ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-[11px] text-emerald-400">Kopyalandı!</span>
+                      </>
                     ) : (
-                      <Copy className="w-3.5 h-3.5" />
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">curl Kopyala</span>
+                      </>
                     )}
                   </button>
                 </div>
               )}
 
               <div className="flex items-center gap-1">
-                <a
-                  href={`http://${p.local_domain}:8080`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:text-white apple-button-ghost transition-colors ${
-                    isDisconnected || !isRunning ? "opacity-35 pointer-events-none" : ""
-                  }`}
-                  title="Tarayıcıda Aç"
+                <div
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] text-neutral-400 bg-neutral-900/60 border border-white/5 select-none"
+                  title="macOS sistem DNS çözücü henüz yapılandırılmadı. Doğrudan tarayıcı yerine loopback ve Host başlığı kullanın."
                 >
-                  <Globe className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Aç</span>
-                  <ExternalLink className="w-3 h-3 text-neutral-400 ml-0.5" />
-                </a>
+                  <Globe className="w-3 h-3 text-neutral-500" />
+                  <span>.test bekliyor</span>
+                </div>
               </div>
             </div>
           </div>

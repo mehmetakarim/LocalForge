@@ -139,6 +139,27 @@ impl PhpFpmSupervisor {
         Ok(bin)
     }
 
+    /// Verifies if a given executable path is an authentic canonical PHP-FPM binary.
+    /// Strictly validates against discovered legitimate PHP-FPM binaries on the system.
+    pub fn is_legitimate_php_fpm_binary(path: &Path) -> bool {
+        let canonical = match path.canonicalize() {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+
+        let common = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4", "any"];
+        for v in common {
+            if let Ok((bin, _)) = Self::find_php_fpm_binary(v) {
+                if let Ok(c) = bin.canonicalize() {
+                    if c == canonical {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Returns the dedicated Unix socket path for a project, safely bounded for sockaddr_un 104-byte limit.
     pub fn socket_path(&self, project_id: &ProjectId) -> PathBuf {
         let standard = self.run_dir.join(format!("{}.sock", project_id.0));
@@ -184,7 +205,11 @@ impl PhpFpmSupervisor {
     ) -> Result<PathBuf> {
         let mut map = self.active_pools.lock().unwrap();
 
-        // 1. Check if already active, alive, and verified
+        // 1. Validate PHP binary
+        let (fpm_bin, _) = Self::find_php_fpm_binary(php_version)?;
+        let canonical_fpm = fpm_bin.canonicalize().unwrap_or(fpm_bin.clone());
+
+        // 2. Check if already active, alive, and verified
         if let Some(pool) = map.get_mut(&project_id.0) {
             let verified = self.process_manager.verify_process_identity(
                 pool.identity.pid,
@@ -212,12 +237,7 @@ impl PhpFpmSupervisor {
                 if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
                         if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                            let exec = identity.executable_path();
-                            if exec
-                                .file_name()
-                                .map(|n| n.to_string_lossy().contains("php-fpm"))
-                                .unwrap_or(false)
-                            {
+                            if identity.executable_path() == canonical_fpm {
                                 return Ok(sock_path);
                             }
                         }
@@ -225,9 +245,6 @@ impl PhpFpmSupervisor {
                 }
             }
         }
-
-        // 2. Validate PHP binary
-        let (fpm_bin, _) = Self::find_php_fpm_binary(php_version)?;
 
         // 3. Stale socket cleanup
         let sock_path = self.socket_path(project_id);
@@ -360,12 +377,7 @@ impl PhpFpmSupervisor {
                 if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
                         if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                            let exec = identity.executable_path();
-                            if exec
-                                .file_name()
-                                .map(|n| n.to_string_lossy().contains("php-fpm"))
-                                .unwrap_or(false)
-                            {
+                            if Self::is_legitimate_php_fpm_binary(identity.executable_path()) {
                                 let _ = self.process_manager.terminate_process_group_verified(
                                     identity.pid,
                                     identity.executable_path(),
@@ -414,11 +426,7 @@ impl PhpFpmSupervisor {
                 if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
                         if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                            let exec = identity.executable_path();
-                            return exec
-                                .file_name()
-                                .map(|n| n.to_string_lossy().contains("php-fpm"))
-                                .unwrap_or(false);
+                            return Self::is_legitimate_php_fpm_binary(identity.executable_path());
                         }
                     }
                 }
@@ -437,12 +445,7 @@ impl PhpFpmSupervisor {
         if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
                 if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                    let exec = identity.executable_path();
-                    if exec
-                        .file_name()
-                        .map(|n| n.to_string_lossy().contains("php-fpm"))
-                        .unwrap_or(false)
-                    {
+                    if Self::is_legitimate_php_fpm_binary(identity.executable_path()) {
                         return Some(identity);
                     }
                 }

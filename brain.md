@@ -10,8 +10,8 @@ Welcome to the centralized project brain of **LocalForge**. This file serves as 
 |---|---|
 | **Project Name** | LocalForge |
 | **Repo** | `mehmetakarim/LocalForge` |
-| **Active Branch** | `phase-r1/r1-1-runtime-implementation` |
-| **Current Phase** | **Phase R1.1 — Real PHP-FPM & Nginx Runtime Integration** |
+| **Active Branch** | `phase-r1/r1-1a-runtime-remediation` |
+| **Current Phase** | **Phase R1.1A — Targeted Acceptance Remediation** |
 | **Phase Status** | COMPLETED (Awaiting Product Owner Acceptance) |
 | **Design Baseline** | **Spatial Studio Visual Direction & Dual-Mode UI** (PO Approved, ADR-0010) |
 | **Runtime Architecture** | Darwin Kernel Verified Process Identity, Shared Nginx, Isolated FPM Pools (ADR-0011, ADR-0012) |

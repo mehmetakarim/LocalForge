@@ -309,3 +309,145 @@ fn test_r1_1_06_multi_project_isolation() {
     service.stop_project(&proj_b.id).unwrap();
     assert!(!sock_b.exists());
 }
+
+#[test]
+fn test_r1_1a_01_probe_classification_distinguishes_routing_from_infrastructure() {
+    use localforge_runtime::{classify_probe_result, RuntimeError};
+
+    // 1. Success HTTP 200 -> Running
+    let assess_200 = classify_probe_result(Ok((200, "OK".into())));
+    assert_eq!(assess_200.project_status(), ProjectStatus::Running);
+    assert!(assess_200.message().contains("200"));
+
+    // 2. HTTP 404 (Route not found / missing root index) -> Running with routing diagnostic
+    let assess_404 = classify_probe_result(Ok((404, "Not Found".into())));
+    assert_eq!(assess_404.project_status(), ProjectStatus::Running);
+    assert!(assess_404.message().contains("HTTP 404"));
+    assert!(assess_404
+        .message()
+        .contains("without default root handler"));
+
+    // 3. HTTP 403 -> Running with permission / index diagnostic
+    let assess_403 = classify_probe_result(Ok((403, "Forbidden".into())));
+    assert_eq!(assess_403.project_status(), ProjectStatus::Running);
+    assert!(assess_403.message().contains("HTTP 403"));
+
+    // 4. HTTP 500 (Application script error) -> Degraded (infrastructure alive, app code crashed)
+    let assess_500 = classify_probe_result(Ok((500, "Internal Server Error".into())));
+    assert_eq!(assess_500.project_status(), ProjectStatus::Degraded);
+    assert!(assess_500.message().contains("HTTP 500"));
+    assert!(assess_500.message().contains("Inspect PHP error log"));
+
+    // 5. HTTP 502 (FastCGI upstream / Bad Gateway) -> Degraded (NEVER Running!)
+    let assess_502 = classify_probe_result(Ok((502, "Bad Gateway".into())));
+    assert_eq!(assess_502.project_status(), ProjectStatus::Degraded);
+    assert!(assess_502.message().contains("HTTP 502"));
+    assert!(assess_502
+        .message()
+        .contains("FastCGI communication failed"));
+
+    // 6. HTTP 504 (FastCGI timeout) -> Degraded (NEVER Running!)
+    let assess_504 = classify_probe_result(Ok((504, "Gateway Timeout".into())));
+    assert_eq!(assess_504.project_status(), ProjectStatus::Degraded);
+    assert!(assess_504.message().contains("HTTP 504"));
+
+    // 7. Transport connection failure -> Degraded (NEVER Running!)
+    let transport_err = Err(RuntimeError::ServiceUnhealthy {
+        service: "nginx".into(),
+        reason: "Connection refused to 127.0.0.1:8080".into(),
+    });
+    let assess_transport = classify_probe_result(transport_err);
+    assert_eq!(assess_transport.project_status(), ProjectStatus::Degraded);
+    assert!(assess_transport
+        .message()
+        .contains("Gateway transport error"));
+}
+
+#[test]
+fn test_r1_1a_02_loopback_url_and_domain_separation() {
+    let dir = tempdir().unwrap();
+    let store = Arc::new(MetadataStore::open_in_memory().unwrap());
+    let volume_manager = Arc::new(MacOSVolumeManager::new());
+    let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
+    let vol_info = volume_manager
+        .find_volume_for_path(dir.path())
+        .unwrap()
+        .unwrap();
+
+    let project = ProjectRecord {
+        id: ProjectId::from_string("proj_url_test"),
+        name: "URL Test".into(),
+        path: dir.path().to_path_buf(),
+        volume_uuid: vol_info.uuid,
+        document_root: "".into(),
+        php_version: "8.5".into(),
+        local_domain: "urltest.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-18T00:00:00Z".into(),
+        updated_at: "2026-10-18T00:00:00Z".into(),
+    };
+    store.insert_project(&project).unwrap();
+
+    let service = ProjectRuntimeService::create_default(
+        dir.path().join("runtime"),
+        store.clone(),
+        volume_manager,
+        volume_barrier,
+        process_manager,
+        18099,
+    );
+
+    let status = service.get_runtime_status(&project.id).unwrap();
+    // Must report loopback IP with port, NEVER unresolvable domain
+    assert_eq!(status.local_url, "http://127.0.0.1:18099");
+    assert_eq!(status.local_domain, "urltest.test");
+}
+
+#[test]
+fn test_r1_1a_03_stale_or_dead_fpm_socket_never_reports_running() {
+    let dir = tempdir().unwrap();
+    let store = Arc::new(MetadataStore::open_in_memory().unwrap());
+    let volume_manager = Arc::new(MacOSVolumeManager::new());
+    let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
+    let vol_info = volume_manager
+        .find_volume_for_path(dir.path())
+        .unwrap()
+        .unwrap();
+
+    // Insert a project with status Running in DB, but with no live process
+    let project = ProjectRecord {
+        id: ProjectId::from_string("proj_crashed"),
+        name: "Crashed Site".into(),
+        path: dir.path().to_path_buf(),
+        volume_uuid: vol_info.uuid,
+        document_root: "".into(),
+        php_version: "8.5".into(),
+        local_domain: "crashed.test".into(),
+        status: ProjectStatus::Running,
+        created_at: "2026-10-18T00:00:00Z".into(),
+        updated_at: "2026-10-18T00:00:00Z".into(),
+    };
+    store.insert_project(&project).unwrap();
+
+    let service = ProjectRuntimeService::create_default(
+        dir.path().join("runtime"),
+        store.clone(),
+        volume_manager,
+        volume_barrier,
+        process_manager,
+        18098,
+    );
+
+    let status = service.get_runtime_status(&project.id).unwrap();
+    // Must be FAILED, NOT RUNNING!
+    assert_eq!(status.status, ProjectStatus::Failed);
+    assert!(status.message.contains("terminated unexpectedly"));
+
+    // DB must be synced to Failed
+    let refreshed = store.get_project(&project.id).unwrap().unwrap();
+    assert_eq!(refreshed.status, ProjectStatus::Failed);
+}

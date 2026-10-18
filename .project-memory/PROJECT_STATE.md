@@ -6,14 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.1 — Real PHP-FPM & Nginx Runtime Integration**
+- **Active Phase**: **Phase R1.1A — Targeted Acceptance Remediation**
 - **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-1-runtime-implementation`
-- **Target Remote**: `origin/phase-r1/r1-1-runtime-implementation` (base: `main`)
-- **Previous Phase Status**: **Recovery Phase R1.0 — CONDITIONALLY ACCEPTED** by Product Owner.
+- **Active Branch**: `phase-r1/r1-1a-runtime-remediation`
+- **Target Remote**: `origin/phase-r1/r1-1a-runtime-remediation` (base: `b7be903`)
+- **Previous Phase Status**: **Phase R1.1 — CONDITIONALLY ACCEPTED** (subject to R1.1A acceptance remediation).
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.2 (MariaDB/Resilience - Locked), R1.3 (Spatial Studio UI - Locked).
-- **Test Matrix Status**: 25/25 automated tests pass, zero Clippy warnings, live HTTP 200 FastCGI verified on external APFS volume.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Locked), R1.3 (Spatial Studio UI - Locked).
+- **Test Matrix Status**: 26/26 automated tests pass across 8 crates, zero Clippy warnings, live HTTP 200 FastCGI verified on external APFS volume.
 
 ---
 
@@ -28,7 +28,8 @@ This document tracks the canonical technical and operational state of the LocalF
 | **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39123438754` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
 | **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
 | **Recovery Phase R1.0** | ARCHITECTURE | ACCEPTED | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
-| **Phase R1.1: Runtime Integration** | REAL DAEMONS | COMPLETED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, PID reuse defense, multi-project isolation. |
+| **Phase R1.1: Runtime Integration** | REAL DAEMONS | CONDITIONALLY ACCEPTED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, multi-project isolation. |
+| **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | COMPLETED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
 
 ---
 

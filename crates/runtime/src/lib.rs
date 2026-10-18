@@ -10,4 +10,6 @@ pub use health::{find_available_port, is_port_available, is_unix_socket_alive, p
 pub use mariadb::MariaDbSupervisor;
 pub use nginx::NginxSupervisor;
 pub use php::PhpFpmSupervisor;
-pub use service::{ProjectRuntimeService, ProjectRuntimeStatus};
+pub use service::{
+    classify_probe_result, GatewayHealthAssessment, ProjectRuntimeService, ProjectRuntimeStatus,
+};

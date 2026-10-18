@@ -25,6 +25,7 @@ pub trait CredentialStore: Send + Sync {
 pub struct ProcessIdentity {
     pub pid: u32,
     pub pgid: u32,
+    pub uid: u32,
     pub std_path: std::path::PathBuf,
     pub start_time_secs: u64,
     pub start_time_usecs: u32,
