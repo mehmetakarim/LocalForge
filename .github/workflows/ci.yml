@@ -2,7 +2,7 @@ name: LocalForge CI
 
 on:
   push:
-    branches: [ "main", "phase-*", "release-*", "recovery/*" ]
+    branches: [ "main", "phase-*", "phase-**", "release-*", "recovery/**" ]
   pull_request:
     branches: [ "main" ]
 
