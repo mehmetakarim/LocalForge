@@ -112,6 +112,7 @@ LocalForge currently operates an unprivileged local Nginx gateway on port 8080. 
 | `cargo test` | Workspace test suite | **PASS** | 26 tests across 8 crates (0 failed, 0 ignored) |
 | `runtime_integration_test` | End-to-end runtime & daemons | **PASS** | 7 tests passed (real PHP-FPM, multi-pool isolation, probe classification) |
 | `npm run build` | Desktop UI compilation | **PASS** | `tsc && vite build` succeeded with zero TypeScript errors |
+| **GitHub Actions CI** | Full CI workflow on macOS Apple Silicon | **PASS** | Run `39142354888` Green (Format, Clippy, Build, Workspace Tests) |
 | **CLI Acceptance** | External SSD Project Lifecycle | **PASS** | `list` -> `start` -> `curl` (HTTP 200) -> `status` -> `stop` -> `status` |
 
 ---
