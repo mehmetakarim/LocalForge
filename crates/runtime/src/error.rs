@@ -29,6 +29,18 @@ pub enum RuntimeError {
     #[error("Database error: {0}")]
     DatabaseError(String),
 
+    #[error("Database destructive operation unauthorized: {0}")]
+    DatabaseUnauthorized(String),
+
+    #[error("Database backup creation failed: {0}")]
+    BackupError(String),
+
+    #[error("Database restore failed: {0}")]
+    RestoreError(String),
+
+    #[error("Credential security violation: {0}")]
+    CredentialError(String),
+
     #[error("IO error in runtime supervisor: {0}")]
     Io(#[from] std::io::Error),
 

@@ -6,14 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.2 — MariaDB Integration, Storage Resilience & Multi-Project Verification**
+- **Active Phase**: **Phase R1.2A — Database Security Remediation**
 - **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-2-database-and-resilience`
-- **Target Remote**: `origin/phase-r1/r1-2-database-and-resilience`
-- **Previous Phase Status**: **Phase R1.1A — CONDITIONALLY ACCEPTED**
+- **Active Branch**: `phase-r1/r1-2a-database-security`
+- **Target Remote**: `origin/phase-r1/r1-2a-database-security`
+- **Previous Phase Status**: **Phase R1.2 — CONDITIONALLY ACCEPTED**
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Done), R1.3 (Spatial Studio UI - Locked).
-- **Test Matrix Status**: 32/32 automated tests pass across 8 crates (including 6 comprehensive MariaDB/E2E/resilience tests), zero Clippy warnings, live PHP PDO FastCGI on external APFS volume verified.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Conditionally Accepted), R1.2A (Database Security Remediation - Completed), R1.3 (Spatial Studio UI - Locked).
+- **Test Matrix Status**: 37/37 automated tests pass across 8 crates (including 11 MariaDB integration & adversarial security tests, 7 runtime integration tests, 5 storage tests, 9 runtime unit tests, and 5 core tests), zero Clippy warnings, clean Vite production build.
 
 ---
 
@@ -23,14 +23,15 @@ This document tracks the canonical technical and operational state of the LocalF
 |---|---|---|---|
 | **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED | Specifications, memory structure, and ADRs established. |
 | **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compile; physical disconnect verification staged in R1.2. |
-| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1/R1.2) | Live unprivileged Darwin kernel verified FPM, MariaDB & shared Nginx loopback gateway. E2E HTTP 200 PDO PASS. |
+| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1/R1.2/R1.2A) | Live unprivileged Darwin kernel verified FPM, MariaDB & shared Nginx loopback gateway. E2E HTTP 200 PDO PASS. |
 | **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | Non-dry-run SFTP rejected with `DeploymentNotImplemented`. MCP self-approval bypass eliminated. Real transport deferred. |
 | **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39142354888` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
 | **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
 | **Recovery Phase R1.0** | ARCHITECTURE | ACCEPTED | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
 | **Phase R1.1: Runtime Integration** | REAL DAEMONS | ACCEPTED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, multi-project isolation. |
 | **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | ACCEPTED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
-| **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | COMPLETED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
+| **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | CONDITIONALLY ACCEPTED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
+| **Phase R1.2A: Database Security** | SECURITY HARDENING | COMPLETED | SQL credential escaping & redaction, single-use deletion authorization, 0600 atomic stream backups, non-empty restore guard, datadir ownership validation. |
 
 ---
 
@@ -45,22 +46,29 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ---
 
-## 4. Active Priorities (Phase R1.0 Architecture Refinement)
+## 4. Phase R1.2A Security Achievements
 
-1. **Local Domain Resolution Clarity**:
-   - Guarantee unprivileged loopback access via `127.0.0.1:8080` (or `localhost:8080`) with Nginx Host-header dispatch.
-   - Decouple system-wide `.test` domain resolver configuration as a separately verified capability.
-2. **MariaDB Storage Policy Revision**:
-   - Mandate internal application data directory (`~/Library/Application Support/LocalForge/mariadb/`) as default.
-   - Keep source code on external APFS drive while isolating database files on internal SSD.
-3. **Verified Process Identity & Lifecycle Safety**:
-   - Enforce executable path and start-timestamp checks before signaling PIDs to prevent PID reuse kills.
-   - Establish shared Nginx gateway vs independent per-project PHP-FPM pools.
-4. **Spatial Studio Performance & Hardware Budgets**:
-   - Codify idle CPU (<1%), memory (<80MB), frame rate (60fps baseline, 120fps opportunistic), and blur budgets.
-   - Implement continuous animation pause guards and pagination for >12 projects.
-5. **R1 Subphase Governance & Planning**:
-   - Establish explicit scopes, test matrices, and exit criteria for R1.0, R1.1, R1.2, and R1.3.
+1. **SQL Credential Safety**:
+   - Eliminated unsafe string formatting in `create_project_database`.
+   - Implemented `escape_sql_string_literal` with null byte rejection (`\0`), quote escaping (`''`), backslash escaping (`\\`), and length constraints.
+   - Password scrubbed from stderr in error reports.
+2. **Database Deletion Authorization**:
+   - Self-authorization strictly eliminated: `approval_token == db_name` immediately returns `DatabaseUnauthorized`.
+   - Single-use cryptographic UUIDv4 token with 60s TTL via `request_database_deletion_approval`.
+3. **Secure Backup Creation**:
+   - `0o600` permissions enforced atomically via `OpenOptionsExt::mode(0o600)` at creation time.
+   - Refuses to overwrite existing files.
+   - Destination path canonicalized and symlinks rejected.
+   - Streaming stdout directly to file descriptor (O(1) memory).
+   - Validates non-empty SQL header (`--`, `/*`, `CREATE`) and renames temporary file atomically.
+4. **Safe Restore**:
+   - Destination database checked for existing tables (`information_schema.tables == 0`); refuses restore into non-empty database.
+   - Symlinks and empty/corrupt files rejected.
+   - Streams dump file directly into client stdin.
+5. **Lifecycle & Datadir Safety**:
+   - Datadir ownership verified: `meta.uid() == libc::getuid()`.
+   - Unknown existing non-empty directory protected from overwrite.
+   - Graceful shutdown via `mysqladmin` and `SIGTERM` before fallback `SIGKILL`.
 
 ---
 

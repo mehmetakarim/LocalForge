@@ -6,25 +6,24 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.2 — MariaDB Integration, Storage Resilience & Multi-Project Verification Completed**
-- **Active Git Branch**: `phase-r1/r1-2-database-and-resilience`
-- **Target Remote**: `origin/phase-r1/r1-2-database-and-resilience`
+- **Current State**: **Phase R1.2A — Database Security Remediation Completed**
+- **Active Git Branch**: `phase-r1/r1-2a-database-security`
+- **Target Remote**: `origin/phase-r1/r1-2a-database-security`
 - **Previous Milestone Status**:
   - **Recovery Phase R0**: CONDITIONALLY ACCEPTED (18/18 tests pass, CI Green).
   - **Recovery Phase R1.0**: ACCEPTED by Product Owner.
   - **Phase R1.1**: ACCEPTED by Product Owner.
   - **Phase R1.1A**: ACCEPTED by Product Owner.
-  - **Phase R1.2**: COMPLETED & FULLY VERIFIED (32/32 automated tests pass across 8 crates, zero Clippy warnings, live PHP PDO FastCGI on external APFS volume verified, 6 MariaDB integration tests pass).
-- **Completed Tasks in R1.2**:
-  - `TASK-R1.2-01`: Implemented `MariaDbSupervisor` with Darwin process identity and unprivileged Homebrew `mariadbd` lifecycle.
-  - `TASK-R1.2-02`: Implemented internal datadir isolation (`~/Library/Application Support/LocalForge/mariadb/data/`) and private Unix socket.
-  - `TASK-R1.2-03`: Implemented authenticated SQL health check (`SELECT 1;`) with latency measurement; never report RUNNING solely because port is open.
-  - `TASK-R1.2-04`: Implemented database/user provisioning, strict identifier validation, and drop confirmation token guard.
-  - `TASK-R1.2-05`: Implemented database backup (`mariadb-dump`) with `0o600` permissions and database restore.
-  - `TASK-R1.2-06`: Verified end-to-end PHP PDO connectivity on external APFS storage with data persistence across PHP restart.
-  - `TASK-R1.2-07`: Verified multi-project concurrency on shared Nginx with independent FastCGI sockets and database users.
-  - `TASK-R1.2-08`: Verified `VolumeBarrier` disconnect guard and zero fallback writes to internal disk.
-- **Next Permitted Action**: Present R1.2 acceptance report to Product Owner and await explicit authorization for Phase R1.3 (Spatial Studio UI).
+  - **Phase R1.2**: CONDITIONALLY ACCEPTED (Functional progress accepted; security remediation authorized as R1.2A).
+  - **Phase R1.2A**: COMPLETED & FULLY VERIFIED (37/37 automated tests pass across 8 crates, zero Clippy warnings, 11 MariaDB integration & adversarial security tests pass).
+- **Completed Tasks in R1.2A**:
+  - `TASK-R1.2A-01`: SQL credential escaping (`escape_sql_string_literal`), null byte rejection (`\0`), length constraints, and password redaction from stderr logs.
+  - `TASK-R1.2A-02`: Secure atomic backup streaming with `0o600` creation permissions, symlink defense, overwrite protection, and non-empty SQL header verification.
+  - `TASK-R1.2A-03`: Strict elimination of deletion self-authorization (`db_name == approval_token` fails closed) and single-use cryptographic UUIDv4 token with 60s TTL.
+  - `TASK-R1.2A-04`: Safe restore with non-empty database protection (`information_schema.tables > 0`), streaming stdin, and header integrity checks.
+  - `TASK-R1.2A-05`: Datadir ownership validation (`uid == geteuid()`), unknown existing directory guard, and graceful shutdown (`mysqladmin` & `SIGTERM` before `SIGKILL`).
+  - `TASK-R1.2A-06`: Comprehensive adversarial security test suite (5 new tests in `mariadb_integration_test.rs`).
+- **Next Permitted Action**: Present R1.2A acceptance report to Product Owner and await explicit authorization for Phase R1.3 (Spatial Studio UI).
 
 ---
 

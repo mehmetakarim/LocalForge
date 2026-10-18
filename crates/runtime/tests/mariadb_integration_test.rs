@@ -121,18 +121,36 @@ fn test_r1_2_02_database_user_provisioning_and_safety() {
     let count_out = sup.execute_query(&select_sql).unwrap();
     assert!(count_out.contains('2'), "Count must be 2. Got: {count_out}");
 
-    // 3. Drop safety: invalid confirmation token must fail closed
+    // 3. Drop safety: self-authorization using database name as token MUST fail closed
+    let self_auth = sup.drop_project_database(db_name, db_name);
+    assert!(
+        self_auth.is_err(),
+        "Self-authorization using database name as token must be rejected"
+    );
+
+    // 4. Invalid/unissued token must fail closed
     let bad_drop = sup.drop_project_database(db_name, "wrong_token");
     assert!(
         bad_drop.is_err(),
-        "Dropping database with invalid confirmation must fail"
+        "Dropping database with invalid token must fail"
     );
 
-    // 4. Drop with valid confirmation must succeed
-    let good_drop = sup.drop_project_database(db_name, db_name);
+    // 5. Explicit application-mediated approval token allows deletion
+    let approval = sup
+        .request_database_deletion_approval(db_name, "integration_test_ui")
+        .expect("Failed to request approval");
+    let good_drop = sup.drop_project_database(db_name, &approval.token);
     assert!(
         good_drop.is_ok(),
-        "Dropping database with valid confirmation must succeed"
+        "Dropping database with valid approval token must succeed: {:?}",
+        good_drop
+    );
+
+    // 6. Token reuse must fail closed (single-use)
+    let reuse_drop = sup.drop_project_database(db_name, &approval.token);
+    assert!(
+        reuse_drop.is_err(),
+        "Reusing consumed approval token must be rejected"
     );
 
     sup.stop().expect("Failed to stop MariaDB");
@@ -185,7 +203,21 @@ fn test_r1_2_03_database_backup_and_recovery() {
         );
     }
 
-    // 2. Restore into a new database
+    // 2. Overwrite Protection: dumping to existing file without permission must fail
+    let overwrite_res = sup.dump_database(source_db, &backup_file);
+    assert!(
+        overwrite_res.is_err(),
+        "Overwriting existing backup file must fail closed"
+    );
+
+    // 3. Non-empty restore protection: attempting to restore into existing nonempty source_db must fail
+    let nonempty_restore = sup.restore_database(source_db, &backup_file);
+    assert!(
+        nonempty_restore.is_err(),
+        "Restoring into existing non-empty database must fail closed"
+    );
+
+    // 4. Restore into a new database
     let target_db = "backup_restored_db";
     let restore_res = sup.restore_database(target_db, &backup_file);
     assert!(
@@ -194,7 +226,7 @@ fn test_r1_2_03_database_backup_and_recovery() {
         restore_res
     );
 
-    // 3. Verify data records in restored database
+    // 5. Verify data records in restored database
     let verify_sql = format!("USE `{target_db}`; SELECT msg FROM logs ORDER BY id;");
     let rows = sup.execute_query(&verify_sql).unwrap();
     assert!(rows.contains("first log"), "Must contain first log");
@@ -559,4 +591,188 @@ fn test_r1_2_06_storage_resilience_and_volume_barrier() {
         "Internal disk folder creation must succeed"
     );
     assert!(valid_internal_sub.exists());
+}
+
+#[test]
+fn test_r1_2a_07_credential_security_and_injection_adversarial() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+    let binaries_found = MariaDbSupervisor::discover_binaries().is_ok();
+    if !binaries_found {
+        eprintln!("Skipping MariaDB adversarial credential test: binaries not found on host");
+        return;
+    }
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let db_port = localforge_runtime::find_available_port(13590, 50).unwrap_or(13590);
+    let sup = MariaDbSupervisor::new(dir.path().to_path_buf(), db_port, pm);
+    sup.start().expect("Failed to start MariaDB");
+
+    // 1. Password with null byte must fail closed
+    let null_byte_res = sup.create_project_database("db_null", "user_null", "bad\0pass");
+    assert!(null_byte_res.is_err());
+    assert!(null_byte_res.unwrap_err().to_string().contains("null byte"));
+
+    // 2. Empty password must fail closed
+    let empty_pass_res = sup.create_project_database("db_empty", "user_empty", "");
+    assert!(empty_pass_res.is_err());
+
+    // 3. SQL injection payload in password: must be provisioned safely as literal
+    let inj_db = "db_inj_test";
+    let inj_user = "user_inj";
+    let inj_pass = "p'ass'; DROP DATABASE mysql; --";
+    let inj_res = sup.create_project_database(inj_db, inj_user, inj_pass);
+    assert!(
+        inj_res.is_ok(),
+        "SQL injection password must be safely escaped: {:?}",
+        inj_res
+    );
+
+    // Verify mysql database was NOT dropped
+    let check_mysql = sup.execute_query("SHOW DATABASES LIKE 'mysql';").unwrap();
+    assert!(
+        check_mysql.contains("mysql"),
+        "System database must not be dropped"
+    );
+
+    // 4. Special characters, quotes, backslashes and unicode in password
+    let unicode_db = "db_unicode_test";
+    let unicode_user = "user_unicode";
+    let unicode_pass = "P@ss\\w'o\"rd🚀2026_Şçğüö;--";
+    let unicode_res = sup.create_project_database(unicode_db, unicode_user, unicode_pass);
+    assert!(
+        unicode_res.is_ok(),
+        "Unicode and special char password must be provisioned: {:?}",
+        unicode_res
+    );
+
+    sup.stop().expect("Failed to stop MariaDB");
+}
+
+#[test]
+fn test_r1_2a_08_backup_symlink_defense_and_atomic_permissions() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+    let binaries_found = MariaDbSupervisor::discover_binaries().is_ok();
+    if !binaries_found {
+        eprintln!("Skipping MariaDB backup symlink test: binaries not found on host");
+        return;
+    }
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let db_port = localforge_runtime::find_available_port(13640, 50).unwrap_or(13640);
+    let sup = MariaDbSupervisor::new(dir.path().to_path_buf(), db_port, pm);
+    sup.start().expect("Failed to start MariaDB");
+
+    let db_name = "db_symlink_test";
+    sup.create_project_database(db_name, "u_sym", "p_sym")
+        .unwrap();
+
+    // Create a sensitive file
+    let sensitive_file = dir.path().join("sensitive.txt");
+    std::fs::write(&sensitive_file, "TOP_SECRET").unwrap();
+
+    let symlink_target = dir.path().join("symlink_backup.sql");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&sensitive_file, &symlink_target).unwrap();
+
+    // Dump targeting symlink must be rejected
+    let sym_res = sup.dump_database(db_name, &symlink_target);
+    assert!(sym_res.is_err(), "Dumping to symlink must fail closed");
+
+    // Verify sensitive file was not overwritten
+    let content = std::fs::read_to_string(&sensitive_file).unwrap();
+    assert_eq!(content, "TOP_SECRET");
+
+    sup.stop().expect("Failed to stop MariaDB");
+}
+
+#[test]
+fn test_r1_2a_09_restore_invalid_and_corrupt_files() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+    let binaries_found = MariaDbSupervisor::discover_binaries().is_ok();
+    if !binaries_found {
+        eprintln!("Skipping MariaDB restore invalid test: binaries not found on host");
+        return;
+    }
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let db_port = localforge_runtime::find_available_port(13690, 50).unwrap_or(13690);
+    let sup = MariaDbSupervisor::new(dir.path().to_path_buf(), db_port, pm);
+    sup.start().expect("Failed to start MariaDB");
+
+    // 1. Nonexistent file must fail closed
+    let non_existent = dir.path().join("does_not_exist.sql");
+    assert!(sup.restore_database("target_1", &non_existent).is_err());
+
+    // 2. Empty file must fail closed
+    let empty_file = dir.path().join("empty.sql");
+    std::fs::write(&empty_file, "").unwrap();
+    assert!(sup.restore_database("target_2", &empty_file).is_err());
+
+    // 3. Binary corrupted file (not SQL) must fail closed
+    let corrupt_file = dir.path().join("corrupt.sql");
+    std::fs::write(&corrupt_file, b"\x00\x01\x02\x03\xFF\xFE\xFD").unwrap();
+    assert!(sup.restore_database("target_3", &corrupt_file).is_err());
+
+    sup.stop().expect("Failed to stop MariaDB");
+}
+
+#[test]
+fn test_r1_2a_10_datadir_ownership_and_unknown_directory_guard() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+
+    let dir = tempdir().unwrap();
+    let data_dir = dir.path().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    // Populate data_dir with unexpected non-MariaDB files
+    let alien_file = data_dir.join("some_random_file.bin");
+    std::fs::write(&alien_file, "unexpected alien contents").unwrap();
+
+    let pm = Arc::new(MacOSProcessManager::new());
+    let sup = MariaDbSupervisor::new(dir.path().to_path_buf(), 13740, pm);
+
+    // Initializing datadir must fail closed due to unexpected contents without mysql/ schema
+    let init_res = sup.ensure_datadir_initialized();
+    assert!(
+        init_res.is_err(),
+        "Must refuse to overwrite unknown existing data directory"
+    );
+    assert!(init_res
+        .unwrap_err()
+        .to_string()
+        .contains("Refusing to overwrite unknown data directory"));
+}
+
+#[test]
+fn test_r1_2a_11_deletion_authorization_tampering_and_expiry() {
+    let _lock = SERIAL_TEST_LOCK.lock().unwrap();
+
+    let dir = tempdir().unwrap();
+    let sup = MariaDbSupervisor::new_simple(dir.path().to_path_buf(), 13790);
+
+    // 1. Self-approval using database name as token must be rejected
+    let self_auth = sup.drop_project_database("secret_prod_db", "secret_prod_db");
+    assert!(self_auth.is_err());
+    assert!(self_auth
+        .unwrap_err()
+        .to_string()
+        .contains("Self-authorization rejected"));
+
+    // 2. Request token for db_a, attempt to use on db_b -> must be rejected
+    let approval_a = sup
+        .request_database_deletion_approval("db_a", "ui_admin")
+        .unwrap();
+    let mismatch = sup.drop_project_database("db_b", &approval_a.token);
+    assert!(mismatch.is_err());
+    assert!(mismatch
+        .unwrap_err()
+        .to_string()
+        .contains("issued for database 'db_a', but deletion was requested for 'db_b'"));
+
+    // 3. Token cannot be reused (consumed upon lookup/mismatch)
+    let reuse = sup.drop_project_database("db_a", &approval_a.token);
+    assert!(reuse.is_err());
 }

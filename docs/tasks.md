@@ -22,20 +22,38 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.0-05** | R1 Subphase Governance & Spec Documents | Critical | COMPLETED | Principal Architect | `R1_0_ARCHITECTURE_REFINEMENT.md` through `R1_3` |
 | **TASK-R1.0-06** | Architecture Decision Records (ADR 10–12) | Critical | COMPLETED | Principal Architect | `ADR-0010`, `ADR-0011` (amended), `ADR-0012` |
 
-### Subphase R1.1: Real PHP-FPM & Nginx Integration (PLANNED / LOCKED)
+### Subphase R1.1: Real PHP-FPM & Nginx Integration (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.1-01** | Unprivileged PHP-FPM Child Process Spawning | Critical | PLANNED | Senior Rust Eng | FastCGI unix sockets, dedicated pool configs |
-| **TASK-R1.1-02** | Shared Nginx Loopback Master Process Gateway | High | PLANNED | Systems Engineer | Unprivileged port 8080 routing, dynamic vhost reloads |
-| **TASK-R1.1-03** | Verified Process Identity & Registry Engine | Critical | PLANNED | Senior Rust Eng | In-memory registry, PID reuse check, bounded SIGTERM |
-| **TASK-R1.1-04** | End-to-End Loopback HTTP 200 Verification | Critical | PLANNED | QA Lead | Automated HTTP GET verification against live socket |
+| **TASK-R1.1-01** | Unprivileged PHP-FPM Child Process Spawning | Critical | COMPLETED | Senior Rust Eng | FastCGI unix sockets, dedicated pool configs |
+| **TASK-R1.1-02** | Shared Nginx Loopback Master Process Gateway | High | COMPLETED | Systems Engineer | Unprivileged port 8080 routing, dynamic vhost reloads |
+| **TASK-R1.1-03** | Verified Process Identity & Registry Engine | Critical | COMPLETED | Senior Rust Eng | In-memory registry, PID reuse check, bounded SIGTERM |
+| **TASK-R1.1-04** | End-to-End Loopback HTTP 200 Verification | Critical | COMPLETED | QA Lead | Automated HTTP GET verification against live socket |
 
-### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (PLANNED / LOCKED)
+### Subphase R1.1A: Targeted Acceptance Remediation (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.2-01** | User-Level MariaDB Internal Datadir Supervisor | High | PLANNED | Systems Engineer | Port 3306 binding, socket ping, internal SSD datadir |
-| **TASK-R1.2-02** | Concurrent Multi-Version PHP Project Execution | Critical | PLANNED | Senior Rust Eng | Project A (8.4) & B (8.3) live side-by-side |
-| **TASK-R1.2-03** | External APFS Volume Disconnect Resilience | Critical | PLANNED | Systems Engineer | Physical/simulated disconnect safety without write fallback |
+| **TASK-R1.1A-01** | Eliminate False RUNNING Status | Critical | COMPLETED | Senior Rust Eng | Gateway health assessment, probe classification |
+| **TASK-R1.1A-02** | Harden Process Ownership Verification | Critical | COMPLETED | Security Specialist | UID matching, PGID isolation |
+| **TASK-R1.1A-03** | Honest Local URL Reporting | High | COMPLETED | Desktop/CLI Eng | Report 127.0.0.1:8080, loopback separation |
+| **TASK-R1.1A-04** | Negative Security & Regression Suite | Critical | COMPLETED | QA Lead | 7 regression tests covering probes & sockets |
+
+### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (COMPLETED / CONDITIONALLY ACCEPTED)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.2-01** | User-Level MariaDB Internal Datadir Supervisor | High | COMPLETED | Systems Engineer | Port 3306 binding, socket ping, internal SSD datadir |
+| **TASK-R1.2-02** | Concurrent Multi-Version PHP Project Execution | Critical | COMPLETED | Senior Rust Eng | Project A & B live side-by-side |
+| **TASK-R1.2-03** | External APFS Volume Disconnect Resilience | Critical | COMPLETED | Systems Engineer | Physical/simulated disconnect safety without write fallback |
+
+### Subphase R1.2A: Database Security Remediation (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.2A-01** | SQL Credential Escaping & Redaction | Critical | COMPLETED | Security Specialist | `escape_sql_string_literal`, null byte rejection, secret scrubbing |
+| **TASK-R1.2A-02** | Secure Atomic Backup Streaming (0600) | Critical | COMPLETED | Database Architect | O(1) RAM streaming, atomic temp file, symlink rejection, 0600 creation |
+| **TASK-R1.2A-03** | Elimination of Deletion Self-Authorization | Critical | COMPLETED | Security Specialist | Single-use UUIDv4 token with 60s TTL, anti-self-approval |
+| **TASK-R1.2A-04** | Safe Restore & Non-Empty Database Protection | Critical | COMPLETED | Database Architect | Rejection of non-empty target databases, streaming stdin |
+| **TASK-R1.2A-05** | Datadir Ownership & Graceful Termination | High | COMPLETED | Systems Engineer | Datadir UID validation, `mysqladmin` & SIGTERM before SIGKILL |
+| **TASK-R1.2A-06** | Adversarial Security Test Suite | Critical | COMPLETED | QA Lead | 5 new adversarial tests covering SQL injection, symlinks, replay |
 
 ### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |

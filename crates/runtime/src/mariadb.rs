@@ -1,6 +1,7 @@
 use crate::error::{Result, RuntimeError};
 use crate::health::is_port_available;
 use localforge_platform::{ProcessIdentity, ProcessManager};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -27,6 +28,16 @@ pub struct DatabaseHealthStatus {
     pub message: String,
 }
 
+/// Cryptographically random, time-bounded approval token required for destructive database operations.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseDeletionApproval {
+    pub database_name: String,
+    pub token: String,
+    pub issued_at_secs: u64,
+    pub expires_at_secs: u64,
+    pub requesting_context: String,
+}
+
 pub struct MariaDbSupervisor {
     base_dir: PathBuf,
     data_dir: PathBuf,
@@ -37,6 +48,7 @@ pub struct MariaDbSupervisor {
     config_file: PathBuf,
     process_manager: Arc<dyn ProcessManager>,
     master_process: Mutex<Option<(ProcessIdentity, Option<Child>)>>,
+    active_approvals: Mutex<HashMap<String, DatabaseDeletionApproval>>,
     pub terminate_on_drop: bool,
 }
 
@@ -62,6 +74,7 @@ impl MariaDbSupervisor {
             config_file,
             process_manager,
             master_process: Mutex::new(None),
+            active_approvals: Mutex::new(HashMap::new()),
             terminate_on_drop: false,
         }
     }
@@ -312,11 +325,27 @@ user = root
         )
     }
 
-    /// Initializes data directory if not already created. Never overwrites existing tables.
+    /// Initializes data directory if not already created. Never overwrites existing tables or unknown directories.
     pub fn ensure_datadir_initialized(&self) -> Result<()> {
-        let _ = std::fs::create_dir_all(&self.base_dir);
-        let _ = std::fs::create_dir_all(&self.data_dir);
-        let _ = std::fs::create_dir_all(&self.run_dir);
+        std::fs::create_dir_all(&self.base_dir).map_err(RuntimeError::Io)?;
+        std::fs::create_dir_all(&self.data_dir).map_err(RuntimeError::Io)?;
+        std::fs::create_dir_all(&self.run_dir).map_err(RuntimeError::Io)?;
+
+        // Validate datadir ownership on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let meta = std::fs::metadata(&self.data_dir).map_err(RuntimeError::Io)?;
+            let current_uid = unsafe { libc::getuid() };
+            if meta.uid() != current_uid {
+                return Err(RuntimeError::DatabaseError(format!(
+                    "Datadir ownership mismatch: '{}' is owned by UID {} but current process is running as UID {}",
+                    self.data_dir.display(),
+                    meta.uid(),
+                    current_uid
+                )));
+            }
+        }
 
         // Check if database is already initialized
         if self.data_dir.join("mysql").is_dir() {
@@ -326,6 +355,20 @@ user = root
                     .map_err(RuntimeError::Io)?;
             }
             return Ok(());
+        }
+
+        // Refuse to initialize into an existing non-empty directory that lacks the mysql/ schema
+        if let Ok(entries) = std::fs::read_dir(&self.data_dir) {
+            let non_hidden_entries: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+                .collect();
+            if !non_hidden_entries.is_empty() {
+                return Err(RuntimeError::DatabaseError(format!(
+                    "Existing datadir '{}' contains unexpected files but lacks MariaDB system schema ('mysql/'). Refusing to overwrite unknown data directory.",
+                    self.data_dir.display()
+                )));
+            }
         }
 
         // Write configuration file
@@ -545,8 +588,27 @@ user = root
 
         if let Some((identity, mut child_opt)) = lock.take() {
             if let Some(mut child) = child_opt.take() {
-                let _ = child.kill();
-                let _ = child.wait();
+                if let Ok(Some(_)) = child.try_wait() {
+                    // Process already terminated cleanly via mysqladmin
+                } else {
+                    #[cfg(unix)]
+                    unsafe {
+                        libc::kill(identity.pid as i32, libc::SIGTERM);
+                    }
+                    let wait_start = Instant::now();
+                    let mut exited = false;
+                    while wait_start.elapsed() < Duration::from_secs(3) {
+                        if let Ok(Some(_)) = child.try_wait() {
+                            exited = true;
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(50));
+                    }
+                    if !exited {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                }
             } else {
                 let _ = self.process_manager.terminate_process_group_verified(
                     identity.pid,
@@ -688,8 +750,8 @@ user = root
         })
     }
 
-    /// Executes raw SQL query via client CLI through the Unix domain socket.
-    pub fn execute_query(&self, sql: &str) -> Result<String> {
+    /// Executes raw SQL query via client CLI through the Unix domain socket, redacting secret from errors.
+    fn execute_query_internal(&self, sql: &str, secret_to_redact: Option<&str>) -> Result<String> {
         let binaries = Self::discover_binaries()?;
         let client = binaries
             .client
@@ -720,18 +782,46 @@ user = root
 
         if !output.status.success() {
             let err = String::from_utf8_lossy(&output.stderr);
+            let sanitized_err = if let Some(secret) = secret_to_redact {
+                if !secret.is_empty() {
+                    err.replace(secret, "[REDACTED_PASSWORD]")
+                } else {
+                    err.into_owned()
+                }
+            } else {
+                err.into_owned()
+            };
             return Err(RuntimeError::DatabaseError(format!(
-                "SQL execution error: {err}"
+                "SQL execution error: {sanitized_err}"
             )));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    /// Creates an isolated database and dedicated project user.
+    /// Executes raw SQL query via client CLI through the Unix domain socket.
+    pub fn execute_query(&self, sql: &str) -> Result<String> {
+        self.execute_query_internal(sql, None)
+    }
+
+    /// Creates an isolated database and dedicated project user with securely escaped credentials.
+    /// Never logs plaintext passwords or allows direct SQL string interpolation injection.
     pub fn create_project_database(&self, db_name: &str, user: &str, pass: &str) -> Result<()> {
         Self::validate_identifier(db_name)?;
         Self::validate_identifier(user)?;
+
+        if pass.is_empty() {
+            return Err(RuntimeError::CredentialError(
+                "Database password cannot be empty".into(),
+            ));
+        }
+        if pass.len() > 256 {
+            return Err(RuntimeError::CredentialError(
+                "Database password exceeds maximum permitted length of 256 characters".into(),
+            ));
+        }
+
+        let escaped_pass = escape_sql_string_literal(pass)?;
 
         let sql = format!(
             r#"CREATE DATABASE IF NOT EXISTS `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -743,34 +833,156 @@ FLUSH PRIVILEGES;
 "#,
             db = db_name,
             user = user,
-            pass = pass,
+            pass = escaped_pass,
         );
 
-        self.execute_query(&sql)?;
+        self.execute_query_internal(&sql, Some(pass))?;
         Ok(())
     }
 
-    /// Drops project database strictly requiring confirmation token matching database name.
-    pub fn drop_project_database(&self, db_name: &str, confirmation_token: &str) -> Result<()> {
+    /// Requests a cryptographic approval token for dropping a database.
+    /// Approval is strictly bound to the exact database, requesting context, and expires in 60 seconds.
+    pub fn request_database_deletion_approval(
+        &self,
+        db_name: &str,
+        requesting_context: &str,
+    ) -> Result<DatabaseDeletionApproval> {
         Self::validate_identifier(db_name)?;
-        if db_name != confirmation_token {
-            return Err(RuntimeError::DatabaseError(format!(
-                "Confirmation token '{confirmation_token}' does not match database name '{db_name}'"
+        if requesting_context.trim().is_empty() {
+            return Err(RuntimeError::DatabaseUnauthorized(
+                "Requesting context cannot be empty for destructive operations.".into(),
+            ));
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let token = format!("del_{}_{}", db_name, uuid::Uuid::new_v4().simple());
+        let approval = DatabaseDeletionApproval {
+            database_name: db_name.to_string(),
+            token: token.clone(),
+            issued_at_secs: now,
+            expires_at_secs: now + 60,
+            requesting_context: requesting_context.to_string(),
+        };
+
+        let mut lock = self.active_approvals.lock().unwrap();
+        // Clean expired approvals
+        lock.retain(|_, v| v.expires_at_secs >= now);
+        lock.insert(token, approval.clone());
+
+        Ok(approval)
+    }
+
+    /// Drops project database strictly requiring a valid, unexpired, single-use approval token.
+    /// Direct database name confirmation is strictly rejected to prevent self-authorization.
+    pub fn drop_project_database(&self, db_name: &str, approval_token: &str) -> Result<()> {
+        Self::validate_identifier(db_name)?;
+
+        // Explicitly catch and reject self-approval attempt (using database name as confirmation token)
+        if db_name == approval_token {
+            return Err(RuntimeError::DatabaseUnauthorized(
+                "Self-authorization rejected: using database name as confirmation token is strictly prohibited. An application-mediated approval token must be requested.".into(),
+            ));
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let mut lock = self.active_approvals.lock().unwrap();
+        let approval = match lock.remove(approval_token) {
+            Some(app) => app,
+            None => {
+                return Err(RuntimeError::DatabaseUnauthorized(
+                    "Invalid, unissued, or previously consumed database deletion approval token."
+                        .into(),
+                ));
+            }
+        };
+
+        if approval.database_name != db_name {
+            return Err(RuntimeError::DatabaseUnauthorized(format!(
+                "Approval token was issued for database '{}', but deletion was requested for '{}'",
+                approval.database_name, db_name
             )));
         }
+
+        if now > approval.expires_at_secs {
+            return Err(RuntimeError::DatabaseUnauthorized(
+                "Database deletion approval token has expired.".into(),
+            ));
+        }
+
+        drop(lock);
 
         let sql = format!("DROP DATABASE IF EXISTS `{db_name}`;");
         self.execute_query(&sql)?;
         Ok(())
     }
 
-    /// Performs logical database dump to target file with 0600 permissions.
+    /// Performs logical database dump to target file with atomic temp file and immediate 0600 permissions.
+    /// Streams output directly to disk to prevent unbounded application memory buffering.
+    /// Never silently overwrites an existing backup.
     pub fn dump_database(&self, db_name: &str, target_file: &Path) -> Result<()> {
         Self::validate_identifier(db_name)?;
 
-        if let Some(parent) = target_file.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        // 1. Prevent silent overwrite of existing backups
+        if target_file.exists() {
+            return Err(RuntimeError::BackupError(format!(
+                "Backup target file already exists: {}. Refusing to overwrite existing backup.",
+                target_file.display()
+            )));
         }
+
+        // 2. Path traversal & symlink protection
+        if let Ok(meta) = std::fs::symlink_metadata(target_file) {
+            if meta.file_type().is_symlink() {
+                return Err(RuntimeError::BackupError(format!(
+                    "Backup target path is a symlink: {}. Symlink targets are prohibited.",
+                    target_file.display()
+                )));
+            }
+        }
+
+        let parent = target_file.parent().ok_or_else(|| {
+            RuntimeError::BackupError(format!(
+                "Target file has no parent directory: {}",
+                target_file.display()
+            ))
+        })?;
+
+        std::fs::create_dir_all(parent).map_err(RuntimeError::Io)?;
+        let canonical_parent = dunce::canonicalize(parent).map_err(RuntimeError::Io)?;
+
+        // 3. Create atomic temporary file in destination directory with 0600 permissions from creation
+        let temp_filename = format!(
+            ".tmp_dump_{}_{}.part",
+            db_name,
+            uuid::Uuid::new_v4().simple()
+        );
+        let temp_path = canonical_parent.join(temp_filename);
+
+        #[cfg(unix)]
+        let temp_file = {
+            use std::os::unix::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .mode(0o600)
+                .open(&temp_path)
+                .map_err(RuntimeError::Io)?
+        };
+
+        #[cfg(not(unix))]
+        let temp_file = std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temp_path)
+            .map_err(RuntimeError::Io)?;
 
         let binaries = Self::discover_binaries()?;
         let dump_bin = binaries.dump.ok_or_else(|| RuntimeError::RuntimeNotFound {
@@ -778,58 +990,183 @@ FLUSH PRIVILEGES;
             version: "any".into(),
         })?;
 
-        let output = Command::new(dump_bin)
+        // 4. Stream dump output directly to file (zero process RAM buffering)
+        let child = Command::new(dump_bin)
             .arg(format!("--socket={}", self.socket_path.display()))
             .arg("-u")
             .arg("root")
             .arg(db_name)
-            .output()
-            .map_err(|e| RuntimeError::DatabaseError(format!("Dump failed: {e}")))?;
+            .stdout(Stdio::from(temp_file))
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&temp_path);
+                RuntimeError::BackupError(format!("Failed to spawn mariadb-dump: {e}"))
+            })?;
+
+        let output = child.wait_with_output().map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            RuntimeError::BackupError(format!("Failed to wait for mariadb-dump: {e}"))
+        })?;
 
         if !output.status.success() {
+            let _ = std::fs::remove_file(&temp_path);
             let err = String::from_utf8_lossy(&output.stderr);
-            return Err(RuntimeError::DatabaseError(format!(
+            return Err(RuntimeError::BackupError(format!(
                 "mariadb-dump exited with error: {err}"
             )));
         }
 
-        std::fs::write(target_file, &output.stdout).map_err(RuntimeError::Io)?;
+        // 5. Verify backup file existence and basic integrity
+        let file_meta = std::fs::metadata(&temp_path).map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            RuntimeError::BackupError(format!("Failed to inspect backup file metadata: {e}"))
+        })?;
 
-        // Enforce 0600 permissions on Unix
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(target_file)
-                .map_err(RuntimeError::Io)?
-                .permissions();
-            perms.set_mode(0o600);
-            let _ = std::fs::set_permissions(target_file, perms);
+        if file_meta.len() == 0 {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(RuntimeError::BackupError(
+                "Backup creation resulted in an empty file (0 bytes)".into(),
+            ));
         }
+
+        // Validate basic SQL header (e.g. starts with standard dump comment or SQL)
+        use std::io::Read;
+        let mut check_file = std::fs::File::open(&temp_path).map_err(RuntimeError::Io)?;
+        let mut header_buf = [0u8; 64];
+        let bytes_read = check_file.read(&mut header_buf).map_err(RuntimeError::Io)?;
+        let header_str = String::from_utf8_lossy(&header_buf[..bytes_read]);
+        if !header_str.contains("--")
+            && !header_str.contains("/*")
+            && !header_str.to_uppercase().contains("CREATE")
+        {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(RuntimeError::BackupError(
+                "Backup file does not contain valid SQL dump header".into(),
+            ));
+        }
+        drop(check_file);
+
+        // 6. Atomic rename from temporary file to final target file
+        std::fs::rename(&temp_path, target_file).map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            RuntimeError::BackupError(format!("Failed to atomically rename backup file: {e}"))
+        })?;
 
         Ok(())
     }
 
-    /// Restores database from a SQL dump file.
+    /// Restores database from a SQL dump file with safety guards.
+    /// Refuses to restore into an existing non-empty database automatically.
+    /// Streams dump file into client stdin to prevent memory exhaustion.
+    /// Note: MySQL/MariaDB DDL statements execute with implicit commits and cannot provide all-or-nothing rollback.
     pub fn restore_database(&self, db_name: &str, source_file: &Path) -> Result<()> {
         Self::validate_identifier(db_name)?;
+
+        // 1. Validate source file existence and regular file
         if !source_file.exists() {
-            return Err(RuntimeError::DatabaseError(format!(
+            return Err(RuntimeError::RestoreError(format!(
                 "Dump source file does not exist: {}",
                 source_file.display()
             )));
         }
 
-        let sql = std::fs::read_to_string(source_file).map_err(RuntimeError::Io)?;
-        let create_db_sql =
-            format!("CREATE DATABASE IF NOT EXISTS `{db_name}`; USE `{db_name}`;\n");
-        let full_sql = format!("{create_db_sql}{sql}");
+        let meta = std::fs::symlink_metadata(source_file).map_err(RuntimeError::Io)?;
+        if meta.file_type().is_symlink() {
+            return Err(RuntimeError::RestoreError(format!(
+                "Source file is a symlink: {}. Symlink restoration is rejected.",
+                source_file.display()
+            )));
+        }
 
-        self.execute_query(&full_sql)?;
+        if meta.len() == 0 {
+            return Err(RuntimeError::RestoreError(
+                "Source backup file is empty (0 bytes).".into(),
+            ));
+        }
+
+        // 2. Validate backup header / integrity before executing
+        use std::io::Read;
+        let mut check_file = std::fs::File::open(source_file).map_err(RuntimeError::Io)?;
+        let mut header_buf = [0u8; 128];
+        let bytes_read = check_file.read(&mut header_buf).map_err(RuntimeError::Io)?;
+        let header_str = String::from_utf8_lossy(&header_buf[..bytes_read]);
+        if !header_str.contains("--")
+            && !header_str.contains("/*")
+            && !header_str.to_uppercase().contains("CREATE")
+        {
+            return Err(RuntimeError::RestoreError(
+                "Source file does not appear to be a valid SQL dump archive.".into(),
+            ));
+        }
+        drop(check_file);
+
+        // 3. Check if target database already exists and contains tables
+        let check_sql = format!(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{db_name}';"
+        );
+        if let Ok(count_output) = self.execute_query(&check_sql) {
+            let count_num = count_output
+                .lines()
+                .last()
+                .unwrap_or("0")
+                .trim()
+                .parse::<u64>()
+                .unwrap_or(0);
+
+            if count_num > 0 {
+                return Err(RuntimeError::RestoreError(format!(
+                    "Target database '{db_name}' already exists and contains {count_num} tables. Refusing to overwrite existing data automatically."
+                )));
+            }
+        }
+
+        // 4. Ensure target database exists
+        let create_db_sql = format!(
+            "CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n"
+        );
+        self.execute_query(&create_db_sql)?;
+
+        // 5. Stream SQL dump directly from file into client stdin (zero process RAM buffering)
+        let binaries = Self::discover_binaries()?;
+        let client = binaries
+            .client
+            .ok_or_else(|| RuntimeError::RuntimeNotFound {
+                binary: "mariadb/mysql client".into(),
+                version: "any".into(),
+            })?;
+
+        let input_file = std::fs::File::open(source_file).map_err(RuntimeError::Io)?;
+
+        let child = Command::new(client)
+            .arg(format!("--socket={}", self.socket_path.display()))
+            .arg("-u")
+            .arg("root")
+            .arg(db_name)
+            .stdin(Stdio::from(input_file))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                RuntimeError::RestoreError(format!("Failed to spawn client for restore: {e}"))
+            })?;
+
+        let output = child
+            .wait_with_output()
+            .map_err(|e| RuntimeError::RestoreError(format!("Restore execution failed: {e}")))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(RuntimeError::RestoreError(format!(
+                "Database restore exited with error: {err}"
+            )));
+        }
+
         Ok(())
     }
 
     /// Validates SQL identifiers (table, database, user names) to prevent injection.
-    fn validate_identifier(name: &str) -> Result<()> {
+    pub fn validate_identifier(name: &str) -> Result<()> {
         if name.is_empty()
             || name.len() > 64
             || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
@@ -840,6 +1177,30 @@ FLUSH PRIVILEGES;
         }
         Ok(())
     }
+}
+
+/// Securely escapes a string literal for MariaDB SQL statements.
+/// Rejects null bytes (\0) to prevent truncation attacks.
+/// Escapes single quotes as '' (standard ANSI SQL) and backslashes as \\.
+pub fn escape_sql_string_literal(input: &str) -> Result<String> {
+    if input.contains('\0') {
+        return Err(RuntimeError::CredentialError(
+            "SQL string literal contains prohibited null byte (\\0)".into(),
+        ));
+    }
+    let mut escaped = String::with_capacity(input.len() + 8);
+    for ch in input.chars() {
+        match ch {
+            '\'' => escaped.push_str("''"),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\x1a' => escaped.push_str("\\Z"),
+            _ => escaped.push(ch),
+        }
+    }
+    Ok(escaped)
 }
 
 impl Drop for MariaDbSupervisor {
@@ -886,5 +1247,74 @@ mod tests {
         assert!(MariaDbSupervisor::validate_identifier("").is_err());
         assert!(MariaDbSupervisor::validate_identifier("invalid-db").is_err());
         assert!(MariaDbSupervisor::validate_identifier("invalid db; DROP TABLE").is_err());
+        assert!(MariaDbSupervisor::validate_identifier("root").is_ok());
+        assert!(MariaDbSupervisor::validate_identifier(
+            "user_with_very_long_name_that_exceeds_sixty_four_characters_limit_which_is_invalid"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_escape_sql_string_literal() {
+        // Simple string
+        assert_eq!(escape_sql_string_literal("hello").unwrap(), "hello");
+
+        // Quotes escaping (ANSI standard '')
+        assert_eq!(
+            escape_sql_string_literal("p'ass'word").unwrap(),
+            "p''ass''word"
+        );
+
+        // Backslash escaping
+        assert_eq!(
+            escape_sql_string_literal("p\\ass\\word").unwrap(),
+            "p\\\\ass\\\\word"
+        );
+
+        // Combined quotes and backslashes
+        assert_eq!(
+            escape_sql_string_literal("p\\'\"word").unwrap(),
+            "p\\\\''\"word"
+        );
+
+        // SQL injection attempt
+        let inj = "secret'; DROP DATABASE mysql; --";
+        let escaped = escape_sql_string_literal(inj).unwrap();
+        assert_eq!(escaped, "secret''; DROP DATABASE mysql; --");
+
+        // Unicode and emojis
+        let unicode = "P@sswørd🚀2026_Şçğüö";
+        assert_eq!(escape_sql_string_literal(unicode).unwrap(), unicode);
+
+        // Prohibit null bytes
+        assert!(escape_sql_string_literal("null\0byte").is_err());
+    }
+
+    #[test]
+    fn test_database_deletion_approval_lifecycle() {
+        let dir = tempdir().unwrap();
+        let sup = MariaDbSupervisor::new_simple(dir.path().to_path_buf(), 3309);
+
+        // 1. Direct self-authorization (using db name as token) must be rejected
+        let self_auth = sup.drop_project_database("my_test_db", "my_test_db");
+        assert!(self_auth.is_err());
+        let err_msg = self_auth.unwrap_err().to_string();
+        assert!(err_msg.contains("Self-authorization rejected"));
+
+        // 2. Unissued token must be rejected
+        let unissued = sup.drop_project_database("my_test_db", "fake_token_123");
+        assert!(unissued.is_err());
+
+        // 3. Request approval
+        let approval = sup
+            .request_database_deletion_approval("my_test_db", "unit_test_ui")
+            .unwrap();
+        assert_eq!(approval.database_name, "my_test_db");
+        assert!(approval.token.starts_with("del_my_test_db_"));
+        assert!(approval.expires_at_secs > approval.issued_at_secs);
+
+        // 4. Token bound to wrong database must be rejected
+        let mismatch = sup.drop_project_database("other_db", &approval.token);
+        assert!(mismatch.is_err());
     }
 }

@@ -199,3 +199,41 @@ This document records the chronological engineering log for all development sess
    - `cargo clippy --workspace --all-targets -- -D warnings`: PASS (Zero warnings).
    - `npm --prefix apps/desktop run build`: PASS (Vite & TypeScript exit code 0).
    - GitHub Actions CI Run `39148541047`: PASS (Green on macOS Apple Silicon).
+
+---
+
+## Session 007 — Phase R1.2A Database Security Remediation
+
+- **Date**: 2026-10-18
+- **Participants**: Principal Rust Engineer, macOS Process Security Specialist, QA Lead, Independent Code Reviewer, Lead Agent
+- **Authorized Phase**: **Phase R1.2A — Database Security Remediation**
+- **Git Branch**: `phase-r1/r1-2a-database-security`
+
+### Summary of Activities
+1. **SQL Credential Safety (TASK-R1.2A-01)**:
+   - Replaced unsafe string formatting in `create_project_database()` with `escape_sql_string_literal()`.
+   - Blocked null byte (`\0`) injection attacks; escaped single quotes (`''`) and backslashes (`\\`).
+   - Redacted database passwords from stderr output in runtime error reports.
+2. **Secure Atomic Backup Streaming (TASK-R1.2A-02)**:
+   - Configured `0o600` permissions atomically via `OpenOptionsExt::mode(0o600)` at creation time.
+   - Guarded against overwrite (`create_new(true)`), symlink traversal, and path escape.
+   - Streamed `mariadb-dump` stdout directly to file descriptor, achieving O(1) memory usage.
+   - Validated non-empty SQL headers and utilized atomic `.part` rename with cleanup on error.
+3. **Elimination of Deletion Self-Authorization (TASK-R1.2A-03)**:
+   - Enforced fail-closed behavior on self-authorization (`db_name == approval_token`).
+   - Implemented `request_database_deletion_approval()` generating cryptographic UUIDv4 tokens with 60-second TTL.
+   - Verified single-use token consumption preventing replay attacks.
+4. **Safe Restore & Non-Empty Database Guard (TASK-R1.2A-04)**:
+   - Inspected `information_schema.tables` and refused restore into non-empty target databases.
+   - Rejected symlinks, zero-byte files, and corrupted dumps missing SQL headers.
+   - Streamed dump directly into client stdin via kernel pipes.
+5. **Lifecycle & Datadir Safety (TASK-R1.2A-05)**:
+   - Validated datadir ownership against `libc::getuid()`.
+   - Prevented overwriting unknown existing data directories.
+   - Implemented graceful shutdown (`mysqladmin` & `SIGTERM` before `SIGKILL`).
+6. **Adversarial Security Test Suite (TASK-R1.2A-06)**:
+   - Added 5 new integration tests covering SQL injection, null bytes, unicode passwords, symlinks, replay attacks, and corrupt files.
+   - Verified all 11 MariaDB integration tests pass on live Homebrew daemon.
+   - `cargo test --workspace`: PASS (37/37 tests passed).
+   - `cargo clippy --workspace --all-targets -- -D warnings`: PASS (Zero warnings).
+   - `npm --prefix apps/desktop run build`: PASS (Exit code 0).
