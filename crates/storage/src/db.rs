@@ -122,8 +122,12 @@ impl MetadataStore {
                 .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
             let status = match status_str.as_str() {
                 "running" => ProjectStatus::Running,
-                "disconnected" => ProjectStatus::Disconnected,
+                "starting" => ProjectStatus::Starting,
+                "stopping" => ProjectStatus::Stopping,
                 "degraded" => ProjectStatus::Degraded,
+                "failed" => ProjectStatus::Failed,
+                "disconnected" => ProjectStatus::Disconnected,
+                "unknown" => ProjectStatus::Unknown,
                 _ => ProjectStatus::Stopped,
             };
 
@@ -159,8 +163,12 @@ impl MetadataStore {
                 let status_str: String = row.get(7)?;
                 let status = match status_str.as_str() {
                     "running" => ProjectStatus::Running,
-                    "disconnected" => ProjectStatus::Disconnected,
+                    "starting" => ProjectStatus::Starting,
+                    "stopping" => ProjectStatus::Stopping,
                     "degraded" => ProjectStatus::Degraded,
+                    "failed" => ProjectStatus::Failed,
+                    "disconnected" => ProjectStatus::Disconnected,
+                    "unknown" => ProjectStatus::Unknown,
                     _ => ProjectStatus::Stopped,
                 };
                 let path_str: String = row.get(2)?;

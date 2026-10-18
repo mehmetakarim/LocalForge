@@ -24,3 +24,5 @@ localforge-core = { path = "../../../crates/core" }
 localforge-platform = { path = "../../../crates/platform" }
 localforge-storage = { path = "../../../crates/storage" }
 localforge-project-manager = { path = "../../../crates/project-manager" }
+localforge-runtime = { path = "../../../crates/runtime" }
+

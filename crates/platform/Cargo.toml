@@ -13,6 +13,7 @@ tracing.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 dunce.workspace = true
+libc.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS native framework bindings when needed

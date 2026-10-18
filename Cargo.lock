@@ -1980,6 +1980,7 @@ dependencies = [
  "localforge-core",
  "localforge-platform",
  "localforge-project-manager",
+ "localforge-runtime",
  "localforge-storage",
  "serde",
  "serde_json",
@@ -2017,6 +2018,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dunce",
+ "libc",
  "localforge-core",
  "serde",
  "thiserror 2.0.21",

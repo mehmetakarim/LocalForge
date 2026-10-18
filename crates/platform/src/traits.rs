@@ -19,3 +19,45 @@ pub trait CredentialStore: Send + Sync {
     fn set_secret(&self, service: &str, account: &str, secret: &str) -> Result<()>;
     fn delete_secret(&self, service: &str, account: &str) -> Result<()>;
 }
+
+/// Verified identity of an active operating system process.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ProcessIdentity {
+    pub pid: u32,
+    pub pgid: u32,
+    pub std_path: std::path::PathBuf,
+    pub start_time_secs: u64,
+    pub start_time_usecs: u32,
+}
+
+impl ProcessIdentity {
+    pub fn executable_path(&self) -> &std::path::Path {
+        &self.std_path
+    }
+}
+
+/// Trait abstracting OS-specific process inspection, PID reuse defense, and verified termination.
+pub trait ProcessManager: Send + Sync {
+    /// Inspects the process currently running with the given PID.
+    fn inspect_process(&self, pid: u32) -> Result<Option<ProcessIdentity>>;
+
+    /// Verifies that the process with `pid` matches the expected binary path and launch timestamp.
+    fn verify_process_identity(
+        &self,
+        pid: u32,
+        expected_executable: &Path,
+        expected_start_secs: u64,
+        expected_start_usecs: u32,
+    ) -> bool;
+
+    /// Terminates the process or its process group with bounded escalation (SIGTERM then SIGKILL).
+    /// Fails closed if the identity does not match or cannot be verified.
+    fn terminate_process_group_verified(
+        &self,
+        pid: u32,
+        expected_executable: &Path,
+        expected_start_secs: u64,
+        expected_start_usecs: u32,
+        grace_period_secs: u64,
+    ) -> Result<()>;
+}

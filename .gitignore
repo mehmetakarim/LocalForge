@@ -78,3 +78,4 @@ coverage/
 *.profraw
 *.profdata
 report.html
+scratch/

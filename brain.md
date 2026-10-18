@@ -10,11 +10,11 @@ Welcome to the centralized project brain of **LocalForge**. This file serves as 
 |---|---|
 | **Project Name** | LocalForge |
 | **Repo** | `mehmetakarim/LocalForge` |
-| **Active Branch** | `phase-r1/r1-0-architecture-refinement` |
-| **Current Phase** | **Recovery Phase R1.0 — Architecture Refinement** |
-| **Phase Status** | ACTIVE (Architecture refined, R1 split into R1.0-R1.3, awaiting R1.1 gateway approval) |
+| **Active Branch** | `phase-r1/r1-1-runtime-implementation` |
+| **Current Phase** | **Phase R1.1 — Real PHP-FPM & Nginx Runtime Integration** |
+| **Phase Status** | COMPLETED (Awaiting Product Owner Acceptance) |
 | **Design Baseline** | **Spatial Studio Visual Direction & Dual-Mode UI** (PO Approved, ADR-0010) |
-| **Runtime Architecture** | Verified Process Identity, Shared Nginx, MariaDB Internal Isolation (ADR-0011, ADR-0012) |
+| **Runtime Architecture** | Darwin Kernel Verified Process Identity, Shared Nginx, Isolated FPM Pools (ADR-0011, ADR-0012) |
 | **Release State** | Held pending completion of Phase R1 subphases |
 | **Primary Platform** | macOS Apple Silicon (`arm64`) |
 | **Core Architecture** | Tauri 2 (Desktop UI) + Shared Rust Core + CLI + MCP Server |

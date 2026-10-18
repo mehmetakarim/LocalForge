@@ -1,5 +1,4 @@
 use anyhow::Result;
-use localforge_core::ProjectStatus;
 use localforge_deployment::{
     calculate_deployment_diff, DeploymentEngine, DeploymentLedger, DeploymentPreview,
 };
@@ -139,12 +138,7 @@ fn handle_tool_call(
                             "document_root": p.document_root,
                             "php_version": p.php_version,
                             "local_domain": p.local_domain,
-                            "status": match p.status {
-                                ProjectStatus::Running => "running",
-                                ProjectStatus::Stopped => "stopped",
-                                ProjectStatus::Disconnected => "disconnected",
-                                ProjectStatus::Degraded => "degraded",
-                            }
+                            "status": p.status.to_string(),
                         })
                     })
                     .collect();

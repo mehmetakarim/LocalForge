@@ -17,6 +17,15 @@ pub enum RuntimeError {
     #[error("Service '{service}' unhealthy or unresponsive: {reason}")]
     ServiceUnhealthy { service: String, reason: String },
 
+    #[error("Project '{0}' not found in registry")]
+    ProjectNotFound(String),
+
+    #[error("Storage volume disconnected or unavailable: {0}")]
+    VolumeDisconnected(String),
+
+    #[error("Process identity mismatch / PID reuse detected: {0}")]
+    ProcessIdentityMismatch(String),
+
     #[error("IO error in runtime supervisor: {0}")]
     Io(#[from] std::io::Error),
 

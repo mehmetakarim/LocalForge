@@ -6,13 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Recovery Phase R1.0 — Architecture Refinement**
-- **Phase Status**: IN EXECUTION / ACTIVE
-- **Active Branch**: `phase-r1/r1-0-architecture-refinement`
-- **Target Remote**: `origin/phase-r1/r1-0-architecture-refinement` (base: `main`)
-- **Previous Phase Status**: **Recovery Phase R0 — CONDITIONALLY ACCEPTED** by Product Owner (18/18 automated tests passing, zero clippy warnings, CI Run `39123438754` Green).
+- **Active Phase**: **Phase R1.1 — Real PHP-FPM & Nginx Runtime Integration**
+- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
+- **Active Branch**: `phase-r1/r1-1-runtime-implementation`
+- **Target Remote**: `origin/phase-r1/r1-1-runtime-implementation` (base: `main`)
+- **Previous Phase Status**: **Recovery Phase R1.0 — CONDITIONALLY ACCEPTED** by Product Owner.
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement), R1.1 (PHP-FPM/Nginx), R1.2 (MariaDB/Resilience), R1.3 (Spatial Studio UI).
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.2 (MariaDB/Resilience - Locked), R1.3 (Spatial Studio UI - Locked).
+- **Test Matrix Status**: 25/25 automated tests pass, zero Clippy warnings, live HTTP 200 FastCGI verified on external APFS volume.
 
 ---
 
@@ -22,11 +23,12 @@ This document tracks the canonical technical and operational state of the LocalF
 |---|---|---|---|
 | **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED | Specifications, memory structure, and ADRs established. |
 | **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compile; physical disconnect verification staged in R1.2. |
-| **Phase 2: Local Runtime Engine** | PARTIAL | IN PROGRESS (R1.0-R1.2) | R1.0 architecture refined. R1.1 will execute live unprivileged FPM/Nginx supervision; R1.2 MariaDB. |
+| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1) | Live unprivileged Darwin kernel verified FPM & shared Nginx loopback gateway. E2E HTTP 200 PASS. |
 | **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | Non-dry-run SFTP rejected with `DeploymentNotImplemented`. MCP self-approval bypass eliminated. Real transport deferred. |
 | **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39123438754` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
 | **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
-| **Recovery Phase R1.0** | ARCHITECTURE | ACTIVE | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
+| **Recovery Phase R1.0** | ARCHITECTURE | ACCEPTED | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
+| **Phase R1.1: Runtime Integration** | REAL DAEMONS | COMPLETED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, PID reuse defense, multi-project isolation. |
 
 ---
 

@@ -4,9 +4,9 @@ use localforge_core::ProjectStatus;
 use localforge_deployment::{
     calculate_deployment_diff, DeploymentEngine, DeploymentLedger, DeploymentPreview,
 };
-use localforge_platform::{MacOSVolumeManager, VolumeManager};
+use localforge_platform::{MacOSProcessManager, MacOSVolumeManager, VolumeManager};
 use localforge_project_manager::ProjectService;
-use localforge_runtime::{health::is_port_available, PhpFpmSupervisor};
+use localforge_runtime::{health::is_port_available, PhpFpmSupervisor, ProjectRuntimeService};
 use localforge_storage::{sanitize_project_path, MetadataStore, VolumeBarrier};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -38,6 +38,11 @@ enum Commands {
     Stop {
         /// Project identifier or name
         project: String,
+    },
+    /// Import an existing project directory
+    Import {
+        /// Path to the project root directory
+        path: PathBuf,
     },
     /// Inspect mounted volumes (internal & external SSDs)
     Volumes,
@@ -81,7 +86,9 @@ enum DeployCommands {
 
 fn open_metadata_store() -> MetadataStore {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let db_path = PathBuf::from(home).join("Library/Application Support/LocalForge/localforge.db");
+    let base = PathBuf::from(home).join("Library/Application Support/LocalForge");
+    let _ = std::fs::create_dir_all(&base);
+    let db_path = base.join("localforge.db");
     MetadataStore::open(&db_path).unwrap_or_else(|_| MetadataStore::open_in_memory().unwrap())
 }
 
@@ -90,43 +97,57 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
 
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let runtime_base = PathBuf::from(&home).join("Library/Application Support/LocalForge/runtime");
+
     let store = Arc::new(open_metadata_store());
     let volume_manager = Arc::new(MacOSVolumeManager::new());
     let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
     let project_service = Arc::new(ProjectService::new(
         store.clone(),
         volume_manager.clone(),
         volume_barrier.clone(),
     ));
 
+    let runtime_service = Arc::new(ProjectRuntimeService::create_default(
+        runtime_base,
+        store.clone(),
+        volume_manager.clone(),
+        volume_barrier.clone(),
+        process_manager.clone(),
+        8080,
+    ));
+
     match cli.command {
         Commands::List => {
-            let projects = project_service.sync_all_projects_status()?;
-            if projects.is_empty() {
+            let statuses = runtime_service.sync_all_projects_runtime_status()?;
+            if statuses.is_empty() {
                 println!("No projects registered yet.");
                 println!("Use the desktop application or import a project to get started.");
                 return Ok(());
             }
 
             println!(
-                "{:<20} {:<32} {:<14} {:<24} PATH",
+                "{:<20} {:<32} {:<18} {:<14} URL",
                 "PROJECT ID", "NAME", "STATUS", "PHP VERSION"
             );
             println!("{:-<100}", "");
-            for p in projects {
+            for p in statuses {
                 let status_str = match p.status {
                     ProjectStatus::Running => "\x1b[32m● Running\x1b[0m",
                     ProjectStatus::Stopped => "\x1b[90m○ Stopped\x1b[0m",
+                    ProjectStatus::Starting => "\x1b[36m◌ Starting\x1b[0m",
+                    ProjectStatus::Stopping => "\x1b[33m◌ Stopping\x1b[0m",
                     ProjectStatus::Disconnected => "\x1b[31m▲ Disconnected\x1b[0m",
                     ProjectStatus::Degraded => "\x1b[33m⚠ Degraded\x1b[0m",
+                    ProjectStatus::Failed => "\x1b[31m✖ Failed\x1b[0m",
+                    ProjectStatus::Unknown => "\x1b[90m? Unknown\x1b[0m",
                 };
                 println!(
-                    "{:<20} {:<32} {:<23} {:<24} {}",
-                    p.id.0,
-                    p.name,
-                    status_str,
-                    p.php_version,
-                    p.path.display()
+                    "{:<20} {:<32} {:<27} {:<14} {}",
+                    p.project_id.0, p.name, status_str, p.php_version, p.local_url
                 );
             }
         }
@@ -143,7 +164,7 @@ async fn main() -> Result<()> {
                 }
             );
             println!(
-                "Nginx Proxy (127.0.0.1:8080):      {}",
+                "Nginx Gateway (127.0.0.1:8080):    {}",
                 if nginx_busy {
                     "\x1b[32mActive / Bound\x1b[0m"
                 } else {
@@ -168,6 +189,7 @@ async fn main() -> Result<()> {
 
                 match target {
                     Some(p) => {
+                        let st = runtime_service.get_runtime_status(&p.id)?;
                         println!("ID:            {}", p.id.0);
                         println!("Name:          {}", p.name);
                         println!("Path:          {}", p.path.display());
@@ -175,7 +197,13 @@ async fn main() -> Result<()> {
                         println!("Document Root: {}", p.document_root);
                         println!("PHP Version:   {}", p.php_version);
                         println!("Local Domain:  {}", p.local_domain);
-                        println!("Status:        {:?}", p.status);
+                        println!("Status:        {:?}", st.status);
+                        println!("PHP-FPM PID:   {:?}", st.php_fpm_pid);
+                        println!("Socket Path:   {:?}", st.socket_path);
+                        println!("Nginx PID:     {:?}", st.nginx_pid);
+                        println!("Gateway Port:  {}", st.gateway_port);
+                        println!("Local URL:     {}", st.local_url);
+                        println!("Diagnostics:   {}", st.message);
                     }
                     None => {
                         eprintln!("Error: Project '{}' not found in registry.", proj_query);
@@ -188,33 +216,71 @@ async fn main() -> Result<()> {
             let target = projects
                 .into_iter()
                 .find(|p| p.id.0 == project || p.name.eq_ignore_ascii_case(&project))
-                .ok_or_else(|| anyhow!("Project '{}' not found", project))?;
+                .ok_or_else(|| anyhow!("Project '{}' not found in registry", project))?;
 
-            // Check volume barrier
-            volume_barrier
-                .verify_volume_available(&target.path, &target.volume_uuid)
-                .context("External storage volume verification failed")?;
-
-            store.update_project_status(&target.id, ProjectStatus::Running)?;
             println!(
-                "\x1b[32m✓ Started runtime for project '{}'\x1b[0m",
+                "Starting development runtime for project '{}'...",
                 target.name
             );
-            println!("Local URL: http://{}:8080", target.local_domain);
+            let st = runtime_service
+                .start_project(&target.id)
+                .context("Failed to start project runtime")?;
+
+            println!(
+                "\x1b[32m✓ Successfully started runtime for project '{}'\x1b[0m",
+                target.name
+            );
+            if let Some(pid) = st.php_fpm_pid {
+                println!("  PHP-FPM PID:      {}", pid);
+            }
+            if let Some(sock) = st.socket_path {
+                println!("  FastCGI Socket:   {}", sock.display());
+            }
+            if let Some(pid) = st.nginx_pid {
+                println!("  Nginx Master PID: {}", pid);
+            }
+            println!("  Local Gateway:    {}", st.local_url);
+            println!("  Diagnostics:      {}", st.message);
         }
         Commands::Stop { project } => {
             let projects = store.list_projects()?;
             let target = projects
                 .into_iter()
                 .find(|p| p.id.0 == project || p.name.eq_ignore_ascii_case(&project))
-                .ok_or_else(|| anyhow!("Project '{}' not found", project))?;
+                .ok_or_else(|| anyhow!("Project '{}' not found in registry", project))?;
 
-            store.update_project_status(&target.id, ProjectStatus::Stopped)?;
             println!(
-                "\x1b[33m○ Stopped runtime for project '{}'\x1b[0m",
+                "Stopping development runtime for project '{}'...",
                 target.name
             );
+            let st = runtime_service
+                .stop_project(&target.id)
+                .context("Failed to stop project runtime")?;
+
+            println!(
+                "\x1b[33m○ Successfully stopped runtime for project '{}'\x1b[0m",
+                target.name
+            );
+            println!("  Status:           {:?}", st.status);
+            println!("  Diagnostics:      {}", st.message);
         }
+
+        Commands::Import { path } => {
+            let canonical = dunce::canonicalize(&path)
+                .with_context(|| format!("Failed to find project path '{}'", path.display()))?;
+            let imported = project_service
+                .import_project(&canonical)
+                .context("Failed to import project")?;
+
+            println!(
+                "\x1b[32m✓ Successfully imported project '{}' (ID: {})\x1b[0m",
+                imported.name, imported.id.0
+            );
+            println!("  Path:        {}", imported.path.display());
+            println!("  PHP Version: {}", imported.php_version);
+            println!("  Domain:      {}", imported.local_domain);
+        }
+
         Commands::Volumes => {
             println!("=== LocalForge Storage Volumes ===");
             let volumes = volume_manager.list_volumes()?;

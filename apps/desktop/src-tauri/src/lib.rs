@@ -1,6 +1,7 @@
 use localforge_core::{ProjectId, ProjectStatus, VolumeInfo};
-use localforge_platform::{MacOSVolumeManager, VolumeManager};
+use localforge_platform::{MacOSProcessManager, MacOSVolumeManager, VolumeManager};
 use localforge_project_manager::ProjectService;
+use localforge_runtime::{ProjectRuntimeService, ProjectRuntimeStatus};
 use localforge_storage::{MetadataStore, ProjectRecord, VolumeBarrier};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -40,6 +41,7 @@ impl From<ProjectRecord> for ProjectDto {
 
 pub struct AppState {
     pub service: Arc<ProjectService>,
+    pub runtime_service: Arc<ProjectRuntimeService>,
     pub volume_manager: Arc<dyn VolumeManager>,
     pub metadata_store: Arc<MetadataStore>,
 }
@@ -64,9 +66,10 @@ fn get_projects(state: State<'_, AppState>) -> Result<Vec<ProjectDto>, String> {
 
 #[tauri::command]
 fn sync_projects(state: State<'_, AppState>) -> Result<Vec<ProjectDto>, String> {
+    let _ = state.runtime_service.sync_all_projects_runtime_status();
     let projs = state
-        .service
-        .sync_all_projects_status()
+        .metadata_store
+        .list_projects()
         .map_err(|e| e.to_string())?;
 
     Ok(projs.into_iter().map(ProjectDto::from).collect())
@@ -99,42 +102,91 @@ fn import_project(state: State<'_, AppState>, path: String) -> Result<ProjectDto
 }
 
 #[tauri::command]
+fn start_project(state: State<'_, AppState>, id: String) -> Result<ProjectRuntimeStatus, String> {
+    state
+        .runtime_service
+        .start_project(&ProjectId::from_string(id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn stop_project(state: State<'_, AppState>, id: String) -> Result<ProjectRuntimeStatus, String> {
+    state
+        .runtime_service
+        .stop_project(&ProjectId::from_string(id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn update_project_status(
     state: State<'_, AppState>,
     id: String,
     status: String,
 ) -> Result<(), String> {
-    let project_status = match status.as_str() {
-        "running" => ProjectStatus::Running,
-        "disconnected" => ProjectStatus::Disconnected,
-        "degraded" => ProjectStatus::Degraded,
-        _ => ProjectStatus::Stopped,
-    };
+    let pid = ProjectId::from_string(id);
+    match status.as_str() {
+        "running" => {
+            state
+                .runtime_service
+                .start_project(&pid)
+                .map_err(|e| e.to_string())?;
+        }
+        "stopped" => {
+            state
+                .runtime_service
+                .stop_project(&pid)
+                .map_err(|e| e.to_string())?;
+        }
+        _ => {
+            let project_status = match status.as_str() {
+                "disconnected" => ProjectStatus::Disconnected,
+                "degraded" => ProjectStatus::Degraded,
+                "failed" => ProjectStatus::Failed,
+                _ => ProjectStatus::Stopped,
+            };
 
-    state
-        .metadata_store
-        .update_project_status(&ProjectId::from_string(id), project_status)
-        .map_err(|e| e.to_string())
+            state
+                .metadata_store
+                .update_project_status(&pid, project_status)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let db_path = PathBuf::from(home).join("Library/Application Support/LocalForge/localforge.db");
+    let base = PathBuf::from(&home).join("Library/Application Support/LocalForge");
+    let _ = std::fs::create_dir_all(&base);
+    let db_path = base.join("localforge.db");
+    let runtime_base = base.join("runtime");
 
     let metadata_store = Arc::new(
         MetadataStore::open(&db_path).unwrap_or_else(|_| MetadataStore::open_in_memory().unwrap()),
     );
     let volume_manager = Arc::new(MacOSVolumeManager::new());
     let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
     let service = Arc::new(ProjectService::new(
         metadata_store.clone(),
         volume_manager.clone(),
+        volume_barrier.clone(),
+    ));
+
+    let runtime_service = Arc::new(ProjectRuntimeService::create_default(
+        runtime_base,
+        metadata_store.clone(),
+        volume_manager.clone(),
         volume_barrier,
+        process_manager,
+        8080,
     ));
 
     let state = AppState {
         service,
+        runtime_service,
         volume_manager,
         metadata_store,
     };
@@ -147,6 +199,8 @@ pub fn run() {
             sync_projects,
             create_project,
             import_project,
+            start_project,
+            stop_project,
             update_project_status
         ])
         .run(tauri::generate_context!())

@@ -51,8 +51,12 @@ impl fmt::Display for VolumeId {
 pub enum ProjectStatus {
     Running,
     Stopped,
-    Disconnected,
+    Starting,
+    Stopping,
     Degraded,
+    Failed,
+    Disconnected,
+    Unknown,
 }
 
 impl fmt::Display for ProjectStatus {
@@ -60,8 +64,12 @@ impl fmt::Display for ProjectStatus {
         match self {
             Self::Running => write!(f, "running"),
             Self::Stopped => write!(f, "stopped"),
-            Self::Disconnected => write!(f, "disconnected"),
+            Self::Starting => write!(f, "starting"),
+            Self::Stopping => write!(f, "stopping"),
             Self::Degraded => write!(f, "degraded"),
+            Self::Failed => write!(f, "failed"),
+            Self::Disconnected => write!(f, "disconnected"),
+            Self::Unknown => write!(f, "unknown"),
         }
     }
 }
