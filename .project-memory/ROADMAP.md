@@ -4,104 +4,89 @@ This document outlines the sequential phases, primary objectives, dependencies, 
 
 ---
 
-## Phase Overview
+## Phase Lifecycle & Current Status Overview
 
 ```
 +-----------------------------------------------------------------------------------+
-| Phase 0: Foundation & Project Memory (ACTIVE)                                     |
-| -> Architecture, ADRs, Project Memory, Threat Model, Standards, Phase 1 Plan      |
+| Phase 0: Foundation & Project Memory (COMPLETED / REMEDIATED)                     |
+| -> Architecture, ADRs, Threat Model, Engineering Standards                        |
 +-----------------------------------------------------------------------------------+
                                          |
-                                         v (Human PO Approval Required)
+                                         v
 +-----------------------------------------------------------------------------------+
-| Phase 1: Desktop Foundation & Workspace Storage (PLANNED)                         |
-| -> Tauri 2 App, Shared Core Crates, APFS External Volume Detection, SQLite Store  |
+| Phase 1: Desktop Foundation & Workspace Storage (IMPLEMENTATION EXISTS)           |
+| -> Tauri 2 App, Core Crates, APFS External Volume Detection, SQLite Store         |
 +-----------------------------------------------------------------------------------+
                                          |
-                                         v (Acceptance Review)
+                                         v
 +-----------------------------------------------------------------------------------+
-| Phase 2: Local Runtime Engine (PLANNED)                                           |
+| Phase 2: Local Runtime Engine (PARTIALLY IMPLEMENTED)                             |
 | -> Isolated PHP-FPM Pools, Loopback Nginx Gateway, MariaDB, Health Probes         |
 +-----------------------------------------------------------------------------------+
                                          |
-                                         v (Acceptance Review)
+                                         v
 +-----------------------------------------------------------------------------------+
-| Phase 3: Smart Deployment & CLI / MCP Integration (PLANNED)                       |
-| -> Git-aware Checksum Ledger, SFTP Engine, Headless CLI, Stdio MCP Server         |
+| Phase 3: Smart Deployment & CLI / MCP Integration (REMEDIATED - FAIL-CLOSED)      |
+| -> Git-aware Checksum Ledger, SFTP Engine (Fail-Closed in R0), CLI, MCP Server    |
 +-----------------------------------------------------------------------------------+
                                          |
-                                         v (Acceptance Review)
+                                         v
 +-----------------------------------------------------------------------------------+
-| Phase 4: Hardening, Packaging & Open-Source Release (PLANNED)                     |
-| -> Security Audits, macOS Notarization & Code Signing, CI/CD, Community Launch    |
+| Phase 4: Hardening, Packaging & Release (REMEDIATED - CI REPAIRED)                |
+| -> Security Hardening, GitHub Actions CI Repair, Packaging Baseline               |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++===================================================================================+
+| >>> RECOVERY PHASE R0: Safety Stabilization & CI Repair (ACTIVE) <<<              |
+| -> Fail-closed SFTP, MCP approval boundary, Clippy/CI repair, Memory sync        |
++===================================================================================+
+                                         |
+                                         v (Awaiting Product Owner Acceptance)
++-----------------------------------------------------------------------------------+
+| Phase R1: Real SFTP Transport & Application-Mediated Deployment UI (PLANNED)      |
+| -> Real SSH2/SFTP transfer, Native desktop approval modal, Clean Mac verification |
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## Phase Details
+## Detailed Phase Statuses (Audit A1 Baseline)
 
 ### Phase 0: Foundation & Project Memory
-- **Status**: **IN PROGRESS**
-- **Objectives**:
-  - Perform environment and toolchain audit on target host.
-  - Formulate architecture decisions (ADR-0001 to ADR-0008).
-  - Establish persistent, file-based project memory (`.project-memory/`).
-  - Draft product specifications (Vision, Requirements, Feature Matrix, Non-Goals).
-  - Draft security baseline (Threat Model, Security Policy).
-  - Set engineering standards (CONTRIBUTING, .gitignore, Git branching & commits).
-  - Define Phase 1 execution plan.
-- **Completion Criteria**:
-  - All Phase 0 documentation completed and verified.
-  - Zero compiler errors (no code yet).
-  - Final engineering report delivered to Product Owner in Turkish.
-  - Formal human approval obtained to authorize Phase 1.
+- **Status**: **COMPLETED (REMEDIATED IN R0)**
+- **Audit Findings**: Documentation and ADRs were established, but memory files had fallen out of sync with subsequent phase claims. Remediated during Recovery Phase R0.
 
 ### Phase 1: Desktop Foundation & Workspace Storage
-- **Status**: *PLANNED (LOCKED)*
-- **Dependencies**: Phase 0 human approval.
-- **Objectives**:
-  - Initialize Tauri 2 desktop shell with React 19, Vite, and Tailwind CSS.
-  - Scaffold modular Cargo workspace (`crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager`).
-  - Implement macOS APFS volume identification (DiskArbitration / IOKit) and persistent volume UUID mapping.
-  - Implement external volume disconnect/reconnect detection with safety barriers.
-  - Implement SQLite metadata repository in WAL mode on internal storage (`~/Library/Application Support/LocalForge/`).
-  - Build UI project list and external disk health indicator.
-- **Completion Criteria**:
-  - Desktop app launches on Apple Silicon with <50MB RAM idle.
-  - Disconnecting external drive safely sets project state to `DISCONNECTED` without crashing or writing to internal disk.
+- **Status**: **IMPLEMENTED (PENDING FORMAL ACCEPTANCE REVIEW)**
+- **Audit Findings**: Modular Cargo workspace (`crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager`) and Tauri 2 desktop shell compile and pass local tests. Real multi-drive disconnect edge cases require live hardware acceptance verification.
 
 ### Phase 2: Local Runtime Engine
-- **Status**: *PLANNED (LOCKED)*
-- **Dependencies**: Phase 1 completion and acceptance.
-- **Objectives**:
-  - Implement `crates/runtime` supervisory tree.
-  - Support independent PHP-FPM versions (e.g. 8.1, 8.2, 8.3, 8.4) with project-specific socket binding.
-  - Loopback Nginx reverse proxy routing requests by local domain (e.g., `http://myproject.test`) without sudo.
-  - Manage user-level MariaDB instance with internal database storage.
-  - Real-time health monitoring and automated port conflict diagnostics.
-- **Completion Criteria**:
-  - Two distinct projects can run different PHP versions concurrently.
-  - Browser successfully loads local WordPress/Laravel site over HTTP loopback.
+- **Status**: **PARTIALLY IMPLEMENTED (INTEGRATION INCOMPLETE)**
+- **Audit Findings**: PHP-FPM supervisor, Nginx template generator, and MariaDB supervisor modules exist with configuration generation unit tests. End-to-end multi-project concurrent routing requires live runtime integration testing.
 
 ### Phase 3: Smart Deployment & Interfaces (CLI + MCP)
-- **Status**: *PLANNED (LOCKED)*
-- **Dependencies**: Phase 2 completion and acceptance.
-- **Objectives**:
-  - Build `crates/deployment` change detection comparing working tree against last-deployed checksum ledger.
-  - Default-deny secret file filtering engine.
-  - Implement SFTP transfer engine with resume and SHA-256 verification.
-  - Build LocalForge CLI (`tools/cli`) reusing core crates.
-  - Build LocalForge MCP Server (`tools/mcp-server`) with strictly scoped tool permissions.
-- **Completion Criteria**:
-  - Deployment preview shows exact file diff and triggers interactive approval dialog.
-  - Claude Code / Codex can inspect project status and generate deployment preview via MCP without root privileges.
+- **Status**: **REMEDIATED (FAIL-CLOSED IN R0)**
+- **Audit Findings**: Audit A1 discovered that SFTP transfer was simulated in memory while falsely reporting transferred files and mutating the on-disk ledger. MCP preview exposed approval tokens directly to AI models.
+- **R0 Remediation**:
+  - Non-dry-run deployments now fail closed with `LocalForgeError::DeploymentNotImplemented`.
+  - Dry-run simulation reports zero transferred files and never touches the ledger.
+  - MCP preview no longer exposes `approval_token`.
+  - Real SFTP transport and application-mediated approval deferred to Phase R1.
 
-### Phase 4: Hardening & Distribution
-- **Status**: **COMPLETED**
-- **Dependencies**: Phase 3 completion and acceptance.
+### Phase 4: Hardening & Packaging
+- **Status**: **REMEDIATED (CI REPAIRED IN R0)**
+- **Audit Findings**: GitHub Actions CI failed in run `39108742495` due to `clippy::useless_format` in `crates/runtime/src/php.rs`. Clean Mac DMG installation and notarization remain unverified.
+- **R0 Remediation**: Clippy warnings eliminated; `cargo fmt` check added; CI trigger expanded to recovery branches.
+
+---
+
+## Recovery Phase R0: Safety Stabilization & CI Repair (ACTIVE)
+
+- **Status**: **ACTIVE / IN REMEDIATION**
 - **Objectives**:
-  - Apple Developer ID code signing and notarization pipeline.
-  - Comprehensive fuzzing of project manifest parser and path sanitizers.
-  - Automated GitHub Actions release pipeline building universal/arm64 DMGs.
-  - Open-source dual-license publication (Apache-2.0 / MIT).
+  1. Fail-closed deployment implementation (`crates/deployment/src/sftp.rs`).
+  2. MCP server credential isolation & self-approval prevention (`tools/mcp-server/src/main.rs`).
+  3. GitHub Actions CI clippy fix (`crates/runtime/src/php.rs` & `.github/workflows/ci.yml`).
+  4. Memory reconciliation across all canonical tracking documents.
+  5. Security regression test suite (18 passing tests across workspace).

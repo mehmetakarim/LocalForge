@@ -100,7 +100,9 @@ mod tests {
                 "Valid subpath '{}' within project root should succeed",
                 vec
             );
-            assert!(res.unwrap().starts_with(dunce::canonicalize(dir.path()).unwrap()));
+            assert!(res
+                .unwrap()
+                .starts_with(dunce::canonicalize(dir.path()).unwrap()));
         }
     }
 }

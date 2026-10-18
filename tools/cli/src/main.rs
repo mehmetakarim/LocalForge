@@ -196,7 +196,10 @@ async fn main() -> Result<()> {
                 .context("External storage volume verification failed")?;
 
             store.update_project_status(&target.id, ProjectStatus::Running)?;
-            println!("\x1b[32m✓ Started runtime for project '{}'\x1b[0m", target.name);
+            println!(
+                "\x1b[32m✓ Started runtime for project '{}'\x1b[0m",
+                target.name
+            );
             println!("Local URL: http://{}:8080", target.local_domain);
         }
         Commands::Stop { project } => {
@@ -207,7 +210,10 @@ async fn main() -> Result<()> {
                 .ok_or_else(|| anyhow!("Project '{}' not found", project))?;
 
             store.update_project_status(&target.id, ProjectStatus::Stopped)?;
-            println!("\x1b[33m○ Stopped runtime for project '{}'\x1b[0m", target.name);
+            println!(
+                "\x1b[33m○ Stopped runtime for project '{}'\x1b[0m",
+                target.name
+            );
         }
         Commands::Volumes => {
             println!("=== LocalForge Storage Volumes ===");
@@ -235,8 +241,9 @@ async fn main() -> Result<()> {
         }
         Commands::Deploy(deploy_args) => match deploy_args.action {
             DeployCommands::Preview { path, target } => {
-                let canonical_path = dunce::canonicalize(&path)
-                    .with_context(|| format!("Project directory '{}' does not exist", path.display()))?;
+                let canonical_path = dunce::canonicalize(&path).with_context(|| {
+                    format!("Project directory '{}' does not exist", path.display())
+                })?;
                 let safe_root = sanitize_project_path(&canonical_path, &canonical_path)?;
 
                 let ledger = DeploymentLedger::load(&safe_root, &target)?;
@@ -254,7 +261,10 @@ async fn main() -> Result<()> {
                 println!("Files to Add:       {}", preview.diff.to_add_count);
                 println!("Files to Modify:    {}", preview.diff.to_modify_count);
                 println!("Files to Delete:    {}", preview.diff.to_delete_count);
-                println!("Transfer Size:      {} bytes", preview.diff.total_upload_bytes);
+                println!(
+                    "Transfer Size:      {} bytes",
+                    preview.diff.total_upload_bytes
+                );
 
                 if !preview.diff.changes.is_empty() {
                     println!("\nChanges:");
@@ -264,7 +274,10 @@ async fn main() -> Result<()> {
                 }
 
                 println!("\n\x1b[1;33m[!] MANDATORY HUMAN APPROVAL TOKEN REQUIRED\x1b[0m");
-                println!("Approval Token:     \x1b[1;32m{}\x1b[0m", preview.preview_id);
+                println!(
+                    "Approval Token:     \x1b[1;32m{}\x1b[0m",
+                    preview.preview_id
+                );
                 println!(
                     "\nTo execute this deployment, run:\n  localforge deploy apply --target {} --token {} {}",
                     preview.target_id,
@@ -278,8 +291,9 @@ async fn main() -> Result<()> {
                 token,
                 dry_run,
             } => {
-                let canonical_path = dunce::canonicalize(&path)
-                    .with_context(|| format!("Project directory '{}' does not exist", path.display()))?;
+                let canonical_path = dunce::canonicalize(&path).with_context(|| {
+                    format!("Project directory '{}' does not exist", path.display())
+                })?;
                 let safe_root = sanitize_project_path(&canonical_path, &canonical_path)?;
 
                 let preview_file = safe_root
@@ -304,7 +318,11 @@ async fn main() -> Result<()> {
                     target, dry_run
                 );
                 let result = DeploymentEngine::execute_deployment(
-                    &safe_root, &preview, &token, &mut ledger, dry_run,
+                    &safe_root,
+                    &preview,
+                    &token,
+                    &mut ledger,
+                    dry_run,
                 )?;
 
                 println!("\x1b[32m✓ Deployment execution completed successfully!\x1b[0m");

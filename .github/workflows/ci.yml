@@ -2,7 +2,7 @@ name: LocalForge CI
 
 on:
   push:
-    branches: [ "main", "phase-*", "release-*" ]
+    branches: [ "main", "phase-*", "release-*", "recovery/*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -40,6 +40,9 @@ jobs:
       - name: Frontend Typecheck & Build
         working-directory: apps/desktop
         run: npm run build
+
+      - name: Run Cargo Fmt Check
+        run: cargo fmt --all -- --check
 
       - name: Run Cargo Check
         run: cargo check --workspace --all-targets

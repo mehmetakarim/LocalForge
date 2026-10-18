@@ -37,6 +37,12 @@ pub enum LocalForgeError {
     #[error("Platform error: {0}")]
     PlatformError(String),
 
+    #[error("Remote deployment transport is not implemented in this release: production transfers are disabled to prevent unverified mutations")]
+    DeploymentNotImplemented,
+
+    #[error("Unauthorized deployment execution: automated MCP or agent self-approval is rejected. Production deployments require native application-mediated human authorization")]
+    UnauthorizedDeploymentExecution,
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

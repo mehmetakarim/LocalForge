@@ -49,9 +49,9 @@ impl PhpFpmSupervisor {
     pub fn find_php_fpm_binary(version: &str) -> Result<PathBuf> {
         let candidates = vec![
             format!("/opt/homebrew/opt/php@{version}/sbin/php-fpm"),
-            format!("/opt/homebrew/bin/php-fpm"),
+            "/opt/homebrew/bin/php-fpm".to_string(),
             format!("/usr/local/opt/php@{version}/sbin/php-fpm"),
-            format!("/usr/local/bin/php-fpm"),
+            "/usr/local/bin/php-fpm".to_string(),
         ];
 
         for c in candidates {

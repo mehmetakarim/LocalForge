@@ -32,7 +32,11 @@ pub fn is_excluded_from_deployment(rel_path: &Path) -> bool {
     }
 
     // 4. OS and editor metadata
-    if file_name == ".ds_store" || file_name == "thumbs.db" || path_str.starts_with(".idea/") || path_str.starts_with(".vscode/") {
+    if file_name == ".ds_store"
+        || file_name == "thumbs.db"
+        || path_str.starts_with(".idea/")
+        || path_str.starts_with(".vscode/")
+    {
         return true;
     }
 

@@ -6,86 +6,50 @@
 
 ## 1. Current Status
 
-- **Current Phase**: **Phase 4 — Hardening, Packaging & Open-Source Release**
-- **Phase Technical Status**: **COMPLETED (All 13 automated tests pass, zero clippy warnings, CI/CD and release pipelines verified)**
-- **Active Git Branch**: `phase-4/hardening-and-release`
-- **Target Remote**: `origin/main` (`https://github.com/mehmetakarim/LocalForge.git`)
-- **Latest Completed Tasks**: TASK-401..405 — CI/CD, DMG packaging, security hardening, and community health files
-- **Next Permitted Action**: Pull request review, tag release `v0.1.0`, and merge to `main`
+- **Current Phase**: **Recovery Phase R0 — Safety Stabilization & CI Repair**
+- **Phase Technical Status**: **COMPLETED (All 18 automated tests pass, zero clippy warnings, fail-closed deployment active, CI/CD repaired)**
+- **Active Git Branch**: `recovery/r0-safety-stabilization`
+- **Target Remote**: `origin/recovery/r0-safety-stabilization`
+- **Latest Completed Tasks**:
+  - `TASK-R0-01`: Fail-Closed Deployment (`crates/deployment/src/sftp.rs`)
+  - `TASK-R0-02`: MCP Human Approval Security (`tools/mcp-server/src/main.rs`, `ADR-0009`)
+  - `TASK-R0-03`: GitHub Actions CI Repair (`crates/runtime/src/php.rs`, `.github/workflows/ci.yml`)
+  - `TASK-R0-04`: Project Memory Suite Reconciliation (`PROJECT_STATE.md`, `ROADMAP.md`, `TASKS.md`, `HANDOFF.md`, `brain.md`, `docs/tasks.md`)
+  - `TASK-R0-05`: Security Regression Test Suite (18 tests passing)
+- **Next Permitted Action**: Push branch, verify GitHub Actions CI run, and submit closure report for Product Owner acceptance.
 
 ---
 
-## 2. Work Summary & Files Created
+## 2. Key Remediation Summary
 
-### Foundation & Memory
-- `AGENTS.md` — Engineering rules, multi-agent protocol, phase discipline.
-- `CLAUDE.md` — Claude Code quick start and context loader.
-- `brain.md` — Centralized project index.
-- `README.md` & `CONTRIBUTING.md` — Project presentation & engineering standards.
-- `.gitignore` — Rust, Node, Tauri, macOS, and secrets exclusion rules.
-- `docs/architecture.md` & `docs/tasks.md` — Architecture map and task tracker.
-- `.project-memory/` — `PROJECT_STATE.md`, `DECISIONS.md`, `ROADMAP.md`, `TASKS.md`, `SESSION_LOG.md`, `KNOWN_ISSUES.md`, `TEST_MATRIX.md`, `HANDOFF.md`.
-
-### Architecture Decisions (`docs/architecture/adr/`)
-- `ADR-0001` (Tauri 2 & Modular Rust Workspace)
-- `ADR-0002` (Shared Core Separation)
-- `ADR-0003` (macOS-First Platform Abstraction)
-- `ADR-0004` (External Workspace Storage & Disconnect Safety)
-- `ADR-0005` (Runtime Distribution Strategy)
-- `ADR-0006` (Secure Deployment Architecture)
-- `ADR-0007` (Project Manifest & SQLite Architecture)
-- `ADR-0008` (Project Memory & Phase Governance)
-
-### Product & Security
-- `docs/product/PRODUCT_VISION.md`
-- `docs/product/REQUIREMENTS.md`
-- `docs/product/FEATURE_MATRIX.md`
-- `docs/product/NON_GOALS.md`
-- `docs/security/THREAT_MODEL.md`
-- `docs/security/SECURITY_POLICY.md`
-
-### Phase Documentation
-- `docs/phases/PHASE_0_FOUNDATION.md`
-- `docs/phases/PHASE_1_DESKTOP_FOUNDATION.md` (Specification only, NOT implemented)
+1. **R0-01 (Deployment Simulation Elimination)**:
+   - Non-dry-run deployment calls reject immediately with `LocalForgeError::DeploymentNotImplemented`.
+   - Dry-run simulation reports 0 transferred files, 0 deleted files, and never mutates or persists the deployment ledger.
+2. **R0-02 (MCP Credential Isolation)**:
+   - `localforge_deploy_preview` no longer exposes `approval_token`.
+   - `localforge_deploy_execute` rejects automated execution attempts with `UNAUTHORIZED_MCP_DEPLOYMENT_EXECUTION`.
+   - Future application-mediated human approval architecture documented in `ADR-0009`.
+3. **R0-03 (CI Repair)**:
+   - Replaced redundant `format!()` calls with `.to_string()` in `crates/runtime/src/php.rs`.
+   - Added `cargo fmt --all -- --check` to CI pipeline.
+   - Expanded CI branch triggers to include `recovery/*`.
+4. **R0-04 (Memory Reconciliation)**:
+   - Resolved all phase contradictions across the documentation suite.
 
 ---
 
-## 3. Verification Performed
+## 3. Verification Evidence Snapshot
 
-- **Toolchain & System Audit**: PASS (macOS 27.0 arm64, Rust 1.94.0, Node 20.19.5, Bun 1.3.12, Clang 21.0.0, Homebrew 7.0.7).
-- **APFS External Drive Validation**: PASS (`/Volumes/Mac Harici Disk` confirmed APFS, journaled, 135 GiB free).
-- **Documentation & Cross-Reference Integrity**: PASS (All relative paths and ADR cross-references verified).
-- **Code Implementations**: NOT RUN (by deliberate design for Phase 0).
-
----
-
-## 4. Open Risks & Invariants
-
-1. **Phase Boundary Invariant**: DO NOT start Phase 1 implementation without explicit Product Owner approval.
-2. **Volatile Mount Paths**: Resolved at design level via UUID tracking (ADR-0004); must be implemented carefully in Phase 1.
-3. **Loopback Ports vs Sudo**: Resolved at design level via unprivileged high ports (ADR-0003); must not introduce `sudo` or root daemons.
+- **Rust Formatting**: `cargo fmt --all -- --check` -> **PASS**
+- **Type Checking**: `cargo check --workspace --all-targets` -> **PASS**
+- **Clippy Linting**: `cargo clippy --workspace --all-targets -- -D warnings` -> **PASS (0 warnings)**
+- **Automated Tests**: `cargo test --workspace` -> **PASS (18 tests: 18 passed, 0 failed)**
+- **Frontend Build**: `npm run build` (`apps/desktop`) -> **PASS (TypeScript + Vite)**
 
 ---
 
-## 5. Next Permitted Actions
+## 4. Invariants & Governance
 
-Upon Product Owner approval to begin Phase 1:
-1. Merge or maintain `phase-0/foundation` and transition to `phase-1/desktop-foundation`.
-2. Scaffold Tauri 2 + React + Vite + Tailwind desktop application in `apps/desktop/` (TASK-101).
-3. Initialize root `Cargo.toml` workspace and foundational core crates (`crates/core`, `crates/platform`, `crates/storage`) (TASK-102).
-
----
-
-## 6. Commands to Continue in a New Session
-
-```bash
-# 1. Verify working tree
-git status
-git branch
-
-# 2. Review Phase 1 plan
-cat docs/phases/PHASE_1_DESKTOP_FOUNDATION.md
-
-# 3. Read current tasks
-cat .project-memory/TASKS.md
-```
+- **Do Not Self-Authorize**: AI agents cannot trigger remote production deployments.
+- **Do Not Rewrite History**: Incomplete phases must remain accurately labeled as partial, simulated, or unverified.
+- **Do Not Auto-Merge to Main**: R0 branch must remain isolated on `recovery/r0-safety-stabilization` until formal Product Owner acceptance.
