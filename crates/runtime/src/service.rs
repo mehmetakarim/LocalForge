@@ -1,5 +1,6 @@
 use crate::error::{Result, RuntimeError};
 use crate::health::probe_http_health;
+use crate::mariadb::{DatabaseHealthStatus, MariaDbSupervisor};
 use crate::nginx::NginxSupervisor;
 use crate::php::PhpFpmSupervisor;
 use localforge_core::{ProjectId, ProjectStatus};
@@ -126,10 +127,12 @@ pub struct ProjectRuntimeService {
     process_manager: Arc<dyn ProcessManager>,
     php_supervisor: Arc<PhpFpmSupervisor>,
     nginx_supervisor: Arc<NginxSupervisor>,
+    mariadb_supervisor: Arc<MariaDbSupervisor>,
     gateway_port: u16,
 }
 
 impl ProjectRuntimeService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         metadata_store: Arc<MetadataStore>,
         volume_manager: Arc<dyn VolumeManager>,
@@ -137,6 +140,7 @@ impl ProjectRuntimeService {
         process_manager: Arc<dyn ProcessManager>,
         php_supervisor: Arc<PhpFpmSupervisor>,
         nginx_supervisor: Arc<NginxSupervisor>,
+        mariadb_supervisor: Arc<MariaDbSupervisor>,
         gateway_port: u16,
     ) -> Self {
         Self {
@@ -146,6 +150,7 @@ impl ProjectRuntimeService {
             process_manager,
             php_supervisor,
             nginx_supervisor,
+            mariadb_supervisor,
             gateway_port,
         }
     }
@@ -161,8 +166,10 @@ impl ProjectRuntimeService {
     ) -> Self {
         let run_dir = base_dir.join("run");
         let conf_dir = base_dir.join("nginx");
+        let mariadb_dir = base_dir.join("mariadb");
         let _ = std::fs::create_dir_all(&run_dir);
         let _ = std::fs::create_dir_all(&conf_dir);
+        let _ = std::fs::create_dir_all(&mariadb_dir);
 
         let php_supervisor = Arc::new(PhpFpmSupervisor::new(
             run_dir.clone(),
@@ -174,6 +181,11 @@ impl ProjectRuntimeService {
             gateway_port,
             process_manager.clone(),
         ));
+        let mariadb_supervisor = Arc::new(MariaDbSupervisor::new(
+            mariadb_dir,
+            3306,
+            process_manager.clone(),
+        ));
 
         Self::new(
             metadata_store,
@@ -182,8 +194,25 @@ impl ProjectRuntimeService {
             process_manager,
             php_supervisor,
             nginx_supervisor,
+            mariadb_supervisor,
             gateway_port,
         )
+    }
+
+    /// Ensures the isolated MariaDB database daemon is started, healthy, and verified.
+    pub fn ensure_database_running(&self) -> Result<DatabaseHealthStatus> {
+        let _ = self.mariadb_supervisor.start()?;
+        self.mariadb_supervisor.check_health()
+    }
+
+    /// Returns verified database health status.
+    pub fn get_database_status(&self) -> Result<DatabaseHealthStatus> {
+        self.mariadb_supervisor.check_health()
+    }
+
+    /// Returns reference to the MariaDbSupervisor.
+    pub fn mariadb_supervisor(&self) -> Arc<MariaDbSupervisor> {
+        self.mariadb_supervisor.clone()
     }
 
     /// Starts development runtime for the given project.

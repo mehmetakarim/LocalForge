@@ -2048,6 +2048,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dunce",
+ "libc",
  "localforge-core",
  "localforge-platform",
  "localforge-project-manager",

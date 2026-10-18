@@ -6,14 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.1A — Targeted Acceptance Remediation**
+- **Active Phase**: **Phase R1.2 — MariaDB Integration, Storage Resilience & Multi-Project Verification**
 - **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-1a-runtime-remediation`
-- **Target Remote**: `origin/phase-r1/r1-1a-runtime-remediation` (base: `b7be903`)
-- **Previous Phase Status**: **Phase R1.1 — CONDITIONALLY ACCEPTED** (subject to R1.1A acceptance remediation).
+- **Active Branch**: `phase-r1/r1-2-database-and-resilience`
+- **Target Remote**: `origin/phase-r1/r1-2-database-and-resilience`
+- **Previous Phase Status**: **Phase R1.1A — CONDITIONALLY ACCEPTED**
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Locked), R1.3 (Spatial Studio UI - Locked).
-- **Test Matrix Status**: 26/26 automated tests pass across 8 crates, zero Clippy warnings, live HTTP 200 FastCGI verified on external APFS volume.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Done), R1.3 (Spatial Studio UI - Locked).
+- **Test Matrix Status**: 32/32 automated tests pass across 8 crates (including 6 comprehensive MariaDB/E2E/resilience tests), zero Clippy warnings, live PHP PDO FastCGI on external APFS volume verified.
 
 ---
 
@@ -23,13 +23,14 @@ This document tracks the canonical technical and operational state of the LocalF
 |---|---|---|---|
 | **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED | Specifications, memory structure, and ADRs established. |
 | **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compile; physical disconnect verification staged in R1.2. |
-| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1) | Live unprivileged Darwin kernel verified FPM & shared Nginx loopback gateway. E2E HTTP 200 PASS. |
+| **Phase 2: Local Runtime Engine** | REAL IMPLEMENTATION | COMPLETED (R1.1/R1.2) | Live unprivileged Darwin kernel verified FPM, MariaDB & shared Nginx loopback gateway. E2E HTTP 200 PDO PASS. |
 | **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | Non-dry-run SFTP rejected with `DeploymentNotImplemented`. MCP self-approval bypass eliminated. Real transport deferred. |
-| **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39123438754` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
+| **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39142354888` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
 | **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
 | **Recovery Phase R1.0** | ARCHITECTURE | ACCEPTED | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
-| **Phase R1.1: Runtime Integration** | REAL DAEMONS | CONDITIONALLY ACCEPTED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, multi-project isolation. |
-| **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | COMPLETED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
+| **Phase R1.1: Runtime Integration** | REAL DAEMONS | ACCEPTED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, multi-project isolation. |
+| **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | ACCEPTED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
+| **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | COMPLETED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
 
 ---
 

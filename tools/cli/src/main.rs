@@ -154,16 +154,35 @@ async fn main() -> Result<()> {
         }
         Commands::Status { project } => {
             println!("=== LocalForge System Diagnostics ===");
-            let mariadb_busy = !is_port_available(3306);
-            let nginx_busy = !is_port_available(8080);
-            println!(
-                "MariaDB loopback (127.0.0.1:3306): {}",
-                if mariadb_busy {
-                    "\x1b[32mActive / Bound\x1b[0m"
-                } else {
-                    "\x1b[90mIdle\x1b[0m"
+            let db_status = runtime_service.get_database_status().unwrap_or_else(|_| {
+                localforge_runtime::DatabaseHealthStatus {
+                    is_alive: false,
+                    socket_path: PathBuf::from("unavailable"),
+                    port: 3306,
+                    version: None,
+                    latency_ms: None,
+                    message: "Database supervisor not started".into(),
                 }
-            );
+            });
+            if db_status.is_alive {
+                println!(
+                    "MariaDB Service:                   \x1b[32m● Alive\x1b[0m ({} - {} ms, socket: {})",
+                    db_status.version.as_deref().unwrap_or("unknown"),
+                    db_status.latency_ms.unwrap_or(0),
+                    db_status.socket_path.display()
+                );
+            } else {
+                let port_busy = !is_port_available(db_status.port);
+                if port_busy {
+                    println!(
+                        "MariaDB Service:                   \x1b[33m○ External Port {} Bound (LocalForge socket idle)\x1b[0m",
+                        db_status.port
+                    );
+                } else {
+                    println!("MariaDB Service:                   \x1b[90m○ Inactive / Idle\x1b[0m");
+                }
+            }
+            let nginx_busy = !is_port_available(8080);
             println!(
                 "Nginx Gateway (127.0.0.1:8080):    {}",
                 if nginx_busy {

@@ -35,12 +35,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.1A-03** | Honest Local URL Reporting | High | COMPLETED | Desktop/CLI Eng | R1.1 Findings | Report `127.0.0.1:8080`, mark `.test` pending, curl copy action |
 | **TASK-R1.1A-04** | Negative Security & Regression Suite | Critical | COMPLETED | QA Lead | TASK-R1.1A-01..03 | 7 regression tests covering probe classification, dead sockets, spoofing |
 
-### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (PLANNED / LOCKED)
+### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (COMPLETED / AWAITING ACCEPTANCE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.2-01** | User-Level MariaDB Internal Datadir Supervisor | High | PLANNED | Systems Engineer | R1.1 Approval | Port 3306 binding, socket ping, internal SSD datadir |
-| **TASK-R1.2-02** | Concurrent Multi-Version PHP Project Execution | Critical | PLANNED | Senior Rust Eng | R1.1 Approval | Project A (8.4) & B (8.3) live side-by-side |
-| **TASK-R1.2-03** | External APFS Volume Disconnect Resilience | Critical | PLANNED | Systems Engineer | TASK-R1.2-02 | Physical/simulated disconnect safety without write fallback |
+| **TASK-R1.2-01** | User-Level MariaDB Internal Datadir Supervisor | High | COMPLETED | Systems Engineer | R1.1A Approval | `MariaDbSupervisor`, Darwin identity, unprivileged Homebrew `mariadbd` lifecycle, datadir init |
+| **TASK-R1.2-02** | Authenticated SQL Health Probes & Isolation | Critical | COMPLETED | Senior Rust Eng | TASK-R1.2-01 | `SELECT 1;` socket ping, latency measurement, user/db provisioning, drop token guard |
+| **TASK-R1.2-03** | Logical Backup & Restore (0600 Permissions) | High | COMPLETED | Database Architect | TASK-R1.2-02 | `mariadb-dump` with `0o600` file permissions and complete SQL restoration |
+| **TASK-R1.2-04** | PHP PDO End-to-End on External APFS Storage | Critical | COMPLETED | QA Lead | TASK-R1.2-01..03 | Live PHP-FPM + Nginx + PDO on `/Volumes/.../scratch`, data persistence across restart |
+| **TASK-R1.2-05** | Multi-Project FastCGI & Database Concurrency | Critical | COMPLETED | Senior Rust Eng | TASK-R1.2-01..04 | Site Alpha & Site Beta concurrent execution, independent FastCGI pools, shared Nginx |
+| **TASK-R1.2-06** | External Storage Resilience & VolumeBarrier Guard | Critical | COMPLETED | Systems Engineer | TASK-R1.2-04 | Simulated/unmounted drive fail-closed protection, zero fallback writes to boot disk |
 
 ### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |

@@ -393,6 +393,9 @@ fastcgi_param  REDIRECT_STATUS    200;
             });
         }
 
+        // Brief delay (50ms) to allow master to dispatch HUP to workers
+        std::thread::sleep(Duration::from_millis(50));
+
         Ok(())
     }
 
@@ -406,7 +409,21 @@ fastcgi_param  REDIRECT_STATUS    200;
                 identity.start_time_secs,
                 identity.start_time_usecs,
             );
-            verified && !is_port_available(self.listen_port)
+            if !verified {
+                return false;
+            }
+            if !is_port_available(self.listen_port) {
+                return true;
+            }
+            // Allow brief grace period for workers to cycle and bind the port after reload
+            let wait_start = Instant::now();
+            while wait_start.elapsed() < Duration::from_millis(350) {
+                std::thread::sleep(Duration::from_millis(25));
+                if !is_port_available(self.listen_port) {
+                    return true;
+                }
+            }
+            false
         } else {
             !is_port_available(self.listen_port)
         }

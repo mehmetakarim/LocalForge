@@ -26,6 +26,9 @@ pub enum RuntimeError {
     #[error("Process identity mismatch / PID reuse detected: {0}")]
     ProcessIdentityMismatch(String),
 
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+
     #[error("IO error in runtime supervisor: {0}")]
     Io(#[from] std::io::Error),
 
