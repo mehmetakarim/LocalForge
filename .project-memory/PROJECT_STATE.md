@@ -6,14 +6,14 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.2B — Final Database Safety Gate**
-- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-2b-final-database-safety`
-- **Target Remote**: `origin/phase-r1/r1-2b-final-database-safety`
-- **Previous Phase Status**: **Phase R1.2A — COMPLETED & VERIFIED**
+- **Active Phase**: **Phase R1.3A — Spatial Studio Foundation & Application Shell**
+- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER VISUAL ACCEPTANCE
+- **Active Branch**: `phase-r1/r1-3a-spatial-studio-foundation`
+- **Target Remote**: `origin/phase-r1/r1-3a-spatial-studio-foundation`
+- **Previous Phase Status**: **Phase R1.2B — COMPLETED & ACCEPTED**
 - **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Conditionally Accepted), R1.2A (Database Security Remediation - Completed), R1.2B (Final Database Safety Gate - Completed), R1.3 (Spatial Studio UI - Locked).
-- **Test Matrix Status**: 40/40 automated tests pass across 8 crates (including 13 MariaDB integration & adversarial security tests, 7 runtime integration tests, 5 storage tests, 10 runtime unit tests, and 5 core tests), zero Clippy warnings, clean Vite production build.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Done), R1.2A (Database Security Remediation - Done), R1.2B (Final Database Safety Gate - Done), R1.3A (Spatial Studio Foundation & Shell - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
+- **Test Matrix Status**: 40/40 automated tests pass across 8 crates; clean TypeScript & Vite v6.4.4 production build; live macOS desktop window capture verified (Studio overview, 2.5D cards, Cmd+K capsule).
 
 ---
 
@@ -30,9 +30,10 @@ This document tracks the canonical technical and operational state of the LocalF
 | **Recovery Phase R1.0** | ARCHITECTURE | ACCEPTED | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
 | **Phase R1.1: Runtime Integration** | REAL DAEMONS | ACCEPTED | Live PHP-FPM 8.5.3 child spawning, Nginx 1.31.7 gateway, multi-project isolation. |
 | **Phase R1.1A: Targeted Remediation** | HARDENED RUNTIME | ACCEPTED | Eliminated false RUNNING, hardened process inspection & group safety, honest loopback URL reporting. |
-| **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | CONDITIONALLY ACCEPTED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
-| **Phase R1.2A: Database Security** | SECURITY HARDENING | COMPLETED | SQL credential escaping & redaction, single-use deletion authorization, 0600 atomic stream backups, non-empty restore guard, datadir ownership validation. |
-| **Phase R1.2B: Final Database Safety** | FINAL SAFETY GATE | COMPLETED | Deletion self-authorization eliminated, deletion kept explicitly disabled in R1.2B pending UI gate, fail-closed restore occupancy check, partial restore tracking, Darwin getpwuid directory resolution. |
+| **Phase R1.2: MariaDB & Resilience** | ISOLATED DB & E2E | ACCEPTED | Unprivileged MariaDB 13.0.2, authenticated SQL health probe, PDO E2E, 0600 backups, VolumeBarrier. |
+| **Phase R1.2A: Database Security** | SECURITY HARDENING | ACCEPTED | SQL credential escaping & redaction, single-use deletion authorization, 0600 atomic stream backups, non-empty restore guard, datadir ownership validation. |
+| **Phase R1.2B: Final Database Safety** | FINAL SAFETY GATE | ACCEPTED | Deletion self-authorization eliminated, deletion kept explicitly disabled in R1.2B pending UI gate, fail-closed restore occupancy check, partial restore tracking, Darwin getpwuid directory resolution. |
+| **Phase R1.3A: Spatial Studio Foundation** | DESIGN SYSTEM & SHELL | COMPLETED | Floating liquid dock, 2.5D SpatialCard micro-tilt, live infrastructure telemetry ribbon, AI Command Capsule (⌘K), embedded dist bundle. |
 
 ---
 

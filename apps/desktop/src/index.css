@@ -2,102 +2,222 @@
 
 @layer base {
   :root {
-    --mac-bg-dark: #0d0f12;
-    --mac-surface-dark: rgba(22, 26, 33, 0.75);
-    --mac-surface-elevated: rgba(30, 36, 46, 0.85);
-    --mac-border-subtle: rgba(255, 255, 255, 0.08);
-    --mac-border-highlight: rgba(255, 255, 255, 0.16);
-    --mac-accent: #0a84ff;
+    /* Foundation Canvas Tokens - Dark Theme Default */
+    --lf-bg-void: #06080D;
+    --lf-bg-canvas: #0A0D15;
+    --lf-bg-surface-subtle: rgba(18, 24, 38, 0.50);
+    --lf-bg-surface: rgba(22, 29, 46, 0.65);
+    --lf-bg-surface-elevated: rgba(30, 40, 64, 0.78);
+    --lf-bg-surface-floating: rgba(38, 50, 80, 0.88);
+
+    /* Atmospheric Lighting & Accent Tokens */
+    --lf-glow-indigo: rgba(79, 110, 247, 0.15);
+    --lf-glow-ultramarine: rgba(45, 65, 125, 0.22);
+    --lf-accent-primary: #4F6EF7;
+    --lf-accent-hover: #637EF9;
+    --lf-accent-active: #3D59D6;
+    --lf-accent-subtle: rgba(79, 110, 247, 0.12);
+
+    /* Border & Specular Highlight Tokens */
+    --lf-border-glass: rgba(255, 255, 255, 0.08);
+    --lf-border-subtle: rgba(255, 255, 255, 0.12);
+    --lf-border-highlight: rgba(255, 255, 255, 0.22);
+    --lf-border-active: rgba(79, 110, 247, 0.45);
+    --lf-border-glow: 0 0 0 1px rgba(79, 110, 247, 0.5), 0 0 16px rgba(79, 110, 247, 0.25);
+
+    /* Typography & Text Semantics */
+    --lf-text-primary: rgba(255, 255, 255, 0.95);
+    --lf-text-secondary: rgba(255, 255, 255, 0.68);
+    --lf-text-tertiary: rgba(255, 255, 255, 0.45);
+    --lf-text-disabled: rgba(255, 255, 255, 0.25);
+    --lf-text-accent: #708BFF;
+
+    /* Semantic Status Colors (Triple-Channel Accessible) */
+    --lf-status-running: #10B981;
+    --lf-status-running-glow: rgba(16, 185, 129, 0.25);
+    --lf-status-stopped: #6B7280;
+    --lf-status-starting: #3B82F6;
+    --lf-status-starting-glow: rgba(59, 130, 246, 0.30);
+    --lf-status-stopping: #9CA3AF;
+    --lf-status-degraded: #F59E0B;
+    --lf-status-degraded-glow: rgba(245, 158, 11, 0.25);
+    --lf-status-failed: #EF4444;
+    --lf-status-failed-glow: rgba(239, 68, 68, 0.30);
+    --lf-status-disconnected: #EC4899;
+    --lf-status-disconnected-glow: rgba(236, 72, 153, 0.25);
+    --lf-status-unknown: #8B5CF6;
+    --lf-status-unavailable: #4B5563;
+
+    /* Typography Scale */
+    --lf-font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --lf-font-text: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --lf-font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  }
+
+  [data-theme="light"] {
+    --lf-bg-void: #F2F4F7;
+    --lf-bg-canvas: #F8F9FA;
+    --lf-bg-surface-subtle: rgba(255, 255, 255, 0.65);
+    --lf-bg-surface: rgba(255, 255, 255, 0.85);
+    --lf-bg-surface-elevated: rgba(255, 255, 255, 0.95);
+    --lf-bg-surface-floating: #FFFFFF;
+
+    --lf-glow-indigo: rgba(79, 110, 247, 0.08);
+    --lf-glow-ultramarine: rgba(45, 65, 125, 0.06);
+    --lf-accent-primary: #3B5CD6;
+    --lf-accent-hover: #2D4ED8;
+    --lf-accent-active: #223EB8;
+    --lf-accent-subtle: rgba(79, 110, 247, 0.10);
+
+    --lf-border-glass: rgba(0, 0, 0, 0.08);
+    --lf-border-subtle: rgba(0, 0, 0, 0.12);
+    --lf-border-highlight: rgba(255, 255, 255, 0.90);
+    --lf-border-active: rgba(59, 92, 214, 0.45);
+
+    --lf-text-primary: rgba(10, 15, 25, 0.95);
+    --lf-text-secondary: rgba(10, 15, 25, 0.68);
+    --lf-text-tertiary: rgba(10, 15, 25, 0.45);
+    --lf-text-disabled: rgba(10, 15, 25, 0.25);
+    --lf-text-accent: #2D4ED8;
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", sans-serif;
+    font-family: var(--lf-font-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: var(--mac-bg-dark);
-    color: rgba(255, 255, 255, 0.92);
+    background-color: var(--lf-bg-canvas);
+    color: var(--lf-text-primary);
     user-select: none;
-    overflow-x: hidden;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
   }
 
   ::selection {
-    background-color: rgba(10, 132, 255, 0.35);
-    color: #ffffff;
+    background-color: var(--lf-accent-subtle);
+    color: var(--lf-accent-primary);
   }
 
   /* macOS Custom Smooth Scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.14);
     border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    background: rgba(255, 255, 255, 0.24);
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.14);
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.24);
   }
 }
 
-/* Apple Specular Highlight and Glass Utilities */
-.apple-glass {
-  background: rgba(20, 24, 32, 0.72);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+/* Accessible Focus Ring */
+:focus-visible {
+  outline: 2px solid var(--lf-accent-primary) !important;
+  outline-offset: 2px !important;
 }
 
-.apple-card {
-  background: linear-gradient(135deg, rgba(25, 30, 40, 0.65) 0%, rgba(18, 22, 30, 0.55) 100%);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.09);
-  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+/* ==========================================================================
+   Spatial Studio Material Utilities
+   ========================================================================== */
+
+/* Floating Vertical Navigation Dock (Liquid Glass) */
+.lf-material-dock {
+  background: var(--lf-bg-surface);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--lf-border-glass);
+  box-shadow: 
+    0 16px 40px -6px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 var(--lf-border-highlight),
+    inset 0 0 16px var(--lf-glow-indigo);
 }
 
-.apple-card:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 28px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
+/* Spatial Card Material with 3D Specular Rim */
+.lf-material-card {
+  background: linear-gradient(
+    145deg,
+    rgba(22, 29, 46, 0.70) 0%,
+    rgba(14, 18, 28, 0.60) 100%
+  );
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--lf-border-glass);
+  box-shadow: 
+    0 8px 24px -4px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 0 var(--lf-border-highlight);
+  border-radius: 16px;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.apple-button-primary {
-  background: linear-gradient(180deg, #1d74f2 0%, #0d5fdb 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.18s ease;
+.lf-material-card:hover {
+  border-color: var(--lf-border-subtle);
+  box-shadow: 
+    0 14px 36px -6px rgba(0, 0, 0, 0.55),
+    0 0 20px -2px var(--lf-glow-indigo),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.28);
 }
 
-.apple-button-primary:hover {
-  background: linear-gradient(180deg, #2b80fc 0%, #176ae2 100%);
-  box-shadow: 0 2px 6px rgba(13, 95, 219, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+[data-theme="light"] .lf-material-card {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.90) 0%,
+    rgba(245, 247, 250, 0.85) 100%
+  );
+  box-shadow: 
+    0 6px 20px -2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
 }
 
-.apple-button-primary:active {
-  transform: scale(0.98);
-  background: #0d5fdb;
+/* Floating AI Command Capsule */
+.lf-material-capsule {
+  background: var(--lf-bg-surface-floating);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid var(--lf-border-subtle);
+  box-shadow: 
+    0 12px 36px -4px rgba(0, 0, 0, 0.50),
+    0 0 18px var(--lf-glow-indigo),
+    inset 0 1px 0 0 var(--lf-border-highlight);
 }
 
-.apple-button-ghost {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.18s ease;
+/* Elevated Surface Panels */
+.lf-material-panel {
+  background: var(--lf-bg-surface-subtle);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--lf-border-glass);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
 }
 
-.apple-button-ghost:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
+/* Active Glow Border for Selected Elements */
+.lf-border-glow-active {
+  box-shadow: var(--lf-border-glow);
+  border-color: var(--lf-accent-primary);
 }
 
-.apple-button-ghost:active {
-  transform: scale(0.98);
+/* Reduced Motion Mode Guard */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
 }

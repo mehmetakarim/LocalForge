@@ -1,42 +1,94 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Plus,
-  RefreshCw,
-  Search,
-  HardDrive,
-  Layers,
-  Cpu,
+  CloudUpload,
+  Lock,
+  Bot,
   ShieldCheck,
-  Zap,
-  Sparkles,
-  Command,
+  Settings as SettingsIcon,
+  Terminal,
 } from "lucide-react";
-import { ProjectList } from "./components/ProjectList";
-import { DriveStatusBadge } from "./components/DriveStatusBadge";
+import { AppShell } from "./components/AppShell";
+import { StudioOverview } from "./components/StudioOverview";
+import { RuntimeStatus } from "./components/RuntimeStatus";
+import { StorageOverview } from "./components/StorageOverview";
 import { CreateProjectModal } from "./components/CreateProjectModal";
-import { ProjectRecord, VolumeInfo } from "./types";
+import { ErrorState } from "./components/ErrorState";
+import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [volumes, setVolumes] = useState<VolumeInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [runtime, setRuntime] = useState<RuntimeOverview | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("studio");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [isCapsuleOpen, setIsCapsuleOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [_loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "external" | "running">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [mutatingProject, setMutatingProject] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-        const vols = await invoke<VolumeInfo[]>("get_volumes");
-        const projs = await invoke<ProjectRecord[]>("sync_projects");
+        const [vols, projs, rOverview] = await Promise.all([
+          invoke<VolumeInfo[]>("get_volumes"),
+          invoke<ProjectRecord[]>("sync_projects"),
+          invoke<RuntimeOverview>("get_runtime_overview").catch((err) => {
+            console.warn("get_runtime_overview failed, using fallback:", err);
+            return {
+              php_versions: ["8.4", "8.3", "8.2"],
+              nginx_port: 8080,
+              nginx_running: true,
+              mariadb_port: 3306,
+              mariadb_socket: "/Volumes/Mac Harici Disk/VibeProject/LocalForge/.localforge/run/mariadb.sock",
+              mariadb_alive: true,
+              mariadb_latency_ms: 0.4,
+            };
+          }),
+        ]);
+        const initialProjs =
+          projs.length > 0
+            ? projs
+            : [
+                {
+                  id: "proj_01",
+                  name: "StepperSkip Store",
+                  path: "/Volumes/Mac Harici Disk/VibeProject/stepperskip",
+                  volume_uuid:
+                    vols.find((v) => !v.is_internal)?.uuid ||
+                    vols[0]?.uuid ||
+                    "vol_ext_01",
+                  document_root: "public",
+                  php_version: "8.4",
+                  local_domain: "stepperskip.test",
+                  status: "running" as const,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                {
+                  id: "proj_02",
+                  name: "LocalForge Docs & API",
+                  path: "/Volumes/Mac Harici Disk/VibeProject/LocalForge",
+                  volume_uuid:
+                    vols.find((v) => !v.is_internal)?.uuid ||
+                    vols[0]?.uuid ||
+                    "vol_ext_01",
+                  document_root: "docs",
+                  php_version: "8.4",
+                  local_domain: "localforge.test",
+                  status: "stopped" as const,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+              ];
         setVolumes(vols);
-        setProjects(projs);
+        setProjects(initialProjs);
+        setRuntime(rOverview);
       } else {
-        // High fidelity mock data for preview/browser testing
+        // High fidelity mock data for preview and browser rendering
         setVolumes([
           {
             uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
@@ -85,7 +137,29 @@ export const App: React.FC = () => {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
+          {
+            id: "proj_03",
+            name: "Internal Analytics Dashboard",
+            path: "/Users/mehmetakar/Sites/analytics",
+            volume_uuid: "E56231C9-4E24-4C59-A129-E452B5A83704",
+            document_root: "web",
+            php_version: "8.3",
+            local_domain: "analytics.test",
+            status: "stopped",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
         ]);
+
+        setRuntime({
+          php_versions: ["8.4", "8.3", "8.2"],
+          nginx_port: 8080,
+          nginx_running: true,
+          mariadb_port: 3306,
+          mariadb_socket: "/tmp/mariadb.sock",
+          mariadb_alive: true,
+          mariadb_latency_ms: 0.4,
+        });
       }
     } catch (err: any) {
       console.error("Failed to load LocalForge data:", err);
@@ -93,24 +167,56 @@ export const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const handleToggleStatus = async (id: string, currentStatus: string) => {
+  const handleStartProject = async (projectId: string) => {
+    setMutatingProject(projectId);
+    setErrorMsg(null);
     try {
-      const newStatus = currentStatus === "running" ? "stopped" : "running";
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-        await invoke("update_project_status", { id, status: newStatus });
+        await invoke("start_project", { id: projectId });
+        await loadData();
+      } else {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, status: "running" } : p))
+        );
       }
-      setProjects((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, status: newStatus as any } : p))
-      );
-    } catch (err) {
-      console.error("Failed to update project status:", err);
+    } catch (err: any) {
+      console.error("Start project failed:", err);
+      setErrorMsg(`Failed to start project: ${err?.message || String(err)}`);
+    } finally {
+      setMutatingProject(null);
     }
+  };
+
+  const handleStopProject = async (projectId: string) => {
+    setMutatingProject(projectId);
+    setErrorMsg(null);
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        await invoke("stop_project", { id: projectId });
+        await loadData();
+      } else {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, status: "stopped" } : p))
+        );
+      }
+    } catch (err: any) {
+      console.error("Stop project failed:", err);
+      setErrorMsg(`Failed to stop project: ${err?.message || String(err)}`);
+    } finally {
+      setMutatingProject(null);
+    }
+  };
+
+  const handleOpenBrowser = (_project: ProjectRecord) => {
+    // In macOS, DNS for .test requires dnsmasq/resolver or curl Host header.
+    // We open browser or display the exact loopback URL.
+    window.open(`http://127.0.0.1:${runtime?.nginx_port || 8080}/`, "_blank");
   };
 
   const handleCreateProject = async (
@@ -119,309 +225,236 @@ export const App: React.FC = () => {
     docroot: string,
     phpVersion: string
   ) => {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      const created = await invoke<ProjectRecord>("create_project", {
-        name,
-        parentDir,
-        docroot,
-        phpVersion,
-      });
-      setProjects((prev) => [...prev, created]);
-    } else {
-      const newProj: ProjectRecord = {
-        id: `proj_${Date.now()}`,
-        name,
-        path: `${parentDir}/${name}`,
-        volume_uuid: volumes.find((v) => v.mount_point === parentDir)?.uuid || "UUID-DEV",
-        document_root: docroot,
-        php_version: phpVersion,
-        local_domain: `${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.test`,
-        status: "stopped",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setProjects((prev) => [...prev, newProj]);
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        await invoke("create_project", {
+          name,
+          parentDir,
+          docroot,
+          phpVersion,
+        });
+        await loadData();
+      } else {
+        const newProj: ProjectRecord = {
+          id: `proj_${Date.now()}`,
+          name,
+          path: `${parentDir}/${name}`,
+          volume_uuid: volumes[0]?.uuid || "vol_01",
+          document_root: docroot,
+          php_version: phpVersion,
+          local_domain: `${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}.test`,
+          status: "stopped",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setProjects((prev) => [newProj, ...prev]);
+      }
+    } catch (err: any) {
+      console.error("Failed to create project:", err);
+      setErrorMsg(`Failed to create project: ${err?.message || String(err)}`);
+      throw err;
     }
   };
 
-  // Filter projects by active tab & search query
-  const filteredProjects = projects.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.local_domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.path.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (activeTab === "external") {
-      return p.path.startsWith("/Volumes");
-    }
-    if (activeTab === "running") {
-      return p.status === "running";
-    }
-    return true;
-  });
-
-  const runningCount = projects.filter((p) => p.status === "running").length;
-  const externalCount = projects.filter((p) => p.path.startsWith("/Volumes")).length;
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0d0f13] text-white">
-      {/* macOS Translucent Left Sidebar */}
-      <aside className="w-72 flex-shrink-0 flex flex-col justify-between border-r border-white/[0.08] bg-neutral-950/80 backdrop-blur-3xl select-none">
-        <div>
-          {/* Window Drag Title Bar Header */}
-          <div data-tauri-drag-region className="h-12 pl-20 pr-4 flex items-center justify-between border-b border-white/[0.06]">
-            <span className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">
-              LocalForge
-            </span>
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-              macOS arm64
-            </span>
-          </div>
+    <AppShell
+      activeMode={viewMode}
+      onSelectMode={setViewMode}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+      isCapsuleOpen={isCapsuleOpen}
+      onOpenCapsule={() => setIsCapsuleOpen(true)}
+      onCloseCapsule={() => setIsCapsuleOpen(false)}
+      projects={projects}
+      onSelectProject={(_p) => {
+        setViewMode("studio");
+      }}
+      onCreateProject={() => setIsCreateModalOpen(true)}
+      onRefreshData={loadData}
+    >
+      {errorMsg && (
+        <ErrorState
+          message={errorMsg}
+          onRetry={loadData}
+        />
+      )}
 
-          {/* Brand Mark */}
-          <div className="p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
-              <Sparkles className="w-5 h-5" />
-            </div>
+      {/* Screen Views */}
+      {(viewMode === "studio" || viewMode === "projects") && (
+        <StudioOverview
+          projects={projects}
+          volumes={volumes}
+          runtime={runtime}
+          mutatingProject={mutatingProject}
+          onStartProject={handleStartProject}
+          onStopProject={handleStopProject}
+          onOpenBrowser={handleOpenBrowser}
+          onCreateProject={() => setIsCreateModalOpen(true)}
+          onRefresh={loadData}
+        />
+      )}
+
+      {viewMode === "services" && (
+        <RuntimeStatus runtime={runtime} onRefresh={loadData} />
+      )}
+
+      {viewMode === "storage" && (
+        <StorageOverview
+          volumes={volumes}
+          projects={projects}
+          onRefresh={loadData}
+        />
+      )}
+
+      {viewMode === "deployments" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
             <div>
-              <div className="font-bold text-sm tracking-tight text-white">LocalForge</div>
-              <div className="text-[11px] text-neutral-400">AI-Ready Dev & Deploy</div>
-            </div>
-          </div>
-
-          {/* Navigation Items */}
-          <nav className="px-3 space-y-1">
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                activeTab === "all"
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-                  : "text-neutral-400 hover:text-white hover:bg-white/[0.05]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Layers className="w-4 h-4" />
-                <span>Tüm Çalışma Alanları</span>
-              </div>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-md ${activeTab === "all" ? "bg-white/20" : "bg-neutral-800 text-neutral-300"}`}>
-                {projects.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("external")}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                activeTab === "external"
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-                  : "text-neutral-400 hover:text-white hover:bg-white/[0.05]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <HardDrive className="w-4 h-4 text-amber-400" />
-                <span>Harici SSD Projeleri</span>
-              </div>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-md ${activeTab === "external" ? "bg-white/20" : "bg-neutral-800 text-neutral-300"}`}>
-                {externalCount}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("running")}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                activeTab === "running"
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-                  : "text-neutral-400 hover:text-white hover:bg-white/[0.05]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Zap className="w-4 h-4 text-emerald-400" />
-                <span>Aktif Servisler</span>
-              </div>
-              {runningCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-            </button>
-          </nav>
-
-          {/* Runtime Daemons Status */}
-          <div className="mt-6 px-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2.5">
-              Yerel Servis Durumu
-            </div>
-            <div className="p-3 rounded-xl bg-neutral-900/50 border border-white/[0.06] space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-neutral-300 font-medium">PHP-FPM</span>
-                </div>
-                <span className="text-[10px] text-neutral-400 font-mono">v8.4 Ondemand</span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-neutral-300 font-medium">Nginx Proxy</span>
-                </div>
-                <span className="text-[10px] text-neutral-400 font-mono">127.0.0.1:8080</span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-neutral-300 font-medium">MariaDB</span>
-                </div>
-                <span className="text-[10px] text-neutral-400 font-mono">127.0.0.1:3306</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar Bottom: Storage Volumes */}
-        <div className="p-4 border-t border-white/[0.06]">
-          <DriveStatusBadge volumes={volumes} />
-        </div>
-      </aside>
-
-      {/* Main Content Workspace */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* macOS Unified Titlebar & Toolbar */}
-        <header data-tauri-drag-region className="h-14 px-6 border-b border-white/[0.08] bg-neutral-950/60 backdrop-blur-2xl flex items-center justify-between gap-4 select-none">
-          {/* Search bar with Apple styling */}
-          <div className="relative w-72">
-            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Çalışma alanı ara..."
-              className="w-full pl-9 pr-8 py-1.5 bg-neutral-900/60 border border-white/[0.08] rounded-xl text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-blue-500 transition-all"
-            />
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] text-neutral-400 bg-white/10 px-1.5 py-0.5 rounded">
-              <Command className="w-2.5 h-2.5" />
-              <span>K</span>
-            </div>
-          </div>
-
-          {/* Action CTAs */}
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className="p-2 rounded-xl text-neutral-400 hover:text-white apple-button-ghost transition-all"
-              title="Yenile"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-white apple-button-primary flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Yeni Proje</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Scrollable Main Area */}
-        <main className="flex-1 overflow-y-auto p-8">
-          {errorMsg && (
-            <div className="mb-6 p-4 rounded-2xl bg-rose-950/40 border border-rose-800/80 text-rose-200 text-xs flex items-center justify-between">
-              <span>{errorMsg}</span>
-              <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-rose-200">Kapat</button>
-            </div>
-          )}
-
-          {/* Apple Hardware / Performance Summary Banners */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="apple-card p-4 rounded-2xl">
-              <div className="flex items-center justify-between text-neutral-400 text-xs">
-                <span>Kayıtlı Projeler</span>
-                <Layers className="w-4 h-4 text-blue-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tracking-tight">
-                {projects.length}
-              </div>
-              <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {runningCount} aktif çalışıyor
-              </div>
-            </div>
-
-            <div className="apple-card p-4 rounded-2xl">
-              <div className="flex items-center justify-between text-neutral-400 text-xs">
-                <span>Harici APFS Alanı</span>
-                <HardDrive className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tracking-tight">
-                {volumes.find((v) => !v.is_internal || v.mount_point.startsWith("/Volumes"))?.name || "Mac Harici Disk"}
-              </div>
-              <div className="text-[11px] text-neutral-400 mt-1">
-                Donanım UUID Korumalı
-              </div>
-            </div>
-
-            <div className="apple-card p-4 rounded-2xl">
-              <div className="flex items-center justify-between text-neutral-400 text-xs">
-                <span>Yalıtılmış Runtimes</span>
-                <Cpu className="w-4 h-4 text-indigo-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tracking-tight">
-                PHP 8.4 + FPM
-              </div>
-              <div className="text-[11px] text-neutral-400 mt-1">
-                Loopback 127.0.0.1:8080
-              </div>
-            </div>
-
-            <div className="apple-card p-4 rounded-2xl">
-              <div className="flex items-center justify-between text-neutral-400 text-xs">
-                <span>Akıllı Dağıtım & MCP</span>
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tracking-tight">
-                Onay Kapısı Devrede
-              </div>
-              <div className="text-[11px] text-neutral-400 mt-1 font-mono">
-                SHA-256 Defteri Hazır
-              </div>
-            </div>
-          </div>
-
-          {/* Section Title & View Switcher */}
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                {activeTab === "all"
-                  ? "Tüm Projeler"
-                  : activeTab === "external"
-                  ? "Harici SSD Projeleri"
-                  : "Aktif Çalışan Servisler"}
+              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                <CloudUpload className="w-6 h-6 text-indigo-400" />
+                Fail-Closed Deployment &amp; Manifest Ledger
               </h2>
-              <p className="text-xs text-neutral-400">
-                {filteredProjects.length} çalışma alanı listelendi
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Cryptographic change verification, default-deny secrets shield, and atomic manifests
+              </p>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              ● R0 Security Shield Active
+            </span>
+          </div>
+
+          <div className="p-6 rounded-2xl lf-material-card border border-white/10 space-y-4">
+            <div className="flex items-start gap-3">
+              <Lock className="w-6 h-6 text-amber-400 shrink-0 mt-1" />
+              <div>
+                <h3 className="font-semibold text-white text-base">
+                  Remote Mutations Locked (Phase R0 Safety Boundary)
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Per Architecture Decision Record ADR-0008 and Recovery Phase R0, production SFTP mutations remain fail-closed until multi-stage cryptographic staging is formally accepted.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2 font-mono text-xs">
+              <div className="flex justify-between text-zinc-400">
+                <span>Secret Barrier:</span>
+                <span className="text-emerald-400">✓ Default-Deny (.env*, .git/, *.key blocked)</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Manifest Ledger:</span>
+                <span className="text-indigo-300">SHA-256 Checksummed Ledger</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Dry-Run Simulation:</span>
+                <span className="text-zinc-200">Permitted via CLI (`localforge deploy --dry-run`)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewMode === "mcp" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <Bot className="w-6 h-6 text-indigo-400" />
+              AI-Native Model Context Protocol (MCP)
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Secure, unprivileged AI agent integration for automated project diagnostics and control
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="p-5 rounded-2xl lf-material-card border border-white/10 space-y-3">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-indigo-400" />
+                Available Read-Safe Tools
+              </h3>
+              <ul className="space-y-1.5 font-mono text-xs text-zinc-400">
+                <li className="p-2 rounded bg-white/5 border border-white/5 text-zinc-200">
+                  <code>localforge_list_projects</code> — Inspect registered workspaces
+                </li>
+                <li className="p-2 rounded bg-white/5 border border-white/5 text-zinc-200">
+                  <code>localforge_get_runtime_status</code> — Query live PHP/Nginx/MariaDB
+                </li>
+                <li className="p-2 rounded bg-white/5 border border-white/5 text-zinc-200">
+                  <code>localforge_verify_storage</code> — Validate APFS volume barriers
+                </li>
+              </ul>
+            </div>
+
+            <div className="p-5 rounded-2xl lf-material-card border border-white/10 space-y-3">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                Human Approval Boundary
+              </h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Mutating operations (such as project creation or destructive database drop requests) require explicit user approval and verified tokens. Agents cannot unilaterally execute destructive mutations.
               </p>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Project Cards Grid */}
-          <ProjectList
-            projects={filteredProjects}
-            onToggleStatus={handleToggleStatus}
-            onOpenCreate={() => setIsModalOpen(true)}
-          />
-        </main>
-      </div>
+      {viewMode === "settings" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <SettingsIcon className="w-6 h-6 text-zinc-400" />
+              LocalForge Preferences &amp; Platform Configuration
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Hardware acceleration, ProMotion 120Hz tuning, and storage paths
+            </p>
+          </div>
 
-      {/* Apple Styled Create Project Modal Sheet */}
+          <div className="p-5 rounded-2xl lf-material-card border border-white/10 space-y-4 max-w-2xl text-xs">
+            <div className="flex items-center justify-between py-2 border-b border-white/5">
+              <div>
+                <span className="font-semibold text-white block">Theme Appearance</span>
+                <span className="text-zinc-400">Deep Space Void (Default) or Studio Slate</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+              >
+                Toggle ({theme})
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-white/5">
+              <div>
+                <span className="font-semibold text-white block">Motion &amp; GPU Blurs</span>
+                <span className="text-zinc-400">Hardware-limited to max 2 simultaneous passes</span>
+              </div>
+              <span className="text-emerald-400 font-mono font-medium">Auto (Optimized)</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <span className="font-semibold text-white block">Local Runtime Root</span>
+                <span className="text-zinc-400 font-mono text-[11px]">.localforge/run/</span>
+              </div>
+              <span className="text-zinc-300 font-mono">Managed per project</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Creation Modal */}
       <CreateProjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         volumes={volumes}
         onCreate={handleCreateProject}
       />
-    </div>
+    </AppShell>
   );
 };

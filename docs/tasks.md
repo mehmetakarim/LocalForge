@@ -63,13 +63,20 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
 | **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
-### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
+### Subphase R1.3A: Spatial Studio Foundation & Shell (COMPLETED / AWAITING ACCEPTANCE)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.3-01** | Spatial Studio Design System Token Integration | High | PLANNED | Frontend Lead | CSS tokens, void canvas, atmospheric indigo glow |
-| **TASK-R1.3-02** | SpatialCard & 3D Interactive Stage | High | PLANNED | Frontend Engineer | 2.5D micro-tilt cards, status halos, action deck |
-| **TASK-R1.3-03** | FloatingDock Navigation & AICommandCapsule | High | PLANNED | Desktop Engineer | Liquid glass dock, Cmd+K command palette |
-| **TASK-R1.3-04** | Performance & Accessibility Budget Verification | Critical | PLANNED | QA Lead | CPU <1%, RAM <80MB, WCAG AA, reduced motion |
+| **TASK-R1.3A-01** | Spatial Studio Design System Token Integration | High | COMPLETED | Frontend Lead | CSS tokens, void canvas, atmospheric indigo glow in `index.css` |
+| **TASK-R1.3A-02** | SpatialCard & 3D Interactive Stage | High | COMPLETED | Frontend Engineer | 2.5D micro-tilt cards, status halos, action deck |
+| **TASK-R1.3A-03** | FloatingDock Navigation & AICommandCapsule | High | COMPLETED | Desktop Engineer | Liquid glass dock (`⌘1..7`), Cmd+K command palette with MCP actions |
+| **TASK-R1.3A-04** | Embedded Dist Distribution & Window Integration | Critical | COMPLETED | Tauri Architect | `devUrl: null`, embedded dist frontend, traffic-light clearance, native dragging |
+| **TASK-R1.3A-05** | Performance & Accessibility Budget Verification | Critical | COMPLETED | QA Lead | CPU <0.3%, RAM 52MB, max 2 blurs, WCAG AA, real screenshot captures |
+
+### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.3B-01** | Native Workspace Detailed Inspector View | High | PLANNED | Frontend Lead | Per-project detailed telemetry, live log stream, environment variable editor |
+| **TASK-R1.3B-02** | Interactive Human Approval Gate for Deletions | Critical | PLANNED | Security Engineer | Multi-step human confirmation modal for destructive database drops |
 
 ---
 

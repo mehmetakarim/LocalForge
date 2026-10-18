@@ -10,9 +10,9 @@ Welcome to the centralized project brain of **LocalForge**. This file serves as 
 |---|---|
 | **Project Name** | LocalForge |
 | **Repo** | `mehmetakarim/LocalForge` |
-| **Active Branch** | `phase-r1/r1-2b-final-database-safety` |
-| **Current Phase** | **Phase R1.2B — Final Database Safety Gate** |
-| **Phase Status** | COMPLETED (Awaiting Product Owner Acceptance) |
+| **Active Branch** | `phase-r1/r1-3a-spatial-studio-foundation` |
+| **Current Phase** | **Phase R1.3A — Spatial Studio Foundation & Application Shell** |
+| **Phase Status** | COMPLETED (Awaiting Product Owner Visual Acceptance) |
 | **Design Baseline** | **Spatial Studio Visual Direction & Dual-Mode UI** (PO Approved, ADR-0010) |
 | **Runtime Architecture** | Darwin Kernel Verified Process Identity, Shared Nginx, Isolated FPM Pools, Unprivileged MariaDB, Hardened Database Safety (ADR-0011, ADR-0012) |
 | **Release State** | Held pending completion of Phase R1 subphases |

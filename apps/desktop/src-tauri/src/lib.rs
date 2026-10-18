@@ -154,6 +154,40 @@ fn update_project_status(
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+pub struct RuntimeOverviewDto {
+    pub php_versions: Vec<String>,
+    pub nginx_port: u16,
+    pub nginx_running: bool,
+    pub mariadb_port: u16,
+    pub mariadb_socket: String,
+    pub mariadb_alive: bool,
+    pub mariadb_version: Option<String>,
+    pub mariadb_latency_ms: Option<u64>,
+}
+
+#[tauri::command]
+fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto, String> {
+    let php_versions = localforge_runtime::PhpFpmSupervisor::discover_installed_versions();
+    let nginx_port = 8080;
+    let nginx_running = !localforge_runtime::is_port_available(nginx_port);
+    let db_status = state.runtime_service.get_database_status().ok();
+
+    Ok(RuntimeOverviewDto {
+        php_versions,
+        nginx_port,
+        nginx_running,
+        mariadb_port: db_status.as_ref().map(|s| s.port).unwrap_or(3306),
+        mariadb_socket: db_status
+            .as_ref()
+            .map(|s| s.socket_path.display().to_string())
+            .unwrap_or_default(),
+        mariadb_alive: db_status.as_ref().map(|s| s.is_alive).unwrap_or(false),
+        mariadb_version: db_status.as_ref().and_then(|s| s.version.clone()),
+        mariadb_latency_ms: db_status.as_ref().and_then(|s| s.latency_ms),
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base = localforge_runtime::resolve_application_support_dir()
@@ -201,7 +235,8 @@ pub fn run() {
             import_project,
             start_project,
             stop_project,
-            update_project_status
+            update_project_status,
+            get_runtime_overview
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalForge application");

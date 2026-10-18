@@ -23,3 +23,16 @@ export interface VolumeInfo {
   total_bytes: number;
   available_bytes: number;
 }
+
+export interface RuntimeOverview {
+  php_versions: string[];
+  nginx_port: number;
+  nginx_running: boolean;
+  mariadb_port: number;
+  mariadb_socket: string;
+  mariadb_alive: boolean;
+  mariadb_version?: string;
+  mariadb_latency_ms?: number;
+}
+
+export type ViewMode = "studio" | "projects" | "services" | "storage" | "deployments" | "mcp" | "settings";

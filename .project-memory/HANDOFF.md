@@ -6,23 +6,25 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.2B — Final Database Safety Gate Completed**
-- **Active Git Branch**: `phase-r1/r1-2b-final-database-safety`
-- **Target Remote**: `origin/phase-r1/r1-2b-final-database-safety`
+- **Current State**: **Phase R1.3A — Spatial Studio Foundation & Application Shell Completed**
+- **Active Git Branch**: `phase-r1/r1-3a-spatial-studio-foundation`
+- **Target Remote**: `origin/phase-r1/r1-3a-spatial-studio-foundation`
 - **Previous Milestone Status**:
   - **Recovery Phase R0**: CONDITIONALLY ACCEPTED (18/18 tests pass, CI Green).
   - **Recovery Phase R1.0**: ACCEPTED by Product Owner.
   - **Phase R1.1**: ACCEPTED by Product Owner.
   - **Phase R1.1A**: ACCEPTED by Product Owner.
-  - **Phase R1.2**: CONDITIONALLY ACCEPTED.
-  - **Phase R1.2A**: COMPLETED & VERIFIED.
-  - **Phase R1.2B**: COMPLETED & FULLY VERIFIED (40/40 automated tests pass across 8 crates, zero Clippy warnings, 13 MariaDB integration tests pass).
-- **Completed Tasks in R1.2B**:
-  - `TASK-R1.2B-01`: Deletion request and approval decision separation (`DatabaseDeletionRequest`), self-authorization via `db_name` and `request_id` strictly eliminated, deletion explicitly disabled in Phase R1.2B pending UI gate (`DatabaseDeletionUnavailable`).
-  - `TASK-R1.2B-02`: Fail-closed database restore without `if let Ok(...)`, non-empty destination rejection, and diagnostic partial restore tracking with DDL implicit commit documentation.
-  - `TASK-R1.2B-03`: Darwin Application Support resolution via `$HOME` and `libc::getpwuid(libc::getuid())`; eliminated all hardcoded `/Users/mehmetakar` fallbacks across runtime, desktop app, CLI, and MCP server.
-  - `TASK-R1.2B-04`: 13 MariaDB integration tests and 40 workspace tests executed and verified.
-- **Next Permitted Action**: Present R1.2B final safety report to Product Owner and await explicit authorization for Phase R1.3 (Spatial Studio UI).
+  - **Phase R1.2**: ACCEPTED by Product Owner.
+  - **Phase R1.2A**: ACCEPTED by Product Owner.
+  - **Phase R1.2B**: ACCEPTED by Product Owner.
+  - **Phase R1.3A**: COMPLETED & VERIFIED (Spatial Studio design system, floating dock, 2.5D cards, Cmd+K capsule, embedded dist frontend).
+- **Completed Tasks in R1.3A**:
+  - `TASK-R1.3A-01`: Spatial Studio design system tokens and atmospheric void styling (`index.css`).
+  - `TASK-R1.3A-02`: 2.5D `SpatialCard` with micro-tilt, live metrics, status halos, and curl command helper.
+  - `TASK-R1.3A-03`: `FloatingDock` navigation (`⌘1..7`) and `AICommandCapsule` modal dialog (`⌘K`).
+  - `TASK-R1.3A-04`: Embedded production frontend distribution (`devUrl: null`), eliminating sandbox socket network issues.
+  - `TASK-R1.3A-05`: Verified real macOS window captures (`docs/screenshots/spatial_studio_final.png`, `spatial_studio_cmd_k.png`).
+- **Next Permitted Action**: Present R1.3A visual acceptance report to Product Owner and await authorization for Phase R1.3B (Native Workspace & Detailed Inspector).
 
 ---
 
