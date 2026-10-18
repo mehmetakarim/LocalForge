@@ -6,68 +6,53 @@ This document mirrors and indexes the active engineering tasks across project ph
 
 ## Task Management Rules
 1. **Lead / Auditor Authority**: Only the Lead Agent or Auditor Agent may modify task states. Worker agents report results and must not modify this file directly.
-2. **Phase Discipline**: Work must strictly remain within the currently authorized phase (**Recovery Phase R0**).
+2. **Phase Discipline**: Work must strictly remain within the currently authorized subphase (**Recovery Phase R1.0 — Architecture Refinement**). Do not start implementation of R1.1, R1.2, or R1.3 without explicit Product Owner approval.
 
 ---
 
-## Recovery Phase R0: Safety Stabilization & CI Repair (ACTIVE)
+## Recovery Phase R1: Runtime Integration & Spatial Studio (ACTIVE)
 
+### Subphase R1.0: Architecture Refinement (COMPLETED / ACTIVE IN REVIEW)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R0-01** | Fail-Closed Deployment Engine | Critical | COMPLETED | Rust Security Auditor | `crates/deployment/src/sftp.rs` rejects non-dry-run with `DeploymentNotImplemented`; 0 fake transfers reported; ledger immutable |
-| **TASK-R0-02** | MCP Human Approval Security Barrier | Critical | COMPLETED | Security Engineer | `tools/mcp-server/src/main.rs` eliminates `approval_token` exposure; rejects non-dry-run execute; ADR-0009 |
-| **TASK-R0-03** | GitHub Actions CI & Clippy Repair | High | COMPLETED | DevOps / Release Eng | Fixed `clippy::useless_format` in `crates/runtime/src/php.rs`; updated `.github/workflows/ci.yml` |
-| **TASK-R0-04** | Project Memory Suite Reconciliation | Critical | COMPLETED | Principal Architect | Reconciled `PROJECT_STATE.md`, `ROADMAP.md`, `TASKS.md`, `HANDOFF.md`, `brain.md`, `docs/tasks.md` |
-| **TASK-R0-05** | Security & Safety Regression Test Suite | Critical | COMPLETED | QA Lead | 18/18 workspace tests PASS (deployment ledger immutability, MCP self-approval rejection, dry-run simulation) |
+| **TASK-R1.0-01** | Local Domain Resolution & Loopback Architecture | Critical | COMPLETED | Systems Architect | Decouple Host-header loopback from browser `.test` resolver |
+| **TASK-R1.0-02** | MariaDB Storage Policy & Internal Isolation | Critical | COMPLETED | Database Architect | Internal app storage default; decouple external source |
+| **TASK-R1.0-03** | Verified Process Identity & Lifecycle Safety | Critical | COMPLETED | Senior Rust Eng | Path + ticks PID reuse defense; PGID; shared Nginx lifecycle |
+| **TASK-R1.0-04** | Spatial Studio Performance & Hardware Budgets | High | COMPLETED | Lead UI Designer | CPU <1%, RAM <80MB, max 2 blurs, animation pause guards |
+| **TASK-R1.0-05** | R1 Subphase Governance & Spec Documents | Critical | COMPLETED | Principal Architect | `R1_0_ARCHITECTURE_REFINEMENT.md` through `R1_3` |
+| **TASK-R1.0-06** | Architecture Decision Records (ADR 10–12) | Critical | COMPLETED | Principal Architect | `ADR-0010`, `ADR-0011` (amended), `ADR-0012` |
+
+### Subphase R1.1: Real PHP-FPM & Nginx Integration (PLANNED / LOCKED)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.1-01** | Unprivileged PHP-FPM Child Process Spawning | Critical | PLANNED | Senior Rust Eng | FastCGI unix sockets, dedicated pool configs |
+| **TASK-R1.1-02** | Shared Nginx Loopback Master Process Gateway | High | PLANNED | Systems Engineer | Unprivileged port 8080 routing, dynamic vhost reloads |
+| **TASK-R1.1-03** | Verified Process Identity & Registry Engine | Critical | PLANNED | Senior Rust Eng | In-memory registry, PID reuse check, bounded SIGTERM |
+| **TASK-R1.1-04** | End-to-End Loopback HTTP 200 Verification | Critical | PLANNED | QA Lead | Automated HTTP GET verification against live socket |
+
+### Subphase R1.2: MariaDB, Storage Resilience & Multi-Project Verification (PLANNED / LOCKED)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.2-01** | User-Level MariaDB Internal Datadir Supervisor | High | PLANNED | Systems Engineer | Port 3306 binding, socket ping, internal SSD datadir |
+| **TASK-R1.2-02** | Concurrent Multi-Version PHP Project Execution | Critical | PLANNED | Senior Rust Eng | Project A (8.4) & B (8.3) live side-by-side |
+| **TASK-R1.2-03** | External APFS Volume Disconnect Resilience | Critical | PLANNED | Systems Engineer | Physical/simulated disconnect safety without write fallback |
+
+### Subphase R1.3: Spatial Studio UI Implementation (PLANNED / LOCKED)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.3-01** | Spatial Studio Design System Token Integration | High | PLANNED | Frontend Lead | CSS tokens, void canvas, atmospheric indigo glow |
+| **TASK-R1.3-02** | SpatialCard & 3D Interactive Stage | High | PLANNED | Frontend Engineer | 2.5D micro-tilt cards, status halos, action deck |
+| **TASK-R1.3-03** | FloatingDock Navigation & AICommandCapsule | High | PLANNED | Desktop Engineer | Liquid glass dock, Cmd+K command palette |
+| **TASK-R1.3-04** | Performance & Accessibility Budget Verification | Critical | PLANNED | QA Lead | CPU <1%, RAM <80MB, WCAG AA, reduced motion |
 
 ---
 
-## Historical Phase Baseline (Post-Audit A1 Assessment)
+## Recovery Phase R0: Safety Stabilization & CI Repair (COMPLETED / CONDITIONALLY ACCEPTED)
 
-### Phase 0: Foundation & Project Memory (COMPLETED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-001** | Environment and Repository Audit | Critical | COMPLETED | DevOps / Systems Eng | Audit log, CLI versions, hardware specs |
-| **TASK-002** | Architecture Research & Tech Stack Selection | Critical | COMPLETED | Principal Architect | Tech stack validation, dependency versions |
-| **TASK-003** | Architecture Decision Records (ADR 1–8) | Critical | COMPLETED | Principal Architect | `docs/architecture/adr/ADR-0001` to `0008` |
-| **TASK-004** | Project Memory Initialization | Critical | COMPLETED | Project Manager | `.project-memory/*` canonical memory files |
-| **TASK-005** | Product Documentation Suite | High | COMPLETED | Product Owner | Vision, Requirements, Feature Matrix, Non-Goals |
-| **TASK-006** | Security Baseline & Threat Modeling | Critical | COMPLETED | Security Engineer | `THREAT_MODEL.md`, `SECURITY_POLICY.md` |
-| **TASK-007** | Engineering Standards & Repository Setup | High | COMPLETED | DevOps / QA | `CONTRIBUTING.md`, `.gitignore`, `README.md` |
-| **TASK-008** | Phase 0 & Phase 1 Specifications | High | COMPLETED | Lead Architect | `PHASE_0_FOUNDATION.md`, `PHASE_1_DESKTOP_FOUNDATION.md` |
-| **TASK-009** | Phase 0 Verification & Acceptance Audit | Critical | COMPLETED | Auditor Agent | Link validation, criteria verification, handoff |
-
-### Phase 1: Desktop Foundation & Workspace Storage (IMPLEMENTED - PENDING FORMAL REVIEW)
-| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
-|---|---|---|---|---|---|
-| **TASK-101** | Tauri 2 & React + Vite Scaffolding | High | IMPLEMENTED | Desktop Engineer | `apps/desktop/` with React 19 & Tailwind |
-| **TASK-102** | Core Crates Setup in Cargo Workspace | High | IMPLEMENTED | Senior Rust Eng | Root Cargo workspace & typed domain primitives |
-| **TASK-103** | External Volume Detection & Safety Guards | Critical | IMPLEMENTED | Systems Engineer | Diskutil / IOKit bindings & volume disconnect barrier |
-| **TASK-104** | Project Registration & SQLite Metadata Store | High | IMPLEMENTED | Backend / Rust Eng | `.localforge/project.yaml` parser & SQLite schema |
-| **TASK-105** | Desktop UI Project Browser & Volume Health Indicator | Medium | IMPLEMENTED | Frontend Engineer | Project list view & disk health badge |
-| **TASK-106** | Phase 1 Automated Test Suite & Acceptance Audit | Critical | REQUIRES REVIEW | Auditor Agent | Unit/integration tests & Phase 1 closure report |
-
-### Phase 2: Local Runtime Engine (PARTIALLY IMPLEMENTED - INTEGRATION INCOMPLETE)
-| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
-|---|---|---|---|---|---|
-| **TASK-201** | PHP-FPM Lifecycle & Multi-Version Manager | Critical | PARTIAL | Senior Rust Eng | `crates/runtime` FPM lifecycle supervisor |
-| **TASK-202** | Nginx Reverse Proxy & Loopback Virtual Hosts | High | PARTIAL | Systems Engineer | Non-root Nginx config builder & loopback proxy |
-| **TASK-203** | MariaDB Lifecycle & Database Manager | High | PARTIAL | Systems Engineer | MariaDB process manager & data directory guards |
-| **TASK-204** | Runtime Health Probes & Port Conflict Resolver | Medium | IMPLEMENTED | Backend / Rust Eng | HTTP/TCP health probes & conflict diagnostics |
-
-### Phase 3: Smart Deployment & CLI / MCP Integration (REMEDIATED TO FAIL-CLOSED IN R0)
-| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
-|---|---|---|---|---|---|
-| **TASK-301** | Git-Aware Change Detection & Deployment Checksums | Critical | COMPLETED | Senior Rust Eng | `crates/deployment` SHA-256 change tracker |
-| **TASK-302** | SFTP Transfer Engine with Atomic Remote Sync | Critical | SIMULATION REMEDIATED | Security / Rust Eng | Simulated SFTP removed; fail-closed in R0 |
-| **TASK-303** | LocalForge CLI Binary (`tools/cli`) | Medium | IMPLEMENTED | DevOps / Rust Eng | Headless terminal utility (`localforge`) |
-| **TASK-304** | Model Context Protocol Server (`tools/mcp-server`) | High | HARDENED | AI Systems Eng | JSON-RPC Stdio MCP server for Claude/Codex |
-
-### Phase 4: Hardening, Packaging & Open-Source Release (REMEDIATED IN R0)
-| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
-|---|---|---|---|---|---|
-| **TASK-401** | GitHub Actions CI/CD & Automated Release Pipelines | High | REMEDIATED | DevOps / Release Eng | Clippy warnings fixed; branch triggers expanded |
-| **TASK-402** | Security Hardening & Edge-Case Traversal Tests | Critical | COMPLETED | Security Engineer | `crates/storage/src/paths.rs` security test suite |
-| **TASK-403** | macOS DMG Packaging & Hardened Runtime Setup | High | UNVERIFIED | Desktop Engineer | `tauri.conf.json` with overlay titlebar, DMG config |
-| **TASK-404** | Open-Source Community Health Suite | Medium | COMPLETED | Product Owner | `SECURITY.md`, `CODE_OF_CONDUCT.md`, templates |
-| **TASK-405** | Final Phase 4 Verification & Closure Audit | Critical | AUDITED | Auditor Agent | Audit A1 identified deficiencies; R0 executed |
+| **TASK-R0-01** | Fail-Closed Deployment Engine | Critical | COMPLETED | Rust Security Auditor | `crates/deployment/src/sftp.rs` rejects non-dry-run with `DeploymentNotImplemented` |
+| **TASK-R0-02** | MCP Human Approval Security Barrier | Critical | COMPLETED | Security Engineer | `tools/mcp-server/src/main.rs` eliminates `approval_token` exposure; ADR-0009 |
+| **TASK-R0-03** | GitHub Actions CI & Clippy Repair | High | COMPLETED | DevOps / Release Eng | Fixed `clippy::useless_format` in `crates/runtime/src/php.rs`; CI Green (Run 39123438754) |
+| **TASK-R0-04** | Project Memory Suite Reconciliation | Critical | COMPLETED | Principal Architect | Reconciled memory files and documentation suite |
+| **TASK-R0-05** | Security & Safety Regression Test Suite | Critical | COMPLETED | QA Lead | 18/18 workspace tests PASS |

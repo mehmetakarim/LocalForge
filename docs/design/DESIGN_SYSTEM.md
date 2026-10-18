@@ -199,5 +199,28 @@ LocalForge adheres strictly to macOS San Francisco typography metrics with fixed
 
 ### 5.5 Reduced Motion Mode (`prefers-reduced-motion: reduce`)
 When user enables reduced motion in macOS System Settings:
-- All 3D tilt, hover translations, and pulse animations are completely disabled (`transform: none !important; transition-duration: 0.01ms !important;`).
+- All 3D tilt, hover translations, and continuous pulse animations are completely disabled (`transform: none !important; transition-duration: 0.01ms !important;`).
 - State changes use instantaneous, crisp cross-fades.
+
+---
+
+## 6. Performance, GPU & Hardware Constraints
+
+Spatial Studio delivers high visual fidelity without compromising host system efficiency:
+
+### 6.1 Resource Consumption Budgets
+- **Idle CPU**: < 1.0% CPU utilization across all cores when the desktop application is idle.
+- **Idle Memory**: < 80MB total resident memory footprint (Rust core + WebKit webview combined).
+- **Process Awakening**: Background timers and status polling sleep when the window is minimized or hidden (`document.visibilityState === 'hidden'`).
+
+### 6.2 Rendering & GPU Frame Rate Budget
+- **Display Adaptivity**: 60fps baseline for standard displays; 120fps opportunistic support on ProMotion displays. 120Hz is an enhancement, NEVER a baseline hardware requirement.
+- **Glass Layer Budget**: Maximum 2 concurrent `backdrop-filter: blur(...)` layers on screen. Stacking 3 or more blur layers is strictly prohibited to prevent GPU fill-rate exhaustion.
+- **Continuous Animation Guard**: Ambient halos and breathing status pulses MUST automatically pause when:
+  1. System state is static (no active transition or error condition).
+  2. The window is out of focus (`window.onblur`).
+  3. Reduced motion is requested.
+
+### 6.3 Scalability & Virtualization
+- **Large Project Catalogs**: When managing > 12 projects, Spatial Studio cards automatically paginate or utilize DOM virtualization (`react-window` / virtual grid) to prevent DOM node bloat and compositor slowdowns.
+- **Window Resizing**: Layout utilizes CSS Grid with fractional units. Resize recalculations are throttled (`16ms` / `requestAnimationFrame`) to prevent stutter during live window drag-resize.

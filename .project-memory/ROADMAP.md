@@ -8,7 +8,7 @@ This document outlines the sequential phases, primary objectives, dependencies, 
 
 ```
 +-----------------------------------------------------------------------------------+
-| Phase 0: Foundation & Project Memory (COMPLETED / REMEDIATED)                     |
+| Phase 0: Foundation & Project Memory (COMPLETED)                                  |
 | -> Architecture, ADRs, Threat Model, Engineering Standards                        |
 +-----------------------------------------------------------------------------------+
                                          |
@@ -21,72 +21,73 @@ This document outlines the sequential phases, primary objectives, dependencies, 
                                          v
 +-----------------------------------------------------------------------------------+
 | Phase 2: Local Runtime Engine (PARTIALLY IMPLEMENTED)                             |
-| -> Isolated PHP-FPM Pools, Loopback Nginx Gateway, MariaDB, Health Probes         |
+| -> Configuration generators exist; active process supervision in Phase R1         |
 +-----------------------------------------------------------------------------------+
                                          |
                                          v
 +-----------------------------------------------------------------------------------+
-| Phase 3: Smart Deployment & CLI / MCP Integration (REMEDIATED - FAIL-CLOSED)      |
-| -> Git-aware Checksum Ledger, SFTP Engine (Fail-Closed in R0), CLI, MCP Server    |
+| Phase 3: Smart Deployment & Interfaces (REMEDIATED - FAIL-CLOSED)                 |
+| -> Git-aware Checksum Ledger, Fail-Closed SFTP Engine, Hardened MCP Server        |
 +-----------------------------------------------------------------------------------+
                                          |
                                          v
 +-----------------------------------------------------------------------------------+
-| Phase 4: Hardening, Packaging & Release (REMEDIATED - CI REPAIRED)                |
-| -> Security Hardening, GitHub Actions CI Repair, Packaging Baseline               |
+| Phase 4: Hardening & Packaging (REMEDIATED - CI REPAIRED)                         |
+| -> Clippy fix, CI Green, DMG Packaging Baseline                                   |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+| Recovery Phase R0: Safety Stabilization & CI Repair (CONDITIONALLY ACCEPTED)      |
+| -> Fail-closed SFTP, MCP approval boundary, CI Green (Run 39123438754)            |
 +-----------------------------------------------------------------------------------+
                                          |
                                          v
 +===================================================================================+
-| >>> RECOVERY PHASE R0: Safety Stabilization & CI Repair (ACTIVE) <<<              |
-| -> Fail-closed SFTP, MCP approval boundary, Clippy/CI repair, Memory sync        |
+| >>> RECOVERY PHASE R1: RUNTIME INTEGRATION & SPATIAL STUDIO SUITE <<<             |
 +===================================================================================+
-                                         |
-                                         v (Awaiting Product Owner Acceptance)
-+-----------------------------------------------------------------------------------+
-| Phase R1: Real SFTP Transport & Application-Mediated Deployment UI (PLANNED)      |
-| -> Real SSH2/SFTP transfer, Native desktop approval modal, Clean Mac verification |
-+-----------------------------------------------------------------------------------+
+| [R1.0] Architecture Refinement (ACTIVE - IN REVIEW)                               |
+|        Domain resolution, MariaDB storage policy, process identity, budgets       |
+|                                         |                                         |
+|                                         v (Awaiting PO Approval)                  |
+| [R1.1] Real PHP-FPM and Nginx Integration (PLANNED)                               |
+|        Unprivileged child spawn, FastCGI unix sockets, loopback HTTP 200 flow     |
+|                                         |                                         |
+|                                         v (Awaiting PO Approval)                  |
+| [R1.2] MariaDB, Storage Resilience & Multi-Project Verification (PLANNED)         |
+|        Internal database datadir, multi-project concurrency, disconnect safety    |
+|                                         |                                         |
+|                                         v (Awaiting PO Approval)                  |
+| [R1.3] Spatial Studio UI Implementation (PLANNED)                                 |
+|        Dual-mode Spatial Studio / Native Workspace, performance budgets           |
++===================================================================================+
 ```
 
 ---
 
-## Detailed Phase Statuses (Audit A1 Baseline)
+## Detailed Recovery Phase R1 Breakdown
 
-### Phase 0: Foundation & Project Memory
-- **Status**: **COMPLETED (REMEDIATED IN R0)**
-- **Audit Findings**: Documentation and ADRs were established, but memory files had fallen out of sync with subsequent phase claims. Remediated during Recovery Phase R0.
+### R1.0: Architecture Refinement
+- **Status**: **ACTIVE / IN REVIEW**
+- **Focus**: Resolving technical ambiguities before writing runtime code:
+  - Local domain resolution: HTTP Host-header loopback vs explicit `.test` resolver.
+  - MariaDB storage: Default internal application storage isolation (`~/Library/Application Support/LocalForge/mariadb/`).
+  - Process identity: Executable path and launch-ticks verification preventing PID reuse kills.
+  - Shared Nginx vs independent PHP-FPM pool lifecycles.
+  - Spatial Studio performance constraints (CPU <1%, RAM <80MB, max 2 blur layers, animation pause guards).
+  - Four subphase specifications authored: R1.0, R1.1, R1.2, R1.3.
 
-### Phase 1: Desktop Foundation & Workspace Storage
-- **Status**: **IMPLEMENTED (PENDING FORMAL ACCEPTANCE REVIEW)**
-- **Audit Findings**: Modular Cargo workspace (`crates/core`, `crates/platform`, `crates/storage`, `crates/project-manager`) and Tauri 2 desktop shell compile and pass local tests. Real multi-drive disconnect edge cases require live hardware acceptance verification.
+### R1.1: Real PHP-FPM and Nginx Integration
+- **Status**: *PLANNED (LOCKED)*
+- **Prerequisite**: Formal approval of R1.0.
+- **Scope**: Live child process supervision for PHP-FPM and shared Nginx loopback gateway. FastCGI unix sockets, verified process identity, bounded 5s SIGTERM escalation, HTTP 200 loopback verification.
 
-### Phase 2: Local Runtime Engine
-- **Status**: **PARTIALLY IMPLEMENTED (INTEGRATION INCOMPLETE)**
-- **Audit Findings**: PHP-FPM supervisor, Nginx template generator, and MariaDB supervisor modules exist with configuration generation unit tests. End-to-end multi-project concurrent routing requires live runtime integration testing.
+### R1.2: MariaDB, Storage Resilience & Multi-Project Verification
+- **Status**: *PLANNED (LOCKED)*
+- **Prerequisite**: Formal approval of R1.1.
+- **Scope**: Supervise user-level MariaDB on internal SSD. Concurrently run Project A (PHP 8.4) and Project B (PHP 8.3). Test external APFS volume disconnect safety without internal storage pollution.
 
-### Phase 3: Smart Deployment & Interfaces (CLI + MCP)
-- **Status**: **REMEDIATED (FAIL-CLOSED IN R0)**
-- **Audit Findings**: Audit A1 discovered that SFTP transfer was simulated in memory while falsely reporting transferred files and mutating the on-disk ledger. MCP preview exposed approval tokens directly to AI models.
-- **R0 Remediation**:
-  - Non-dry-run deployments now fail closed with `LocalForgeError::DeploymentNotImplemented`.
-  - Dry-run simulation reports zero transferred files and never touches the ledger.
-  - MCP preview no longer exposes `approval_token`.
-  - Real SFTP transport and application-mediated approval deferred to Phase R1.
-
-### Phase 4: Hardening & Packaging
-- **Status**: **REMEDIATED (CI REPAIRED IN R0)**
-- **Audit Findings**: GitHub Actions CI failed in run `39108742495` due to `clippy::useless_format` in `crates/runtime/src/php.rs`. Clean Mac DMG installation and notarization remain unverified.
-- **R0 Remediation**: Clippy warnings eliminated; `cargo fmt` check added; CI trigger expanded to recovery branches.
-
----
-
-## Recovery Phase R0: Safety Stabilization & CI Repair (ACTIVE)
-
-- **Status**: **ACTIVE / IN REMEDIATION**
-- **Objectives**:
-  1. Fail-closed deployment implementation (`crates/deployment/src/sftp.rs`).
-  2. MCP server credential isolation & self-approval prevention (`tools/mcp-server/src/main.rs`).
-  3. GitHub Actions CI clippy fix (`crates/runtime/src/php.rs` & `.github/workflows/ci.yml`).
-  4. Memory reconciliation across all canonical tracking documents.
-  5. Security regression test suite (18 passing tests across workspace).
+### R1.3: Spatial Studio UI Implementation
+- **Status**: *PLANNED (LOCKED)*
+- **Prerequisite**: Formal approval of R1.2.
+- **Scope**: Implement approved Spatial Studio design system in `apps/desktop`. Deploy `SpatialCard`, `FloatingDock`, `AICommandCapsule`, `StorageTopologyCard`, and `ServiceHealthPill` under strict performance budgets.

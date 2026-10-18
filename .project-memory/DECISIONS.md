@@ -19,6 +19,7 @@ This index tracks all Architecture Decision Records (ADRs) established for the L
 | [**ADR-0009**](../docs/architecture/adr/ADR-0009-application-mediated-human-approval.md) | Application-Mediated Human Approval & AI Agent Authorization Boundary | ACCEPTED | 2026-10-18 | Prevents AI agents from self-authorizing remote mutations; mandates out-of-band application-mediated approval. |
 | [**ADR-0010**](../docs/architecture/adr/ADR-0010-spatial-studio-design-system.md) | Spatial Studio Design System Architecture & Dual-Mode UI | ACCEPTED | 2026-10-18 | Atmospheric 2.5D spatial depth, floating vertical dock, AI command capsule, and dual Spatial Studio/Native Workspace modes. |
 | [**ADR-0011**](../docs/architecture/adr/ADR-0011-real-runtime-process-supervision.md) | Real Runtime Process Supervision & Non-Root Lifecycle Architecture | ACCEPTED | 2026-10-18 | Unprivileged child process spawning, async tokio supervision tree, FastCGI unix sockets, and orphan prevention. |
+| [**ADR-0012**](../docs/architecture/adr/ADR-0012-process-identity-verification-and-storage-isolation.md) | Process Identity Verification, Lifecycle Safety & MariaDB Internal Storage Isolation | ACCEPTED | 2026-10-18 | Verified process identity preventing PID reuse kills; shared Nginx vs independent FPM pools; internal MariaDB storage isolation. |
 
 ---
 

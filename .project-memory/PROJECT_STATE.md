@@ -6,26 +6,27 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Recovery Phase R0 — Safety Stabilization & CI Repair**
-- **Phase Status**: IN PROGRESS (Stabilization & regression testing underway)
-- **Active Branch**: `recovery/r0-safety-stabilization`
-- **Target Branch**: `main`
-- **Latest Commit Baseline**: Commit `a22b871` + R0 remediation
-- **Audit Findings Baseline**: Independent Technical Audit A1 (`LOCALFORGE_INDEPENDENT_AUDIT_A1.md`)
+- **Active Phase**: **Recovery Phase R1.0 — Architecture Refinement**
+- **Phase Status**: IN EXECUTION / ACTIVE
+- **Active Branch**: `phase-r1/r1-0-architecture-refinement`
+- **Target Remote**: `origin/phase-r1/r1-0-architecture-refinement` (base: `main`)
+- **Previous Phase Status**: **Recovery Phase R0 — CONDITIONALLY ACCEPTED** by Product Owner (18/18 automated tests passing, zero clippy warnings, CI Run `39123438754` Green).
+- **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
+- **R1 Subphase Split**: R1.0 (Architecture Refinement), R1.1 (PHP-FPM/Nginx), R1.2 (MariaDB/Resilience), R1.3 (Spatial Studio UI).
 
 ---
 
-## 2. Canonical Subsystem Status (Post-Audit A1 Reconciliation)
+## 2. Canonical Subsystem Status
 
-In accordance with the Honest Verification Policy (AGENTS.md Section 5), phase statuses have been reconciled from actual code and verified test evidence:
-
-| Subsystem / Phase | Audit Classification | Current Status | Notes & Remediation |
+| Subsystem / Phase | Audit Classification | Current Status | Notes & Governance |
 |---|---|---|---|
-| **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED (Remediated) | Core specifications and ADRs established; memory contradictions reconciled in R0. |
-| **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compiled; formal acceptance evidence requires review. |
-| **Phase 2: Local Runtime Engine** | PARTIAL | INCOMPLETE INTEGRATION | Process managers & configuration builders exist; end-to-end multi-project orchestration unverified. |
-| **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | In-memory deployment simulation was falsely writing to disk. Remediated to fail-closed (`DeploymentNotImplemented`). MCP self-approval token exposure eliminated. Real SFTP transport pending future phase. |
-| **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Clippy failure fixed in R0. Clean Mac DMG installation & notarization remains unverified. |
+| **Phase 0: Foundation & Memory** | VERIFIED | COMPLETED | Specifications, memory structure, and ADRs established. |
+| **Phase 1: Desktop & Workspace Storage** | PARTIAL | IMPLEMENTATION EXISTS | Workspace crates & Tauri 2 shell compile; physical disconnect verification staged in R1.2. |
+| **Phase 2: Local Runtime Engine** | PARTIAL | IN PROGRESS (R1.0-R1.2) | R1.0 architecture refined. R1.1 will execute live unprivileged FPM/Nginx supervision; R1.2 MariaDB. |
+| **Phase 3: Deployment & Interfaces** | SIMULATED (SFTP) | REMEDIATED (Fail-Closed) | Non-dry-run SFTP rejected with `DeploymentNotImplemented`. MCP self-approval bypass eliminated. Real transport deferred. |
+| **Phase 4: Hardening & Packaging** | PARTIAL (CI Failed) | REMEDIATED (CI Repaired) | GitHub Actions CI Run `39123438754` Green on macOS Apple Silicon. Clean Mac packaging verification pending. |
+| **Recovery Phase R0** | CRITICAL FIXES | CONDITIONALLY ACCEPTED | Safety stabilization, CI repair, regression suite (18/18 tests pass). |
+| **Recovery Phase R1.0** | ARCHITECTURE | ACTIVE | Architecture refinement: Domain resolution, MariaDB storage, process identity, performance budgets. |
 
 ---
 
@@ -40,29 +41,29 @@ In accordance with the Honest Verification Policy (AGENTS.md Section 5), phase s
 
 ---
 
-## 4. Active Priorities (Recovery Phase R0)
+## 4. Active Priorities (Phase R1.0 Architecture Refinement)
 
-1. **R0-01: Fail-Closed Deployment**:
-   - Reject non-dry-run deployments with `LocalForgeError::DeploymentNotImplemented`.
-   - Prevent fake file transfer reporting and false ledger state persistence.
-   - Verified via unit & regression tests.
-2. **R0-02: MCP Human Approval Security**:
-   - Eliminate `approval_token` leakage in MCP preview responses.
-   - Reject automated production deployment execution via MCP (`UNAUTHORIZED_MCP_DEPLOYMENT_EXECUTION`).
-   - Document future application-mediated approval architecture in ADR-0009.
-3. **R0-03: GitHub CI Repair**:
-   - Fix `clippy::useless_format` warnings in `crates/runtime/src/php.rs`.
-   - Add `cargo fmt` check to CI workflow and expand branch triggers to `recovery/*`.
-4. **R0-04: Project Memory Reconciliation**:
-   - Eliminate contradictions across memory suite; establish single source of truth.
-5. **R0-05: Comprehensive Regression Testing**:
-   - Validate all 18 unit/integration tests across workspace.
+1. **Local Domain Resolution Clarity**:
+   - Guarantee unprivileged loopback access via `127.0.0.1:8080` (or `localhost:8080`) with Nginx Host-header dispatch.
+   - Decouple system-wide `.test` domain resolver configuration as a separately verified capability.
+2. **MariaDB Storage Policy Revision**:
+   - Mandate internal application data directory (`~/Library/Application Support/LocalForge/mariadb/`) as default.
+   - Keep source code on external APFS drive while isolating database files on internal SSD.
+3. **Verified Process Identity & Lifecycle Safety**:
+   - Enforce executable path and start-timestamp checks before signaling PIDs to prevent PID reuse kills.
+   - Establish shared Nginx gateway vs independent per-project PHP-FPM pools.
+4. **Spatial Studio Performance & Hardware Budgets**:
+   - Codify idle CPU (<1%), memory (<80MB), frame rate (60fps baseline, 120fps opportunistic), and blur budgets.
+   - Implement continuous animation pause guards and pagination for >12 projects.
+5. **R1 Subphase Governance & Planning**:
+   - Establish explicit scopes, test matrices, and exit criteria for R1.0, R1.1, R1.2, and R1.3.
 
 ---
 
 ## 5. Security & Architectural Invariants
 
-- **Fail-Closed Default**: No unverified transfer, unapproved token, or missing volume may proceed silently.
-- **AI Agent Boundary**: AI agents (via MCP or automated tools) MUST NOT self-authorize remote production operations.
-- **External Volume Safety**: Disconnected external volumes must never cause directory creation or state pollution on the internal disk.
-- **Non-Root Execution**: Development runtimes (PHP-FPM, Nginx, MariaDB) must run under the user with unprivileged ports.
+- **Fail-Closed Default**: Remote deployments remain strictly disabled (`DeploymentNotImplemented`).
+- **AI Agent Boundary**: AI models via MCP cannot self-authorize production executions.
+- **Process Safety**: Never signal a PID without verifying executable identity and launch timestamp.
+- **Database Integrity**: MariaDB data stays on internal storage until external disconnect resilience is proven.
+- **Non-Root Execution**: Development runtimes (PHP-FPM, Nginx, MariaDB) execute under user permissions on unprivileged ports.
