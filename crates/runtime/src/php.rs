@@ -86,7 +86,7 @@ impl PhpFpmSupervisor {
     pub fn find_php_fpm_binary(requested_version: &str) -> Result<(PathBuf, String)> {
         let candidates = vec![
             format!("/opt/homebrew/opt/php@{requested_version}/sbin/php-fpm"),
-            format!("/opt/homebrew/opt/php/sbin/php-fpm"),
+            "/opt/homebrew/opt/php/sbin/php-fpm".to_string(),
             "/opt/homebrew/sbin/php-fpm".to_string(),
             "/opt/homebrew/bin/php-fpm".to_string(),
             format!("/usr/local/opt/php@{requested_version}/sbin/php-fpm"),
