@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction B: Apple-minimal Spatial Studio — LocalForge</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #080A10;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: #EDEDED;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    background: #080A10;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Ultra-subtle Apple-style Vignette */
+  .apple-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 35%, rgba(40, 50, 80, 0.15) 0%, rgba(8, 10, 16, 0.8) 70%, #080A10 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .macos-titlebar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(8, 10, 16, 0.8);
+    backdrop-filter: blur(24px);
+    z-index: 30;
+  }
+  .traffic-lights { display: flex; align-items: center; gap: 8px; width: 80px; }
+  .traffic-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .window-title { font-size: 13px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+  .window-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* Monolithic Precision Dock */
+  .minimal-dock {
+    position: absolute;
+    left: 40px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 20px;
+    background: rgba(18, 22, 32, 0.55);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    z-index: 25;
+  }
+  .dock-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.4);
+    transition: all 0.15s ease;
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  .dock-btn svg { width: 18px; height: 18px; stroke-width: 1.7; }
+
+  /* Centered Clean Stage */
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 120px 80px 140px;
+  }
+
+  .stage-header {
+    text-align: center;
+    max-width: 760px;
+    margin-bottom: 56px;
+  }
+  .sub-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .stage-title {
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+  }
+  .stage-desc {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 24px;
+  }
+
+  /* Minimalist Telemetry Row */
+  .telemetry-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    padding: 6px 20px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .pip { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .pip-live { background: #34D399; }
+  .pip-off { background: #6B7280; }
+
+  /* Precision Cards */
+  .cards-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+  }
+  .minimal-card {
+    width: 420px;
+    border-radius: 20px;
+    padding: 26px;
+    background: rgba(18, 22, 34, 0.6);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+    transition: all 0.25s ease;
+  }
+  .minimal-card.active {
+    border-top: 1px solid rgba(255, 255, 255, 0.32);
+    box-shadow: 0 28px 56px -12px rgba(0, 0, 0, 0.65), 0 0 24px rgba(52, 211, 153, 0.08);
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .status-label {
+    display: flex;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .status-label.running { color: #34D399; }
+  .status-label.stopped { color: #9CA3AF; }
+
+  .disk-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .disk-badge.gold { color: #F59E0B; }
+
+  .project-heading {
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #FFFFFF;
+    margin-bottom: 2px;
+  }
+  .project-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 22px;
+  }
+
+  .specs-well {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 22px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .spec-title { font-size: 9px; text-transform: uppercase; color: rgba(255, 255, 255, 0.35); margin-bottom: 2px; }
+  .spec-value { color: rgba(255, 255, 255, 0.85); font-weight: 500; }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .action-btn {
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .action-btn.solid {
+    background: #FFFFFF;
+    color: #000000;
+    font-weight: 600;
+    border: none;
+  }
+
+  /* Command Capsule */
+  .capsule-bar {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 440px;
+    height: 40px;
+    border-radius: 9999px;
+    background: rgba(20, 24, 36, 0.65);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 16px 36px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    z-index: 30;
+  }
+  .capsule-key {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .watermark {
+    position: absolute;
+    top: 58px;
+    right: 28px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 40;
+  }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="apple-vignette"></div>
+
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="window-title">LocalForge — Studio</div>
+    <div class="window-badge">macOS arm64</div>
+  </header>
+
+  <div class="watermark">DIRECTION B — APPLE-MINIMAL SPATIAL STUDIO</div>
+
+  <aside class="minimal-dock">
+    <div class="dock-btn active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    </div>
+    <div class="dock-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </div>
+    <div class="dock-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+    </div>
+    <div class="dock-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>
+    </div>
+  </aside>
+
+  <main class="stage-viewport">
+    <div class="stage-header">
+      <div class="sub-tag">macOS Apple Silicon • Loopback Engine</div>
+      <h1 class="stage-title">Spatial Studio</h1>
+      <p class="stage-desc">High-integrity local PHP environments and isolated database supervisors</p>
+
+      <div class="telemetry-row">
+        <div><span class="pip pip-live"></span>Nginx Gateway</div>
+        <div><span class="pip pip-live"></span>PHP 8.4 Pools</div>
+        <div><span class="pip pip-off"></span>MariaDB Standby</div>
+      </div>
+    </div>
+
+    <div class="cards-cluster">
+      <div class="minimal-card active">
+        <div class="card-top">
+          <div class="status-label running"><span class="pip pip-live"></span>RUNNING</div>
+          <div class="disk-badge gold">Mac Harici Disk</div>
+        </div>
+        <h2 class="project-heading">StepperSkip Store</h2>
+        <div class="project-url">http://stepperskip.test:8080</div>
+
+        <div class="specs-well">
+          <div><div class="spec-title">Runtime</div><div class="spec-value">PHP 8.4 (FPM)</div></div>
+          <div><div class="spec-title">Port</div><div class="spec-value">127.0.0.1:8080</div></div>
+          <div><div class="spec-title">Path</div><div class="spec-value">/public</div></div>
+          <div><div class="spec-title">PID</div><div class="spec-value">48219</div></div>
+        </div>
+
+        <div class="card-footer">
+          <button class="action-btn">Open ↗</button>
+          <button class="action-btn">Stop ■</button>
+        </div>
+      </div>
+
+      <div class="minimal-card">
+        <div class="card-top">
+          <div class="status-label stopped"><span class="pip pip-off"></span>STOPPED</div>
+          <div class="disk-badge">Macintosh HD</div>
+        </div>
+        <h2 class="project-heading">Client Portal API</h2>
+        <div class="project-url">http://portal.test:8080</div>
+
+        <div class="specs-well">
+          <div><div class="spec-title">Runtime</div><div class="spec-value">PHP 8.3 (FPM)</div></div>
+          <div><div class="spec-title">Port</div><div class="spec-value">Standby (:8080)</div></div>
+          <div><div class="spec-title">Path</div><div class="spec-value">/src/public</div></div>
+          <div><div class="spec-title">Status</div><div class="spec-value">Inactive</div></div>
+        </div>
+
+        <div class="card-footer">
+          <button class="action-btn">Inspect</button>
+          <button class="action-btn solid">Start ▶</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="capsule-bar">
+    <div>✦ Quick navigation or ask command...</div>
+    <div class="capsule-key">⌘K</div>
+  </div>
+</div>
+</body>
+</html>

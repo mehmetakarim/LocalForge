@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalForge — Spatial Studio R1.3A-V Visual Proposals Gallery</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: #030408;
+    color: #F1F5F9;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    padding: 32px;
+  }
+  header {
+    max-width: 1600px;
+    margin: 0 auto 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .title-group h1 { font-size: 26px; font-weight: 700; color: #FFFFFF; }
+  .title-group p { font-size: 13px; color: #94A3B8; margin-top: 4px; }
+  .nav-pills { display: flex; gap: 10px; }
+  .tab-btn {
+    padding: 8px 18px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    color: #CBD5E1;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; }
+  .tab-btn.active { background: #4F6EF7; color: #FFFFFF; border-color: rgba(255, 255, 255, 0.25); box-shadow: 0 0 16px rgba(79,110,247,0.4); }
+
+  .viewport-wrapper {
+    max-width: 1600px;
+    margin: 0 auto;
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    background: #05070E;
+  }
+  iframe {
+    width: 1600px;
+    height: 1000px;
+    border: none;
+    display: block;
+  }
+
+  .meta-deck {
+    max-width: 1600px;
+    margin: 28px auto 0;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+  }
+  .meta-card {
+    padding: 24px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .meta-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #FFFFFF; }
+  .meta-card p, .meta-card li { font-size: 13px; color: #94A3B8; line-height: 1.6; }
+  .meta-card ul { padding-left: 20px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: rgba(79,110,247,0.2); color: #818CF8; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <h1>LocalForge Spatial Studio — Visual Design Proposal (Stage A)</h1>
+      <p>High-Fidelity Visual Direction Selection • Target Viewport: 1600×1000 Desktop</p>
+    </div>
+    <div class="nav-pills">
+      <button class="tab-btn active" onclick="switchTab('direction_a')">Direction A (Spatial Glass ★)</button>
+      <button class="tab-btn" onclick="switchTab('direction_b')">Direction B (Apple Minimal)</button>
+      <button class="tab-btn" onclick="switchTab('direction_c')">Direction C (Cinematic Workspace)</button>
+      <button class="tab-btn" onclick="switchTab('closeup')">Material Close-up</button>
+    </div>
+  </header>
+
+  <div class="viewport-wrapper">
+    <iframe id="previewFrame" src="direction_a_spatial_glass.html"></iframe>
+  </div>
+
+  <div class="meta-deck">
+    <div class="meta-card">
+      <span class="badge">RECOMMENDED DIRECTION</span>
+      <h3>Direction A: Reference-faithful Spatial Glass</h3>
+      <p>Direction A faithfully captures the spatial depth, calm visual gravity, and quiet power of next-generation macOS Pro tools. It eliminates the previous "admin dashboard" failure through a centered stage composition, dual 3D spatial project objects with directional specular rims, a detached liquid glass dock, and an atmospheric void canvas.</p>
+    </div>
+    <div class="meta-card">
+      <h3>Implementation Feasibility</h3>
+      <ul>
+        <li>100% native Tauri 2 &amp; React 19 compatible</li>
+        <li>GPU-capped at 2 blur layers (120Hz ProMotion fluid)</li>
+        <li>Zero Three.js/WebGL weight (pure CSS 3D transforms)</li>
+        <li>Strict WCAG 2.2 AA contrast compliance</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const routes = {
+      direction_a: 'direction_a_spatial_glass.html',
+      direction_b: 'direction_b_apple_minimal.html',
+      direction_c: 'direction_c_cinematic_workspace.html',
+      closeup: 'spatial_card_material_closeup.html'
+    };
+
+    function switchTab(key) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('previewFrame').src = routes[key];
+    }
+  </script>
+</body>
+</html>

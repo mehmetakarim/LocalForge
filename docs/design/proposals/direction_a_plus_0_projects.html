@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction A+ — 0 Projects (Empty State)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-canvas: #0A0D14;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-muted: rgba(255, 255, 255, 0.38);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #07090F;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 20%, rgba(30, 42, 74, 0.45) 0%, rgba(10, 13, 20, 0.95) 60%, #07090F 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .halo-top {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 480px;
+    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.18) 0%, rgba(124, 58, 237, 0.10) 40%, transparent 75%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: rgba(10, 13, 20, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    z-index: 50;
+  }
+  .traffic-lights { display: flex; align-items: center; gap: 8px; width: 120px; }
+  .traffic-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+  .titlebar-center { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .titlebar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-secondary); }
+  .sync-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); color: rgba(255, 255, 255, 0.5); }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 8px;
+    border-radius: 24px;
+    background: rgba(16, 21, 34, 0.55);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    z-index: 40;
+  }
+  .dock-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(99, 102, 241, 0.20);
+    border: 1px solid rgba(99, 102, 241, 0.45);
+  }
+  .dock-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+  .zoom-control {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 18px;
+    background: rgba(16, 21, 34, 0.45);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    z-index: 40;
+  }
+  .zoom-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255, 255, 255, 0.04); color: var(--text-secondary); }
+
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 80px 32px 80px;
+    z-index: 20;
+  }
+  .stage-hero { text-align: center; margin-top: 8px; }
+  .hero-date { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px; }
+  .hero-title { font-size: 46px; font-weight: 300; letter-spacing: -0.04em; color: #FFFFFF; margin-bottom: 8px; }
+  .hero-title strong { font-weight: 700; }
+  .hero-desc { font-size: 14px; color: var(--text-secondary); }
+
+  .spatial-stage {
+    position: relative;
+    width: 1000px;
+    height: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1400px;
+  }
+  .stage-grid-plane {
+    position: absolute;
+    inset: 40px -40px -20px -40px;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    transform: rotateX(60deg);
+    transform-origin: center bottom;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .empty-stage-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 10;
+  }
+  .empty-monolith {
+    width: 280px;
+    min-height: 280px;
+    border-radius: 28px;
+    padding: 32px 24px;
+    border: 1.5px dashed rgba(255, 255, 255, 0.20);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.02);
+    box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.6);
+    -webkit-box-reflect: below 8px linear-gradient(to bottom, transparent 70%, rgba(255, 255, 255, 0.05) 100%);
+  }
+  .empty-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #818CF8;
+    margin-bottom: 16px;
+  }
+  .empty-title { font-size: 16px; font-weight: 700; color: #FFF; margin-bottom: 6px; }
+  .empty-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; }
+  .btn-create {
+    padding: 8px 18px;
+    border-radius: 12px;
+    background: #4F6EF7;
+    color: #FFF;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 16px rgba(79, 110, 247, 0.4);
+    cursor: pointer;
+  }
+
+  .mac-node {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 22px;
+    border-radius: 18px;
+    background: rgba(18, 24, 38, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(24px);
+    z-index: 15;
+  }
+  .mac-title { font-size: 12px; font-weight: 600; color: #FFF; }
+  .mac-subtitle { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); }
+
+  .bottom-deck {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    z-index: 30;
+  }
+  .command-capsule {
+    width: 640px;
+    height: 46px;
+    border-radius: 9999px;
+    background: rgba(18, 24, 38, 0.75);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(99, 102, 241, 0.20);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+  .capsule-prompt { display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+  .capsule-badge { padding: 3px 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); }
+
+  .state-badge-watermark {
+    position: absolute;
+    top: 60px;
+    right: 28px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #A5B4FC;
+    z-index: 50;
+  }
+</style>
+</head>
+<body>
+<div class="studio-backdrop"></div>
+<div class="halo-top"></div>
+<div class="macos-window">
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">LocalForge Spatial Studio · macOS arm64</div>
+    <div class="titlebar-right">
+      <div class="sync-indicator"><span class="sync-dot"></span><span>senkronize</span></div>
+    </div>
+  </header>
+
+  <div class="state-badge-watermark">GÖRÜNÜM: 0 PROJE (DÜRÜST BOŞ DURUM)</div>
+
+  <aside class="left-dock">
+    <div class="dock-btn active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></div>
+    <div class="dock-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+  </aside>
+
+  <aside class="zoom-control">
+    <div class="zoom-btn">+</div>
+    <div>%100</div>
+    <div class="zoom-btn">-</div>
+  </aside>
+
+  <main class="stage-viewport">
+    <div class="stage-hero">
+      <div class="hero-date">YEREL ÇALIŞMA ALANI · APPLE SILICON APFS</div>
+      <h1 class="hero-title">Henüz proje <strong>eklenmedi.</strong></h1>
+      <p class="hero-desc">Yerel PHP çalışma alanınızı başlatmak için harici veya dahili diskten bir proje bağlayın.</p>
+    </div>
+
+    <div class="spatial-stage">
+      <div class="stage-grid-plane"></div>
+      <div class="empty-stage-center">
+        <div class="empty-monolith">
+          <div class="empty-icon">+</div>
+          <div class="empty-title">İlk Projeni Oluştur</div>
+          <div class="empty-desc">Harici SSD (Mac Harici Disk) veya dahili SSD'nizdeki PHP projelerinizi bağlayın.</div>
+          <button class="btn-create">+ Proje Oluştur</button>
+        </div>
+      </div>
+      <div class="mac-node">
+        <div class="mac-title">Bu Mac (Apple Silicon)</div>
+        <div class="mac-subtitle">Loopback 127.0.0.1 · APFS Hazır</div>
+      </div>
+    </div>
+
+    <div class="bottom-deck">
+      <div class="command-capsule">
+        <div class="capsule-prompt">
+          <span style="color: #818CF8;">✦</span>
+          <span>Ne yapmak istersin? Örneğin: yeni bir Laravel/WordPress projesi başlat</span>
+        </div>
+        <div class="capsule-badge">⌘K</div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

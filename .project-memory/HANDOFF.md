@@ -6,25 +6,20 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.3A — Spatial Studio Foundation & Application Shell Completed**
-- **Active Git Branch**: `phase-r1/r1-3a-spatial-studio-foundation`
-- **Target Remote**: `origin/phase-r1/r1-3a-spatial-studio-foundation`
+- **Current State**: **Phase R1.3A-V Stage B — Spatial Studio Visual Recovery Completed**
+- **Active Git Branch**: `phase-r1/r1-3a-v-spatial-visual-implementation`
+- **Target Remote**: `origin/phase-r1/r1-3a-v-spatial-visual-implementation`
 - **Previous Milestone Status**:
-  - **Recovery Phase R0**: CONDITIONALLY ACCEPTED (18/18 tests pass, CI Green).
-  - **Recovery Phase R1.0**: ACCEPTED by Product Owner.
-  - **Phase R1.1**: ACCEPTED by Product Owner.
-  - **Phase R1.1A**: ACCEPTED by Product Owner.
-  - **Phase R1.2**: ACCEPTED by Product Owner.
-  - **Phase R1.2A**: ACCEPTED by Product Owner.
   - **Phase R1.2B**: ACCEPTED by Product Owner.
-  - **Phase R1.3A**: COMPLETED & VERIFIED (Spatial Studio design system, floating dock, 2.5D cards, Cmd+K capsule, embedded dist frontend).
-- **Completed Tasks in R1.3A**:
-  - `TASK-R1.3A-01`: Spatial Studio design system tokens and atmospheric void styling (`index.css`).
-  - `TASK-R1.3A-02`: 2.5D `SpatialCard` with micro-tilt, live metrics, status halos, and curl command helper.
-  - `TASK-R1.3A-03`: `FloatingDock` navigation (`⌘1..7`) and `AICommandCapsule` modal dialog (`⌘K`).
-  - `TASK-R1.3A-04`: Embedded production frontend distribution (`devUrl: null`), eliminating sandbox socket network issues.
-  - `TASK-R1.3A-05`: Verified real macOS window captures (`docs/screenshots/spatial_studio_final.png`, `spatial_studio_cmd_k.png`).
-- **Next Permitted Action**: Present R1.3A visual acceptance report to Product Owner and await authorization for Phase R1.3B (Native Workspace & Detailed Inspector).
+  - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
+  - **Phase R1.3A-V Stage B**: COMPLETED & VERIFIED (Faithful reproduction of visual truth reference, vertical monoliths, floor reflections, Project Inspector drawer, zero fabricated data, 5 scenario screenshots captured).
+- **Completed Tasks in R1.3A-V Stage B**:
+  - `TASK-R1.3A-V-01`: Stage A High-Fidelity Direction A+ Proposal & PO Approval.
+  - `TASK-R1.3A-V-02`: Vertical glass monoliths (`SpatialCard.tsx`) with `-webkit-box-reflect` and 3D perspective stage (`StudioOverview.tsx`).
+  - `TASK-R1.3A-V-03`: Slide-over Project Inspector drawer (`ProjectInspector.tsx`) housing all technical telemetry and diagnostic actions.
+  - `TASK-R1.3A-V-04`: Zero fabricated production data guarantee in `App.tsx` (genuine empty states, honest `UNKNOWN`/`UNAVAILABLE` status tokens).
+  - `TASK-R1.3A-V-05`: High-resolution screen captures across 0, 2, 6 projects, inspector and responsive mode (`docs/screenshots/spatial_studio_v_*.png`).
+- **Next Permitted Action**: Submit R1.3A-V Stage B Acceptance Report to Product Owner. Await explicit authorization before proceeding to Phase R1.3B.
 
 ---
 

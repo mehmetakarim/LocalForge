@@ -1,13 +1,8 @@
 import React, { useState } from "react";
-import {
-  Plus,
-  RefreshCw,
-  Search,
-} from "lucide-react";
+import { Plus, RefreshCw, ExternalLink } from "lucide-react";
 import { ProjectRecord, VolumeInfo, RuntimeOverview } from "../types";
 import { SpatialCard } from "./SpatialCard";
-import { ServiceHealthPill } from "./ServiceHealthPill";
-import { EmptyState } from "./EmptyState";
+import { ProjectInspector } from "./ProjectInspector";
 
 export interface StudioOverviewProps {
   projects: ProjectRecord[];
@@ -32,212 +27,269 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
   onCreateProject,
   onRefresh,
 }) => {
-  const [filter, setFilter] = useState<"all" | "running" | "external">("all");
-  const [search, setSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const runningCount = projects.filter((p) => p.status === "running").length;
-  const externalProjects = projects.filter((p) => {
-    const vol = volumes.find((v) => v.uuid === p.volume_uuid);
-    return vol ? vol.is_removable || !vol.is_internal : false;
-  });
-
-  const filteredProjects = projects.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.local_domain.toLowerCase().includes(search.toLowerCase()) ||
-      p.php_version.includes(search);
-
-    if (!matchesSearch) return false;
-
-    if (filter === "running") return p.status === "running";
-    if (filter === "external") {
-      const vol = volumes.find((v) => v.uuid === p.volume_uuid);
-      return vol ? vol.is_removable || !vol.is_internal : false;
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && projects.length > 0) {
+      const param = new URLSearchParams(window.location.search).get("inspector");
+      if (param) {
+        const found = projects.find((p) => p.id === param || p.name === param);
+        if (found) {
+          setSelectedProjectId(found.id);
+        }
+      }
     }
-    return true;
-  });
+  }, [projects]);
+
+  const runningProjects = projects.filter((p) => p.status === "running");
+  const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
+  const selectedVolume = selectedProject
+    ? volumes.find((v) => v.uuid === selectedProject.volume_uuid) || null
+    : null;
+
+  // Real hero text derived strictly from verified backend state
+  const getHeroContent = () => {
+    if (projects.length === 0) {
+      return {
+        prefix: "Henüz proje",
+        highlight: "eklenmedi.",
+        desc: "Yerel PHP çalışma alanınızı başlatmak için harici veya dahili diskten bir proje bağlayın.",
+      };
+    }
+    if (!runtime) {
+      return {
+        prefix: "Durum",
+        highlight: "doğrulanamadı.",
+        desc: "Çalışma zamanı telemetrisi okunamadı. Servis denetleyicisini yeniden başlatmayı deneyin.",
+      };
+    }
+    if (runtime.nginx_running && runtime.php_versions.length > 0) {
+      return {
+        prefix: "Her şey",
+        highlight: "yolunda.",
+        desc: `${runningProjects.length > 0 ? `${runningProjects.length} aktif projede` : "Kayıtlı projelerde"} Nginx 8080 ve PHP-FPM servisleri sorunsuz çalışıyor.`,
+      };
+    }
+    return {
+      prefix: "Bazı servisler",
+      highlight: "dikkat istiyor.",
+      desc: "Nginx gateway veya PHP-FPM denetleyicisi aktif değil. Servisleri başlatın.",
+    };
+  };
+
+  const hero = getHeroContent();
+  const scaleMode = projects.length > 4 ? "compact" : "default";
 
   return (
-    <div className="space-y-7 pb-20">
-      {/* Top Atmospheric Header & Macro Metrics */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider bg-indigo-500/15 border border-indigo-400/30 text-indigo-300">
-              macOS Apple Silicon
-            </span>
-            <span className="text-zinc-500 text-xs">•</span>
-            <span className="text-xs text-zinc-400 font-mono">Loopback 127.0.0.1</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Spatial Studio
-          </h1>
-          <p className="text-xs md:text-sm text-zinc-400 mt-0.5">
-            AI-native local PHP orchestration, unprivileged runtimes &amp; resilient APFS storage
-          </p>
-        </div>
+    <div className="relative min-h-[calc(100vh-140px)] flex flex-col justify-between items-center select-none pb-24">
+      {/* Perspective Grid Plane */}
+      <div
+        className="absolute inset-x-[-100px] top-[140px] bottom-[120px] pointer-events-none opacity-25 z-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px)",
+          backgroundSize: "36px 36px",
+          transform: "rotateX(60deg)",
+          transformOrigin: "center bottom",
+          maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%)",
+        }}
+        aria-hidden="true"
+      />
 
-        {/* Global Action Deck */}
-        <div className="flex items-center gap-3">
+      {/* Centered Hero Heading */}
+      <div className="text-center z-10 pt-4">
+        <div className="font-mono text-[11px] tracking-widest text-zinc-400 uppercase mb-2">
+          Yerel Çalışma Alanı · Apple Silicon APFS
+        </div>
+        <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-2">
+          {hero.prefix} <strong className="font-bold text-white">{hero.highlight}</strong>
+        </h1>
+        <p className="text-xs md:text-sm text-zinc-400 max-w-xl mx-auto font-normal">
+          {hero.desc}
+        </p>
+      </div>
+
+      {/* Spatial 3D Stage */}
+      <div className="relative w-full max-w-5xl my-auto py-8 flex flex-col items-center justify-center z-10">
+        {/* Connecting Conduits Lines */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-0"
+          viewBox="0 0 1000 400"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M 280 230 Q 280 320 500 350"
+            fill="none"
+            stroke="rgba(255,255,255,0.10)"
+            strokeDasharray="3,3"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M 720 230 Q 720 320 500 350"
+            fill="none"
+            stroke="rgba(255,255,255,0.10)"
+            strokeDasharray="3,3"
+            strokeWidth="1.2"
+          />
+          <line
+            x1="500"
+            y1="230"
+            x2="500"
+            y2="350"
+            stroke="rgba(255,255,255,0.10)"
+            strokeDasharray="3,3"
+            strokeWidth="1.2"
+          />
+        </svg>
+
+        {/* Spatial Monoliths Row */}
+        {projects.length === 0 ? (
+          /* 0 Projects: Honest Empty State Wireframe */
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onCreateProject}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onCreateProject();
+              }
+            }}
+            style={{
+              WebkitBoxReflect:
+                "below 8px linear-gradient(to bottom, transparent 70%, rgba(255, 255, 255, 0.05) 100%)",
+            }}
+            className="w-72 min-h-[280px] rounded-3xl p-8 border-2 border-dashed border-white/20 hover:border-indigo-400/50 bg-white/[0.015] hover:bg-white/[0.04] transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            <div className="w-12 h-12 rounded-full bg-indigo-500/15 border border-indigo-400/35 text-indigo-400 flex items-center justify-center text-xl mb-4">
+              <Plus className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1">İlk Projeni Oluştur</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+              Harici APFS SSD (Mac Harici Disk) veya dahili diskten PHP projesi bağla.
+            </p>
+            <span className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-[0_0_16px_rgba(79,110,247,0.4)]">
+              + Proje Oluştur
+            </span>
+          </div>
+        ) : (
+          /* Projects Rendered (2, 6, or more) */
+          <div
+            className={`flex flex-wrap items-center justify-center z-10 ${
+              scaleMode === "compact" ? "gap-4 max-w-5xl" : "gap-8"
+            }`}
+          >
+            {projects.slice(0, 6).map((project) => {
+              const vol = volumes.find((v) => v.uuid === project.volume_uuid) || null;
+              return (
+                <SpatialCard
+                  key={project.id}
+                  project={project}
+                  volume={vol}
+                  isSelected={selectedProjectId === project.id}
+                  onSelect={(p) => setSelectedProjectId(p.id)}
+                  scaleMode={scaleMode}
+                />
+              );
+            })}
+
+            {/* Quick Add Slot when space permits */}
+            {projects.length < 6 && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={onCreateProject}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onCreateProject();
+                  }
+                }}
+                className="w-44 min-h-[250px] rounded-3xl p-5 border-2 border-dashed border-white/15 hover:border-white/35 bg-white/[0.015] hover:bg-white/[0.04] transition-all flex flex-col items-center justify-center text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center mb-3">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-semibold text-white mb-1">Proje Ekle</span>
+                <span className="text-[10px] text-zinc-500 leading-tight">
+                  Yeni çalışma alanı bağla
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bu Mac Central Node */}
+        <div className="mt-8 flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-[#121826]/70 border border-white/10 backdrop-blur-xl shadow-xl z-10">
+          <svg
+            className="w-5 h-5 text-indigo-300"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold text-white">Bu Mac (Apple Silicon)</span>
+            <span className="text-[10px] font-mono text-zinc-400">
+              Loopback 127.0.0.1 · {volumes.length} APFS Birimi Bağlı
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Controls Deck */}
+      <div className="w-full max-w-3xl flex flex-col items-center gap-3.5 z-10">
+
+        {/* Quick Action Pills */}
+        <div className="flex items-center gap-2.5">
+          {runningProjects.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onOpenBrowser(runningProjects[0])}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{runningProjects[0].local_domain} · tarayıcıda aç</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onRefresh}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
-            title="Resync projects & runtimes"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Servisleri Yenile</span>
           </button>
 
           <button
             type="button"
             onClick={onCreateProject}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-[0_0_20px_rgba(79,110,247,0.45)] border border-indigo-400/50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create Project</span>
+            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Proje Ekle</span>
           </button>
         </div>
       </div>
 
-      {/* Infrastructure Telemetry Ribbon */}
-      <div
-        style={{
-          boxShadow:
-            "0 12px 28px -6px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
-        }}
-        className="p-3.5 rounded-2xl lf-material-card border border-white/10 flex flex-wrap items-center justify-between gap-3"
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <ServiceHealthPill
-            name="Nginx Gateway"
-            status={runtime?.nginx_running ? "running" : "stopped"}
-            port={runtime?.nginx_port || 8080}
-            onRefresh={onRefresh}
-          />
-          <ServiceHealthPill
-            name="PHP-FPM Pools"
-            status="running"
-            version={runtime?.php_versions ? runtime.php_versions.join(", ") : "8.4"}
-            onRefresh={onRefresh}
-          />
-          <ServiceHealthPill
-            name="MariaDB 3306"
-            status={runtime?.mariadb_alive ? "running" : "stopped"}
-            port={runtime?.mariadb_port || 3306}
-            socketPath={runtime?.mariadb_socket}
-            latencyMs={runtime?.mariadb_latency_ms}
-            onRefresh={onRefresh}
-          />
-        </div>
-
-        {/* Quick Stats Counter */}
-        <div className="flex items-center gap-4 text-xs font-mono text-zinc-400 px-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500">Active:</span>
-            <span className="text-emerald-400 font-bold">{runningCount}</span>
-            <span className="text-zinc-600">/</span>
-            <span className="text-zinc-300">{projects.length}</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-1.5">
-            <span className="text-zinc-500">External:</span>
-            <span className="text-amber-400 font-bold">{externalProjects.length}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Project Navigation & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 text-xs">
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-              filter === "all"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            All Workspaces ({projects.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter("running")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-              filter === "running"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Running ({runningCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter("external")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-              filter === "external"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            External SSD ({externalProjects.length})
-          </button>
-        </div>
-
-        {/* Search input */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter projects..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder-zinc-500 outline-none focus:border-indigo-400/60 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Spatial Card Grid */}
-      {filteredProjects.length === 0 ? (
-        <EmptyState
-          title={search ? "No Matching Projects" : "No Projects Registered Yet"}
-          description={
-            search
-              ? `No workspaces found matching "${search}". Try checking your spelling or clearing filters.`
-              : "Create your first local PHP workspace on your external drive or internal SSD to begin serving."
-          }
-          actionLabel={search ? undefined : "Create New Project"}
-          onAction={search ? undefined : onCreateProject}
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredProjects.map((project) => {
-            const vol = volumes.find((v) => v.uuid === project.volume_uuid);
-            const isExternal = vol ? vol.is_removable || !vol.is_internal : false;
-            const volumeLabel = vol ? vol.name : "Internal Drive";
-
-            return (
-              <SpatialCard
-                key={project.id}
-                id={project.id}
-                title={project.name}
-                status={project.status}
-                phpVersion={project.php_version}
-                localDomain={project.local_domain}
-                volumeName={volumeLabel}
-                isExternalVolume={isExternal}
-                documentRoot={project.document_root}
-                activePort={runtime?.nginx_port || 8080}
-                isMutating={mutatingProject === project.id}
-                onStart={() => onStartProject(project.id)}
-                onStop={() => onStopProject(project.id)}
-                onOpenBrowser={() => onOpenBrowser(project)}
-              />
-            );
-          })}
-        </div>
-      )}
+      {/* Slide-Over Project Inspector */}
+      <ProjectInspector
+        project={selectedProject}
+        volume={selectedVolume}
+        runtime={runtime}
+        isOpen={selectedProjectId !== null}
+        onClose={() => setSelectedProjectId(null)}
+        onStartProject={onStartProject}
+        onStopProject={onStopProject}
+        onOpenBrowser={onOpenBrowser}
+        isMutating={mutatingProject === selectedProjectId}
+      />
     </div>
   );
 };

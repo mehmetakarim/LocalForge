@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction A: Reference-faithful Spatial Glass — LocalForge Spatial Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #05070E;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: #F3F4F6;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* macOS Window Frame */
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    background: #05070E;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Ambient Lighting Halos */
+  .halo-primary {
+    position: absolute;
+    top: -120px;
+    left: 450px;
+    width: 700px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(79, 110, 247, 0.16) 0%, rgba(124, 58, 237, 0.08) 45%, transparent 70%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .halo-secondary {
+    position: absolute;
+    bottom: -100px;
+    right: 250px;
+    width: 650px;
+    height: 450px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(30, 27, 75, 0.15) 50%, transparent 70%);
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header / Titlebar */
+  .macos-titlebar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(5, 7, 14, 0.75);
+    backdrop-filter: blur(20px);
+    z-index: 30;
+  }
+
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 80px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; border: 1px solid rgba(0,0,0,0.15); }
+  .dot-min { background: #FFBD2E; border: 1px solid rgba(0,0,0,0.15); }
+  .dot-max { background: #27C93F; border: 1px solid rgba(0,0,0,0.15); }
+
+  .window-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .window-title-app { color: rgba(255, 255, 255, 0.9); font-weight: 600; }
+  .window-version { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(255, 255, 255, 0.35); }
+
+  /* Floating Dock */
+  .floating-dock {
+    position: absolute;
+    left: 36px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 10px;
+    border-radius: 26px;
+    background: rgba(14, 20, 36, 0.65);
+    backdrop-filter: blur(36px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.6), 0 0 28px -4px rgba(79, 110, 247, 0.15);
+    z-index: 25;
+  }
+
+  .dock-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+    position: relative;
+  }
+  .dock-item.active {
+    color: #FFFFFF;
+    background: rgba(79, 110, 247, 0.24);
+    border: 1px solid rgba(79, 110, 247, 0.45);
+    box-shadow: 0 0 16px rgba(79, 110, 247, 0.35);
+  }
+  .dock-item svg { width: 20px; height: 20px; stroke-width: 1.8; }
+  .dock-divider { width: 24px; height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0; }
+
+  /* Stage Content */
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 120px 80px 140px;
+  }
+
+  /* Centered Hero Header */
+  .hero-container {
+    text-align: center;
+    max-width: 800px;
+    margin-bottom: 52px;
+  }
+  .hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px;
+    border-radius: 9999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #818CF8;
+    background: rgba(79, 110, 247, 0.12);
+    border: 1px solid rgba(79, 110, 247, 0.28);
+    margin-bottom: 16px;
+  }
+  .hero-title {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #FFFFFF;
+    margin-bottom: 10px;
+    background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.85) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero-subtitle {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.5;
+    margin-bottom: 22px;
+  }
+
+  /* Integrated Macro Telemetry Bar */
+  .macro-telemetry {
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+    padding: 6px 18px;
+    border-radius: 9999px;
+    background: rgba(14, 20, 36, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+  }
+  .telemetry-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .pip { width: 7px; height: 7px; border-radius: 50%; }
+  .pip-live { background: #10B981; box-shadow: 0 0 8px #10B981; }
+  .pip-stopped { background: #6B7280; }
+  .telemetry-sep { width: 1px; height: 12px; background: rgba(255, 255, 255, 0.12); }
+
+  /* Spatial Project Objects Stage */
+  .spatial-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    perspective: 1200px;
+  }
+
+  /* Spatial Card Object */
+  .spatial-card {
+    width: 440px;
+    border-radius: 24px;
+    padding: 28px 28px 24px 28px;
+    background: rgba(14, 20, 34, 0.72);
+    backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: 0 28px 56px -16px rgba(0, 0, 0, 0.65), 0 0 32px -4px rgba(79, 110, 247, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(0px) rotateX(1.5deg);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+  }
+  .spatial-card.card-active {
+    border-top: 1px solid rgba(129, 140, 248, 0.5);
+    box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.75), 0 0 40px -2px rgba(79, 110, 247, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .badge-running {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #34D399;
+  }
+  .badge-stopped {
+    background: rgba(107, 114, 128, 0.14);
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    color: #9CA3AF;
+  }
+
+  .storage-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.30);
+    color: #FBBF24;
+  }
+  .storage-tag.internal {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .card-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+  }
+  .card-domain {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #818CF8;
+    margin-bottom: 20px;
+  }
+
+  .card-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(5, 8, 16, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 22px;
+  }
+  .metric-item { display: flex; flex-direction: column; gap: 3px; }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.4); }
+  .metric-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+
+  .card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: #4F6EF7;
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 16px rgba(79, 110, 247, 0.4);
+  }
+  .btn-stop {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+
+  /* Floating Command Capsule */
+  .command-capsule {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    height: 44px;
+    border-radius: 9999px;
+    background: rgba(16, 22, 38, 0.75);
+    backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 20px rgba(79, 110, 247, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    z-index: 30;
+  }
+  .capsule-prompt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .capsule-sparkle { color: #818CF8; }
+  .capsule-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* Direction Indicator Badge */
+  .direction-watermark {
+    position: absolute;
+    top: 58px;
+    right: 28px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(79, 110, 247, 0.15);
+    border: 1px solid rgba(79, 110, 247, 0.3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #A5B4FC;
+    z-index: 40;
+  }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <!-- Ambient Lighting Halos -->
+  <div class="halo-primary"></div>
+  <div class="halo-secondary"></div>
+
+  <!-- macOS Native Window Header -->
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="window-title">
+      <span class="window-title-app">LocalForge</span>
+      <span>/</span>
+      <span>Spatial Studio</span>
+    </div>
+    <div class="window-version">v0.1.0 • macOS Apple Silicon</div>
+  </header>
+
+  <div class="direction-watermark">DIRECTION A — REFERENCE-FAITHFUL SPATIAL GLASS</div>
+
+  <!-- Floating Liquid Navigation Dock -->
+  <aside class="floating-dock">
+    <div class="dock-item active" title="Studio (⌘1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    </div>
+    <div class="dock-item" title="Projects (⌘2)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </div>
+    <div class="dock-item" title="Services (⌘3)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+    </div>
+    <div class="dock-item" title="Storage (⌘4)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-item" title="AI & MCP (⌘6)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M9 13v2"/><path d="M15 13v2"/></svg>
+    </div>
+    <div class="dock-item" title="Settings (⌘7)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+  </aside>
+
+  <!-- Stage Viewport (Centered Spatial Composition) -->
+  <main class="stage-viewport">
+    <div class="hero-container">
+      <div class="hero-pill">MACOS APPLE SILICON • LOOPBACK 127.0.0.1</div>
+      <h1 class="hero-title">Spatial Studio</h1>
+      <p class="hero-subtitle">Tangible local PHP orchestration, unprivileged daemons &amp; resilient APFS storage topology</p>
+      
+      <div class="macro-telemetry">
+        <div class="telemetry-item">
+          <span class="pip pip-live"></span>
+          <span>Nginx :8080</span>
+        </div>
+        <div class="telemetry-sep"></div>
+        <div class="telemetry-item">
+          <span class="pip pip-live"></span>
+          <span>PHP-FPM 8.4</span>
+        </div>
+        <div class="telemetry-sep"></div>
+        <div class="telemetry-item">
+          <span class="pip pip-stopped"></span>
+          <span>MariaDB 3306</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spatial Cards Stage (Balanced Dual-Object Focus) -->
+    <div class="spatial-stage">
+      <!-- Project A: RUNNING (External SSD) -->
+      <div class="spatial-card card-active">
+        <div class="card-header">
+          <span class="status-badge badge-running">
+            <span class="pip pip-live"></span>
+            RUNNING
+          </span>
+          <span class="storage-tag">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            Mac Harici Disk
+          </span>
+        </div>
+        <h2 class="card-title">StepperSkip Store</h2>
+        <div class="card-domain">http://stepperskip.test:8080</div>
+
+        <div class="card-metrics">
+          <div class="metric-item">
+            <span class="metric-label">Runtime Engine</span>
+            <span class="metric-val">PHP 8.4 (FPM)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Doc Root</span>
+            <span class="metric-val">/public</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Loopback Port</span>
+            <span class="metric-val">127.0.0.1:8080</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Process ID</span>
+            <span class="metric-val">PID 48219</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary">Open ↗</button>
+            <button class="btn btn-secondary">cURL</button>
+          </div>
+          <button class="btn btn-stop">Stop ■</button>
+        </div>
+      </div>
+
+      <!-- Project B: STOPPED (Internal SSD) -->
+      <div class="spatial-card">
+        <div class="card-header">
+          <span class="status-badge badge-stopped">
+            <span class="pip pip-stopped"></span>
+            STOPPED
+          </span>
+          <span class="storage-tag internal">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Macintosh HD
+          </span>
+        </div>
+        <h2 class="card-title">Client Portal API</h2>
+        <div class="card-domain">http://portal.test:8080</div>
+
+        <div class="card-metrics">
+          <div class="metric-item">
+            <span class="metric-label">Runtime Engine</span>
+            <span class="metric-val">PHP 8.3 (FPM)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Doc Root</span>
+            <span class="metric-val">/src/public</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Loopback Port</span>
+            <span class="metric-val">Standby (:8080)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Process State</span>
+            <span class="metric-val">Dormant</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn btn-secondary">cURL Command</button>
+          <button class="btn btn-primary">Start ▶</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Floating AI Command Capsule -->
+  <div class="command-capsule">
+    <div class="capsule-prompt">
+      <span class="capsule-sparkle">✦</span>
+      <span>Ask LocalForge or jump to workspace...</span>
+    </div>
+    <div class="capsule-badge">⌘K</div>
+  </div>
+</div>
+</body>
+</html>

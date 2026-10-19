@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction C: Cinematic Developer Workspace — LocalForge</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #030509;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: #F8FAFC;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    background: #030509;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Cinematic Atmospheric Spotlights */
+  .spotlight-top {
+    position: absolute;
+    top: -150px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 500px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.22) 0%, rgba(30, 27, 75, 0.25) 50%, transparent 80%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .spotlight-bottom {
+    position: absolute;
+    bottom: -120px;
+    left: 20%;
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, transparent 70%);
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* macOS Titlebar */
+  .macos-titlebar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(3, 5, 9, 0.85);
+    backdrop-filter: blur(28px);
+    z-index: 30;
+  }
+  .traffic-lights { display: flex; align-items: center; gap: 8px; width: 80px; }
+  .traffic-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .window-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+  }
+  .window-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #38BDF8;
+  }
+
+  /* Futuristic Floating Dock */
+  .cyber-dock {
+    position: absolute;
+    left: 36px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 10px;
+    border-radius: 24px;
+    background: rgba(10, 16, 28, 0.7);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.15);
+    z-index: 25;
+  }
+  .dock-node {
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .dock-node.active {
+    color: #38BDF8;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+  }
+  .dock-node svg { width: 20px; height: 20px; stroke-width: 1.8; }
+
+  /* Stage Viewport */
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 120px 80px 140px;
+  }
+
+  .cinematic-header {
+    text-align: center;
+    max-width: 820px;
+    margin-bottom: 50px;
+  }
+  .tech-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px;
+    border-radius: 9999px;
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #38BDF8;
+    margin-bottom: 16px;
+  }
+  .cinematic-title {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+    text-shadow: 0 0 30px rgba(56, 189, 248, 0.25);
+  }
+  .cinematic-desc {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 22px;
+  }
+
+  .status-telemetry {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 24px;
+    border-radius: 9999px;
+    background: rgba(8, 14, 26, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .pip { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .pip-live { background: #10B981; box-shadow: 0 0 10px #10B981; }
+  .pip-off { background: #64748B; }
+
+  /* 3D Cinematic Cards Stage */
+  .cinematic-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    perspective: 1200px;
+  }
+
+  .cyber-card {
+    width: 440px;
+    border-radius: 24px;
+    padding: 28px;
+    background: rgba(10, 16, 28, 0.8);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.8), 0 0 32px rgba(56, 189, 248, 0.12);
+    transform: rotateX(2deg);
+    transition: all 0.3s ease;
+  }
+  .cyber-card.active {
+    border-top: 1px solid rgba(56, 189, 248, 0.8);
+    box-shadow: 0 36px 72px -16px rgba(0, 0, 0, 0.9), 0 0 44px rgba(56, 189, 248, 0.25);
+  }
+
+  .card-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .state-chip {
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .state-chip.live { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.4); }
+  .state-chip.off { background: rgba(100, 116, 139, 0.15); color: #94A3B8; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+  .disk-chip {
+    font-size: 11px;
+    font-weight: 600;
+    color: #FBBF24;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 3px 10px;
+    border-radius: 8px;
+  }
+  .disk-chip.internal { color: #94A3B8; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.12); }
+
+  .title-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .domain-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #38BDF8;
+    margin-bottom: 22px;
+  }
+
+  .telemetry-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(4, 8, 16, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 22px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .grid-lbl { font-size: 10px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase; margin-bottom: 2px; }
+  .grid-val { font-size: 12px; font-weight: 600; color: #FFFFFF; }
+
+  .btn-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .action-btn {
+    padding: 9px 18px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .action-btn.primary {
+    background: #0284C7;
+    border-color: #38BDF8;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+  }
+  .action-btn.danger {
+    background: rgba(225, 29, 72, 0.18);
+    color: #FDA4AF;
+    border-color: rgba(225, 29, 72, 0.4);
+  }
+
+  /* Command Capsule */
+  .cyber-capsule {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    height: 44px;
+    border-radius: 9999px;
+    background: rgba(8, 14, 26, 0.8);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 30;
+  }
+  .capsule-text { font-size: 12px; color: rgba(255, 255, 255, 0.65); display: flex; align-items: center; gap: 8px; }
+  .capsule-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38BDF8;
+  }
+
+  .watermark {
+    position: absolute;
+    top: 58px;
+    right: 28px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #38BDF8;
+    z-index: 40;
+  }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="spotlight-top"></div>
+  <div class="spotlight-bottom"></div>
+
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="window-title">LocalForge Cinematic Workspace</div>
+    <div class="window-status">● Core Supervised</div>
+  </header>
+
+  <div class="watermark">DIRECTION C — CINEMATIC DEVELOPER WORKSPACE</div>
+
+  <aside class="cyber-dock">
+    <div class="dock-node active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    </div>
+    <div class="dock-node">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </div>
+    <div class="dock-node">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+    </div>
+    <div class="dock-node">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+    </div>
+  </aside>
+
+  <main class="stage-viewport">
+    <div class="cinematic-header">
+      <div class="tech-badge">APPLE SILICON NEURAL CONDUIT • LOOPBACK 8080</div>
+      <h1 class="cinematic-title">Spatial Studio</h1>
+      <p class="cinematic-desc">High-contrast orchestrator for unprivileged runtimes and external APFS storage</p>
+
+      <div class="status-telemetry">
+        <div><span class="pip pip-live"></span>Nginx Gateway</div>
+        <div><span class="pip pip-live"></span>PHP 8.4 Engine</div>
+        <div><span class="pip pip-off"></span>MariaDB 3306</div>
+      </div>
+    </div>
+
+    <div class="cinematic-stage">
+      <div class="cyber-card active">
+        <div class="card-topbar">
+          <span class="state-chip live">● RUNNING</span>
+          <span class="disk-chip">Mac Harici Disk (APFS)</span>
+        </div>
+        <h2 class="title-text">StepperSkip Store</h2>
+        <div class="domain-text">http://stepperskip.test:8080</div>
+
+        <div class="telemetry-grid">
+          <div><div class="grid-lbl">Runtime</div><div class="grid-val">PHP 8.4 (FPM)</div></div>
+          <div><div class="grid-lbl">Port</div><div class="grid-val">127.0.0.1:8080</div></div>
+          <div><div class="grid-lbl">Root</div><div class="grid-val">/public</div></div>
+          <div><div class="grid-lbl">Memory</div><div class="grid-val">24.5 MB</div></div>
+        </div>
+
+        <div class="btn-bar">
+          <button class="action-btn">Launch ↗</button>
+          <button class="action-btn danger">Terminate ■</button>
+        </div>
+      </div>
+
+      <div class="cyber-card">
+        <div class="card-topbar">
+          <span class="state-chip off">○ STOPPED</span>
+          <span class="disk-chip internal">Macintosh HD</span>
+        </div>
+        <h2 class="title-text">Client Portal API</h2>
+        <div class="domain-text">http://portal.test:8080</div>
+
+        <div class="telemetry-grid">
+          <div><div class="grid-lbl">Runtime</div><div class="grid-val">PHP 8.3 (FPM)</div></div>
+          <div><div class="grid-lbl">Port</div><div class="grid-val">Standby</div></div>
+          <div><div class="grid-lbl">Root</div><div class="grid-val">/src/public</div></div>
+          <div><div class="grid-lbl">State</div><div class="grid-val">Idle</div></div>
+        </div>
+
+        <div class="btn-bar">
+          <button class="action-btn">Inspect</button>
+          <button class="action-btn primary">Spin Up ▶</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="cyber-capsule">
+    <div class="capsule-text"><span>⚡</span><span>Execute command or jump to workspace...</span></div>
+    <div class="capsule-chip">⌘K</div>
+  </div>
+</div>
+</body>
+</html>

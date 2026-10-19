@@ -6,14 +6,13 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.3A — Spatial Studio Foundation & Application Shell**
-- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER VISUAL ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-3a-spatial-studio-foundation`
-- **Target Remote**: `origin/phase-r1/r1-3a-spatial-studio-foundation`
-- **Previous Phase Status**: **Phase R1.2B — COMPLETED & ACCEPTED**
-- **Approved Design Baseline**: **Spatial Studio Visual Direction & Dual-Mode Architecture (APPROVED by PO)**.
-- **R1 Subphase Split**: R1.0 (Architecture Refinement - Done), R1.1 (PHP-FPM/Nginx - Done), R1.1A (Acceptance Remediation - Done), R1.2 (MariaDB/Resilience - Done), R1.2A (Database Security Remediation - Done), R1.2B (Final Database Safety Gate - Done), R1.3A (Spatial Studio Foundation & Shell - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
-- **Test Matrix Status**: 40/40 automated tests pass across 8 crates; clean TypeScript & Vite v6.4.4 production build; live macOS desktop window capture verified (Studio overview, 2.5D cards, Cmd+K capsule).
+- **Active Phase**: **Phase R1.3A-V Stage B — Spatial Studio Visual Recovery**
+- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER VISUAL & FUNCTIONAL ACCEPTANCE
+- **Active Branch**: `phase-r1/r1-3a-v-spatial-visual-implementation`
+- **Previous Phase Status**: **Phase R1.3A-V Stage A (Visual Gate Approved Direction A+)**
+- **Approved Design Baseline**: **Direction A+ Spatial Studio Stage (1600×1000 Baseline)**.
+- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
+- **Test Matrix Status**: 25/25 automated tests pass across workspace; clean TypeScript & Vite v6.4.4 build; zero clippy warnings; 5 visual screenshots captured across 0, 2, 6 projects, inspector and 1024x768 responsive viewports.
 
 ---
 

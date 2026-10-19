@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction A+ — 6 Projects Multi-Workspace</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-canvas: #0A0D14;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-muted: rgba(255, 255, 255, 0.38);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #07090F;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 20%, rgba(30, 42, 74, 0.45) 0%, rgba(10, 13, 20, 0.95) 60%, #07090F 100%);
+    pointer-events: none;
+  }
+  .halo-top {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 480px;
+    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.18) 0%, rgba(124, 58, 237, 0.10) 40%, transparent 75%);
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: rgba(10, 13, 20, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    z-index: 50;
+  }
+  .traffic-lights { display: flex; align-items: center; gap: 8px; width: 120px; }
+  .traffic-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+  .titlebar-center { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .titlebar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-secondary); }
+  .sync-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); color: rgba(255, 255, 255, 0.5); }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 8px;
+    border-radius: 24px;
+    background: rgba(16, 21, 34, 0.55);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 40;
+  }
+  .dock-btn { width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.45); }
+  .dock-btn.active { color: #FFFFFF; background: rgba(99, 102, 241, 0.20); border: 1px solid rgba(99, 102, 241, 0.45); }
+  .dock-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+  .zoom-control {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 18px;
+    background: rgba(16, 21, 34, 0.45);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    z-index: 40;
+  }
+  .zoom-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255, 255, 255, 0.04); color: var(--text-secondary); }
+
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 80px 32px 80px;
+    z-index: 20;
+  }
+  .stage-hero { text-align: center; margin-top: 8px; }
+  .hero-date { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px; }
+  .hero-title { font-size: 46px; font-weight: 300; letter-spacing: -0.04em; color: #FFFFFF; margin-bottom: 8px; }
+  .hero-title strong { font-weight: 700; }
+  .hero-desc { font-size: 14px; color: var(--text-secondary); }
+
+  .spatial-stage {
+    position: relative;
+    width: 1100px;
+    height: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1400px;
+  }
+  .stage-grid-plane {
+    position: absolute;
+    inset: 40px -40px -20px -40px;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    transform: rotateX(60deg);
+    transform-origin: center bottom;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .nodes-grid-6 {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 10;
+  }
+  .mini-monolith {
+    width: 155px;
+    min-height: 230px;
+    border-radius: 20px;
+    padding: 16px 14px;
+    background: linear-gradient(180deg, rgba(24, 32, 52, 0.75) 0%, rgba(12, 16, 28, 0.85) 75%, rgba(16, 185, 129, 0.2) 100%);
+    backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+    transform: rotateX(6deg);
+    cursor: pointer;
+    -webkit-box-reflect: below 6px linear-gradient(to bottom, transparent 75%, rgba(255, 255, 255, 0.06) 100%);
+  }
+  .mini-monolith.stopped {
+    background: linear-gradient(180deg, rgba(22, 28, 44, 0.70) 0%, rgba(12, 16, 26, 0.85) 85%, rgba(100, 116, 139, 0.12) 100%);
+  }
+  .mini-title { font-size: 14px; font-weight: 700; color: #FFF; margin-bottom: 2px; }
+  .mini-status { font-family: var(--font-mono); font-size: 10px; color: #34D399; display: flex; align-items: center; gap: 4px; margin-bottom: 14px; }
+  .mini-status.off { color: #94A3B8; }
+  .pip { width: 5px; height: 5px; border-radius: 50%; background: #10B981; }
+  .pip.off { background: #64748B; }
+
+  .mini-subpill {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .dot-sq { width: 12px; height: 12px; border-radius: 4px; background: #F59E0B; color: #000; font-size: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+
+  .mini-add {
+    width: 120px;
+    min-height: 230px;
+    border-radius: 20px;
+    border: 1.5px dashed rgba(255, 255, 255, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.01);
+    transform: rotateX(6deg);
+    cursor: pointer;
+  }
+
+  .mac-node {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 22px;
+    border-radius: 18px;
+    background: rgba(18, 24, 38, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(24px);
+    z-index: 15;
+  }
+  .mac-title { font-size: 12px; font-weight: 600; color: #FFF; }
+  .mac-subtitle { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); }
+
+  .bottom-deck {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    z-index: 30;
+  }
+  .timeline-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+  .timeline-track { flex: 1; height: 2px; background: rgba(255, 255, 255, 0.08); position: relative; border-radius: 2px; }
+  .track-marker { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+
+  .command-capsule {
+    width: 640px;
+    height: 46px;
+    border-radius: 9999px;
+    background: rgba(18, 24, 38, 0.75);
+    backdrop-filter: blur(36px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(99, 102, 241, 0.20);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+  .capsule-prompt { display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+  .capsule-badge { padding: 3px 8px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); }
+
+  .state-badge-watermark {
+    position: absolute;
+    top: 60px;
+    right: 28px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #A5B4FC;
+    z-index: 50;
+  }
+</style>
+</head>
+<body>
+<div class="studio-backdrop"></div>
+<div class="halo-top"></div>
+<div class="macos-window">
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">LocalForge Spatial Studio · macOS arm64</div>
+    <div class="titlebar-right">
+      <div class="sync-indicator"><span class="sync-dot"></span><span>senkronize · 6 proje aktif</span></div>
+    </div>
+  </header>
+
+  <div class="state-badge-watermark">GÖRÜNÜM: 6 PROJE (ÇOKLU ÇALIŞMA ALANI)</div>
+
+  <aside class="left-dock">
+    <div class="dock-btn active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></div>
+    <div class="dock-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+  </aside>
+
+  <aside class="zoom-control">
+    <div class="zoom-btn">+</div>
+    <div>%100</div>
+    <div class="zoom-btn">-</div>
+  </aside>
+
+  <main class="stage-viewport">
+    <div class="stage-hero">
+      <div class="hero-date">YEREL ÇALIŞMA ALANI · APPLE SILICON APFS</div>
+      <h1 class="hero-title">Tüm servisler <strong>etkin.</strong></h1>
+      <p class="hero-desc">Altı yerel çalışma alanı ve üç izole veritabanı aktif olarak denetleniyor.</p>
+    </div>
+
+    <div class="spatial-stage">
+      <div class="stage-grid-plane"></div>
+      <div class="nodes-grid-6">
+        <div class="mini-monolith">
+          <div class="mini-title">stepperskip</div>
+          <div class="mini-status"><span class="pip"></span>çevrimiçi</div>
+          <div class="mini-subpill"><span class="dot-sq">K</span><span>store</span></div>
+          <div class="mini-subpill"><span class="dot-sq" style="background:#10B981;">C</span><span>panel</span></div>
+        </div>
+        <div class="mini-monolith">
+          <div class="mini-title">portal-api</div>
+          <div class="mini-status"><span class="pip"></span>çevrimiçi</div>
+          <div class="mini-subpill"><span class="dot-sq" style="background:#8B5CF6;">P</span><span>api</span></div>
+        </div>
+        <div class="mini-monolith stopped">
+          <div class="mini-title">docs-site</div>
+          <div class="mini-status off"><span class="pip off"></span>beklemede</div>
+          <div class="mini-subpill"><span class="dot-sq" style="background:#64748B;">D</span><span>docs</span></div>
+        </div>
+        <div class="mini-monolith">
+          <div class="mini-title">admin-v2</div>
+          <div class="mini-status"><span class="pip"></span>çevrimiçi</div>
+          <div class="mini-subpill"><span class="dot-sq" style="background:#EC4899;">A</span><span>v2</span></div>
+        </div>
+        <div class="mini-monolith stopped">
+          <div class="mini-title">billing-svc</div>
+          <div class="mini-status off"><span class="pip off"></span>beklemede</div>
+          <div class="mini-subpill"><span class="dot-sq" style="background:#F59E0B;">B</span><span>pay</span></div>
+        </div>
+        <div class="mini-add">
+          <div style="font-size: 20px; color: #FFF;">+</div>
+          <div>Ekle</div>
+        </div>
+      </div>
+      <div class="mac-node">
+        <div class="mac-title">Bu Mac (Apple Silicon)</div>
+        <div class="mac-subtitle">Loopback 127.0.0.1 · 6 Proje Bağlı</div>
+      </div>
+    </div>
+
+    <div class="bottom-deck">
+      <div class="timeline-bar">
+        <div>SON 24 SAAT &gt;</div>
+        <div class="timeline-track">
+          <div class="track-marker" style="left: 20%;"></div>
+          <div class="track-marker" style="left: 50%;"></div>
+          <div class="track-marker" style="left: 80%;"></div>
+          <div class="track-marker" style="left: 95%;"></div>
+        </div>
+        <div>24 sa</div>
+        <div>6 sa</div>
+        <div>1 sa</div>
+        <div style="color: #10B981;">şimdi</div>
+      </div>
+      <div class="command-capsule">
+        <div class="capsule-prompt"><span style="color: #818CF8;">✦</span><span>Ne yapmak istersin? Örneğin: portal-api loglarını filtrele</span></div>
+        <div class="capsule-badge">⌘K</div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

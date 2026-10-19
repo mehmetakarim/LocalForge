@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>Direction A+ — Spatial Studio Flagship Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg-canvas: #0A0D14;
+    --bg-card: rgba(18, 24, 38, 0.65);
+    --border-specular: rgba(255, 255, 255, 0.22);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --glow-emerald: rgba(16, 185, 129, 0.35);
+    --glow-indigo: rgba(99, 102, 241, 0.25);
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-muted: rgba(255, 255, 255, 0.38);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: #07090F;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Ambient Studio Backdrop */
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 20%, rgba(30, 42, 74, 0.45) 0%, rgba(10, 13, 20, 0.95) 60%, #07090F 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient Halos */
+  .halo-top {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 480px;
+    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.18) 0%, rgba(124, 58, 237, 0.10) 40%, transparent 75%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Main macOS Application Frame (1600x1000) */
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: rgba(10, 13, 20, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  /* macOS Unified Titlebar */
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    z-index: 50;
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 120px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .titlebar-center {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .titlebar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .sync-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+  }
+
+  /* Slender Floating Left Dock */
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 8px;
+    border-radius: 24px;
+    background: rgba(16, 21, 34, 0.55);
+    backdrop-filter: blur(36px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 20px 44px -10px rgba(0, 0, 0, 0.6);
+    z-index: 40;
+  }
+  .dock-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+  }
+  .dock-btn:hover {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(99, 102, 241, 0.20);
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
+  }
+  .dock-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
+  .dock-divider { width: 22px; height: 1px; background: rgba(255, 255, 255, 0.06); margin: 2px 0; }
+
+  /* Right Floating Zoom / Scale Control */
+  .zoom-control {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 18px;
+    background: rgba(16, 21, 34, 0.45);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    z-index: 40;
+  }
+  .zoom-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+  }
+  .zoom-btn:hover { background: rgba(255, 255, 255, 0.1); color: #FFF; }
+
+  /* Stage Viewport */
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 80px 32px 80px;
+    z-index: 20;
+  }
+
+  /* Centered Hero Heading */
+  .stage-hero {
+    text-align: center;
+    margin-top: 8px;
+  }
+  .hero-date {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .hero-title {
+    font-size: 46px;
+    font-weight: 300;
+    letter-spacing: -0.04em;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+  }
+  .hero-title strong {
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .hero-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* Spatial 3D Stage Floor */
+  .spatial-stage {
+    position: relative;
+    width: 1000px;
+    height: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1400px;
+  }
+
+  /* Perspective Grid Plane */
+  .stage-grid-plane {
+    position: absolute;
+    inset: 40px -40px -20px -40px;
+    background-image: 
+      radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    transform: rotateX(60deg);
+    transform-origin: center bottom;
+    opacity: 0.35;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%);
+  }
+
+  /* Spatial Node Cards Container */
+  .spatial-nodes-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    z-index: 10;
+    transform-style: preserve-3d;
+  }
+
+  /* Sculpted Vertical Spatial Glass Monolith */
+  .spatial-monolith {
+    width: 250px;
+    min-height: 290px;
+    border-radius: 26px;
+    padding: 22px 20px;
+    background: linear-gradient(180deg, rgba(24, 32, 52, 0.75) 0%, rgba(12, 16, 28, 0.85) 75%, rgba(16, 185, 129, 0.22) 100%);
+    backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 
+      0 32px 64px -16px rgba(0, 0, 0, 0.8),
+      0 0 32px -4px rgba(16, 185, 129, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    transform: rotateX(8deg) translateY(-8px);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+    position: relative;
+    /* Subsurface floor reflection */
+    -webkit-box-reflect: below 8px linear-gradient(to bottom, transparent 65%, rgba(255, 255, 255, 0.08) 100%);
+  }
+  .spatial-monolith:hover {
+    transform: rotateX(2deg) translateY(-18px) scale(1.02);
+    box-shadow: 
+      0 44px 80px -16px rgba(0, 0, 0, 0.9),
+      0 0 44px rgba(16, 185, 129, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .spatial-monolith.stopped {
+    background: linear-gradient(180deg, rgba(22, 28, 44, 0.70) 0%, rgba(12, 16, 26, 0.85) 85%, rgba(100, 116, 139, 0.15) 100%);
+    box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    -webkit-box-reflect: below 8px linear-gradient(to bottom, transparent 75%, rgba(255, 255, 255, 0.04) 100%);
+  }
+
+  .monolith-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+  .monolith-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.02em;
+  }
+  .monolith-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #34D399;
+  }
+  .monolith-status.off { color: #94A3B8; }
+  .monolith-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+  }
+  .monolith-pip.off { background: #64748B; box-shadow: none; }
+
+  /* Nested Project Sub-Pills Inside Monolith */
+  .monolith-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nested-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .nested-pill-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pill-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: #F59E0B;
+    color: #000;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pill-avatar.green { background: #10B981; }
+  .pill-avatar.purple { background: #8B5CF6; }
+
+  .pill-dots {
+    display: flex;
+    gap: 3px;
+  }
+  .p-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #10B981;
+  }
+  .p-dot.off { background: #64748B; }
+
+  /* Add Workspace / Server Slot (Dashed Wireframe) */
+  .add-slot-monolith {
+    width: 190px;
+    min-height: 250px;
+    border-radius: 24px;
+    padding: 24px 16px;
+    border: 1.5px dashed rgba(255, 255, 255, 0.16);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.015);
+    transform: rotateX(8deg);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .add-slot-monolith:hover {
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.04);
+    transform: rotateX(2deg) translateY(-6px);
+  }
+  .add-slot-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .add-slot-title { font-size: 13px; font-weight: 600; color: #FFF; margin-bottom: 4px; }
+  .add-slot-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+  /* Connecting Conduits Down to Bu Mac Node */
+  .conduits-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Bu Mac Anchor Node */
+  .mac-node {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 22px;
+    border-radius: 18px;
+    background: rgba(18, 24, 38, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+    z-index: 15;
+  }
+  .mac-icon {
+    width: 24px;
+    height: 24px;
+    color: #A5B4FC;
+  }
+  .mac-node-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .mac-title { font-size: 12px; font-weight: 600; color: #FFF; }
+  .mac-subtitle { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); }
+
+  /* Bottom Controls: Timeline & Action Pills & Command Capsule */
+  .bottom-deck {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    z-index: 30;
+  }
+
+  /* Uptime History Timeline Track */
+  .timeline-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .timeline-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .timeline-track {
+    flex: 1;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    position: relative;
+    border-radius: 2px;
+  }
+  .track-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 6px #10B981;
+  }
+
+  /* Quick Action Pills */
+  .action-pills-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .action-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .action-pill:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #FFF;
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  /* Command Capsule */
+  .command-capsule {
+    width: 640px;
+    height: 46px;
+    border-radius: 9999px;
+    background: rgba(18, 24, 38, 0.75);
+    backdrop-filter: blur(36px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(99, 102, 241, 0.20);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    cursor: pointer;
+  }
+  .capsule-prompt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .sparkle { color: #818CF8; font-size: 13px; }
+  .capsule-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* Slide-Over Project Inspector (Opened on Click) */
+  .inspector-drawer {
+    position: absolute;
+    right: 0;
+    top: 52px;
+    bottom: 0;
+    width: 380px;
+    background: rgba(14, 18, 30, 0.88);
+    backdrop-filter: blur(40px) saturate(190%);
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.8);
+    padding: 28px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .inspector-drawer.open {
+    transform: translateX(0);
+  }
+  .inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .inspector-title { font-size: 18px; font-weight: 700; color: #FFF; }
+  .close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #FFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .inspector-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .inspector-section-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+  .inspector-card {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .inspect-row { display: flex; justify-content: space-between; color: rgba(255, 255, 255, 0.7); }
+  .inspect-val { color: #FFF; font-weight: 600; }
+
+  /* Project Count State Switcher Bar (For PO Evaluation: 0, 2, 6) */
+  .eval-switcher {
+    position: absolute;
+    top: 60px;
+    right: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    z-index: 50;
+  }
+  .eval-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+  .eval-btn.active {
+    background: #4F6EF7;
+    color: #FFF;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="studio-backdrop"></div>
+<div class="halo-top"></div>
+
+<div class="macos-window">
+  <!-- macOS Window Header -->
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">LocalForge Spatial Studio · macOS arm64</div>
+    <div class="titlebar-right">
+      <div class="sync-indicator">
+        <span class="sync-dot"></span>
+        <span>senkronize · yerel loopback :8080</span>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+  </header>
+
+  <!-- State Switcher (PO Evaluation: 0, 2, 6 Projeler) -->
+  <div class="eval-switcher">
+    <span>Görünüm:</span>
+    <div class="eval-btn" onclick="setProjectState(0)">0 Proje</div>
+    <div class="eval-btn active" onclick="setProjectState(2)">2 Proje (Temel)</div>
+    <div class="eval-btn" onclick="setProjectState(6)">6 Proje</div>
+  </div>
+
+  <!-- Slender Left Dock -->
+  <aside class="left-dock">
+    <div class="dock-btn active" title="Studio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    </div>
+    <div class="dock-btn" title="Zaman Çizelgesi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div class="dock-btn" title="Projeler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </div>
+    <div class="dock-btn" title="Servisler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+    </div>
+    <div class="dock-btn" title="Veritabanı">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    </div>
+    <div class="dock-btn" title="Ağ &amp; DNS">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-btn" title="Dağıtım">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div class="dock-btn" title="Yeni Ekle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <div class="dock-btn" title="Ayarlar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+  </aside>
+
+  <!-- Right Floating Zoom Pill -->
+  <aside class="zoom-control">
+    <div class="zoom-btn">+</div>
+    <div>%100</div>
+    <div class="zoom-btn">-</div>
+  </aside>
+
+  <!-- Main Viewport -->
+  <main class="stage-viewport">
+    <!-- Hero Header -->
+    <div class="stage-hero">
+      <div class="hero-date">YEREL ÇALIŞMA ALANI · APPLE SILICON APFS</div>
+      <h1 class="hero-title" id="heroTitle">Her şey <strong>yolunda.</strong></h1>
+      <p class="hero-desc" id="heroDesc">İki aktif projede Nginx 8080 ve PHP-FPM daemons sorunsuz yayında.</p>
+    </div>
+
+    <!-- Spatial Stage with 3D Monolith Objects -->
+    <div class="spatial-stage" id="spatialStageContainer">
+      <div class="stage-grid-plane"></div>
+
+      <!-- Connecting Conduits SVG -->
+      <svg class="conduits-svg" viewBox="0 0 1000 480">
+        <path d="M 320 280 Q 320 370 500 400" fill="none" stroke="rgba(255,255,255,0.12)" stroke-dasharray="3,3" stroke-width="1.2"/>
+        <path d="M 680 280 Q 680 370 500 400" fill="none" stroke="rgba(255,255,255,0.12)" stroke-dasharray="3,3" stroke-width="1.2"/>
+        <line x1="500" y1="280" x2="500" y2="400" stroke="rgba(255,255,255,0.12)" stroke-dasharray="3,3" stroke-width="1.2"/>
+      </svg>
+
+      <!-- Spatial Nodes Dynamic Row -->
+      <div class="spatial-nodes-row" id="nodesRow">
+        <!-- Node 1: StepperSkip Store (Running) -->
+        <div class="spatial-monolith" onclick="openInspector('stepperskip')">
+          <div class="monolith-header">
+            <h2 class="monolith-title">stepperskip</h2>
+            <div class="monolith-status">
+              <span class="monolith-pip"></span>
+              <span>çevrimiçi</span>
+            </div>
+          </div>
+          <div class="monolith-pills">
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar">K</span>
+                <span>store-front</span>
+              </div>
+              <div class="pill-dots">
+                <span class="p-dot"></span>
+                <span class="p-dot"></span>
+              </div>
+            </div>
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar green">C</span>
+                <span>admin-panel</span>
+              </div>
+              <div class="pill-dots">
+                <span class="p-dot"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Node 2: Add Project Slot (Wireframe) -->
+        <div class="add-slot-monolith" onclick="triggerCreate()">
+          <div class="add-slot-icon">+</div>
+          <div class="add-slot-title">Proje Ekle</div>
+          <div class="add-slot-desc">Harici SSD veya dahili diskten PHP çalışma alanı bağla</div>
+        </div>
+
+        <!-- Node 3: Client Portal API (Stopped / Standby) -->
+        <div class="spatial-monolith stopped" onclick="openInspector('portal')">
+          <div class="monolith-header">
+            <h2 class="monolith-title">client-portal</h2>
+            <div class="monolith-status off">
+              <span class="monolith-pip off"></span>
+              <span>beklemede</span>
+            </div>
+          </div>
+          <div class="monolith-pills">
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar purple">M</span>
+                <span>api-gateway</span>
+              </div>
+              <div class="pill-dots">
+                <span class="p-dot off"></span>
+                <span class="p-dot off"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bu Mac Conduit Anchor Node -->
+      <div class="mac-node">
+        <svg class="mac-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <div class="mac-node-text">
+          <span class="mac-title">Bu Mac (Apple Silicon)</span>
+          <span class="mac-subtitle">Loopback 127.0.0.1 · Mac Harici Disk APFS</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Controls: Timeline & Action Pills & AI Command Capsule -->
+    <div class="bottom-deck">
+      <!-- Uptime Timeline Track (Son 24 Saat) -->
+      <div class="timeline-bar">
+        <div class="timeline-label">SON 24 SAAT &gt;</div>
+        <div class="timeline-track">
+          <div class="track-marker" style="left: 10%;"></div>
+          <div class="track-marker" style="left: 45%;"></div>
+          <div class="track-marker" style="left: 55%;"></div>
+          <div class="track-marker" style="left: 78%;"></div>
+          <div class="track-marker" style="left: 88%;"></div>
+          <div class="track-marker" style="left: 98%;"></div>
+        </div>
+        <div>24 sa</div>
+        <div>6 sa</div>
+        <div>1 sa</div>
+        <div style="color: #10B981;">şimdi</div>
+      </div>
+
+      <!-- Quick Action Pills -->
+      <div class="action-pills-row">
+        <div class="action-pill">
+          <span>↗</span>
+          <span>stepperskip.test · tarayıcıda aç</span>
+        </div>
+        <div class="action-pill">
+          <span>☰</span>
+          <span>Logları göster</span>
+        </div>
+        <div class="action-pill" onclick="triggerCreate()">
+          <span>+</span>
+          <span>Proje ekle</span>
+        </div>
+      </div>
+
+      <!-- Floating AI Command Capsule -->
+      <div class="command-capsule" onclick="focusCapsule()">
+        <div class="capsule-prompt">
+          <span class="sparkle">✦</span>
+          <span>Ne yapmak istersin? Örneğin: stepperskip projesini başlat veya servisleri denetle</span>
+        </div>
+        <div class="capsule-badge">⌘K</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Slide-Over Project Inspector (Technical Details) -->
+  <aside class="inspector-drawer open" id="projectInspector">
+    <div class="inspector-header">
+      <h3 class="inspector-title" id="inspectTitle">StepperSkip Store</h3>
+      <div class="close-btn" onclick="closeInspector()">✕</div>
+    </div>
+
+    <div class="inspector-section">
+      <div class="inspector-section-label">Çalışma Zamanı (Runtime)</div>
+      <div class="inspector-card">
+        <div class="inspect-row"><span>PHP Engine:</span><span class="inspect-val">v8.4 (FPM Socket)</span></div>
+        <div class="inspect-row"><span>Nginx Gateway:</span><span class="inspect-val">127.0.0.1:8080</span></div>
+        <div class="inspect-row"><span>Local Domain:</span><span class="inspect-val" style="color: #818CF8;">stepperskip.test</span></div>
+      </div>
+    </div>
+
+    <div class="inspector-section">
+      <div class="inspector-section-label">Depolama &amp; APFS Güvenliği</div>
+      <div class="inspector-card">
+        <div class="inspect-row"><span>Sürücü:</span><span class="inspect-val" style="color: #FBBF24;">Mac Harici Disk (SSD)</span></div>
+        <div class="inspect-row"><span>APFS UUID:</span><span class="inspect-val">7E26530E-5179...</span></div>
+        <div class="inspect-row"><span>Document Root:</span><span class="inspect-val">/Volumes/.../public</span></div>
+      </div>
+    </div>
+
+    <div class="inspector-section">
+      <div class="inspector-section-label">Süreç Telemetrisi</div>
+      <div class="inspector-card">
+        <div class="inspect-row"><span>Process ID:</span><span class="inspect-val">PID 48219</span></div>
+        <div class="inspect-row"><span>Aktif Bellek:</span><span class="inspect-val">24.2 MB</span></div>
+        <div class="inspect-row"><span>MariaDB Ping:</span><span class="inspect-val">0.38 ms</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top: auto; display: flex; gap: 10px;">
+      <button style="flex: 1; padding: 10px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #F87171; font-weight: 600; cursor: pointer;">Durdur ■</button>
+      <button style="flex: 1; padding: 10px; border-radius: 12px; background: #4F6EF7; border: 1px solid rgba(255, 255, 255, 0.2); color: #FFF; font-weight: 600; cursor: pointer;">Tarayıcıda Aç ↗</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+  function openInspector(id) {
+    document.getElementById('projectInspector').classList.add('open');
+  }
+  function closeInspector() {
+    document.getElementById('projectInspector').classList.remove('open');
+  }
+
+  function setProjectState(count) {
+    document.querySelectorAll('.eval-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const heroTitle = document.getElementById('heroTitle');
+    const heroDesc = document.getElementById('heroDesc');
+    const nodesRow = document.getElementById('nodesRow');
+
+    if (count === 0) {
+      heroTitle.innerHTML = 'Henüz proje <strong>eklenmedi.</strong>';
+      heroDesc.innerText = 'Yerel PHP çalışma alanınızı başlatmak için bir proje bağlayın.';
+      nodesRow.innerHTML = `
+        <div class="add-slot-monolith" style="width: 260px; min-height: 280px;" onclick="triggerCreate()">
+          <div class="add-slot-icon">+</div>
+          <div class="add-slot-title" style="font-size: 15px;">İlk Projeni Oluştur</div>
+          <div class="add-slot-desc" style="font-size: 12px;">Harici APFS SSD veya dahili diskinden PHP projesi ekle</div>
+        </div>
+      `;
+    } else if (count === 2) {
+      heroTitle.innerHTML = 'Her şey <strong>yolunda.</strong>';
+      heroDesc.innerText = 'İki aktif projede Nginx 8080 ve PHP-FPM daemons sorunsuz yayında.';
+      nodesRow.innerHTML = `
+        <div class="spatial-monolith" onclick="openInspector('stepperskip')">
+          <div class="monolith-header">
+            <h2 class="monolith-title">stepperskip</h2>
+            <div class="monolith-status"><span class="monolith-pip"></span><span>çevrimiçi</span></div>
+          </div>
+          <div class="monolith-pills">
+            <div class="nested-pill"><div class="nested-pill-left"><span class="pill-avatar">K</span><span>store-front</span></div><div class="pill-dots"><span class="p-dot"></span><span class="p-dot"></span></div></div>
+            <div class="nested-pill"><div class="nested-pill-left"><span class="pill-avatar green">C</span><span>admin-panel</span></div><div class="pill-dots"><span class="p-dot"></span></div></div>
+          </div>
+        </div>
+        <div class="add-slot-monolith" onclick="triggerCreate()">
+          <div class="add-slot-icon">+</div>
+          <div class="add-slot-title">Proje Ekle</div>
+          <div class="add-slot-desc">Harici SSD veya dahili diskten PHP çalışma alanı bağla</div>
+        </div>
+        <div class="spatial-monolith stopped" onclick="openInspector('portal')">
+          <div class="monolith-header">
+            <h2 class="monolith-title">client-portal</h2>
+            <div class="monolith-status off"><span class="monolith-pip off"></span><span>beklemede</span></div>
+          </div>
+          <div class="monolith-pills">
+            <div class="nested-pill"><div class="nested-pill-left"><span class="pill-avatar purple">M</span><span>api-gateway</span></div><div class="pill-dots"><span class="p-dot off"></span><span class="p-dot off"></span></div></div>
+          </div>
+        </div>
+      `;
+    } else if (count === 6) {
+      heroTitle.innerHTML = 'Tüm servisler <strong>etkin.</strong>';
+      heroDesc.innerText = 'Altı yerel çalışma alanı ve üç izole veritabanı aktif olarak denetleniyor.';
+      nodesRow.innerHTML = `
+        <div class="spatial-monolith" style="width: 170px; min-height: 240px;" onclick="openInspector('p1')">
+          <div class="monolith-header"><h2 class="monolith-title" style="font-size: 15px;">stepperskip</h2><div class="monolith-status"><span class="monolith-pip"></span><span>online</span></div></div>
+          <div class="nested-pill" style="font-size: 10px; padding: 6px;"><span class="pill-avatar" style="width: 14px; height: 14px; font-size: 8px;">K</span><span>store</span></div>
+        </div>
+        <div class="spatial-monolith" style="width: 170px; min-height: 240px;" onclick="openInspector('p2')">
+          <div class="monolith-header"><h2 class="monolith-title" style="font-size: 15px;">portal-api</h2><div class="monolith-status"><span class="monolith-pip"></span><span>online</span></div></div>
+          <div class="nested-pill" style="font-size: 10px; padding: 6px;"><span class="pill-avatar green" style="width: 14px; height: 14px; font-size: 8px;">P</span><span>api</span></div>
+        </div>
+        <div class="spatial-monolith stopped" style="width: 170px; min-height: 240px;" onclick="openInspector('p3')">
+          <div class="monolith-header"><h2 class="monolith-title" style="font-size: 15px;">docs-site</h2><div class="monolith-status off"><span class="monolith-pip off"></span><span>idle</span></div></div>
+          <div class="nested-pill" style="font-size: 10px; padding: 6px;"><span class="pill-avatar purple" style="width: 14px; height: 14px; font-size: 8px;">D</span><span>docs</span></div>
+        </div>
+        <div class="spatial-monolith" style="width: 170px; min-height: 240px;" onclick="openInspector('p4')">
+          <div class="monolith-header"><h2 class="monolith-title" style="font-size: 15px;">admin-v2</h2><div class="monolith-status"><span class="monolith-pip"></span><span>online</span></div></div>
+          <div class="nested-pill" style="font-size: 10px; padding: 6px;"><span class="pill-avatar" style="width: 14px; height: 14px; font-size: 8px;">A</span><span>panel</span></div>
+        </div>
+        <div class="spatial-monolith stopped" style="width: 170px; min-height: 240px;" onclick="openInspector('p5')">
+          <div class="monolith-header"><h2 class="monolith-title" style="font-size: 15px;">billing-svc</h2><div class="monolith-status off"><span class="monolith-pip off"></span><span>idle</span></div></div>
+          <div class="nested-pill" style="font-size: 10px; padding: 6px;"><span class="pill-avatar green" style="width: 14px; height: 14px; font-size: 8px;">B</span><span>pay</span></div>
+        </div>
+        <div class="add-slot-monolith" style="width: 130px; min-height: 240px;" onclick="triggerCreate()">
+          <div class="add-slot-icon" style="width: 24px; height: 24px; font-size: 13px;">+</div>
+          <div class="add-slot-title" style="font-size: 11px;">Ekle</div>
+        </div>
+      `;
+    }
+  }
+
+  function triggerCreate() {
+    alert("Proje Ekleme Sihirbazı tetiklendi.");
+  }
+  function focusCapsule() {
+    alert("Cmd+K Komut Merkezi açıldı.");
+  }
+</script>
+</body>
+</html>

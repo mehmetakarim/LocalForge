@@ -63,20 +63,20 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | TASK-R1.2B-01 | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
 | **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | TASK-R1.2B-01..03 | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
-### Subphase R1.3A: Spatial Studio Foundation & Shell (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.3A-V: Spatial Studio Visual Recovery (COMPLETED / AWAITING ACCEPTANCE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.3A-01** | Spatial Studio Design System Token Integration | High | COMPLETED | Frontend Lead | R1.2B Approval | CSS tokens, void canvas, atmospheric indigo glow in `index.css` |
-| **TASK-R1.3A-02** | SpatialCard & 3D Interactive Stage | High | COMPLETED | Frontend Engineer | TASK-R1.3A-01 | 2.5D micro-tilt cards, specular highlights, status halos, action deck |
-| **TASK-R1.3A-03** | FloatingDock Navigation & AICommandCapsule | High | COMPLETED | Desktop Engineer | TASK-R1.3A-01 | Liquid glass dock (`⌘1..7`), Cmd+K command palette with MCP actions |
-| **TASK-R1.3A-04** | Embedded Dist Distribution & Window Integration | Critical | COMPLETED | Tauri Architect | TASK-R1.3A-01..03 | `devUrl: null`, embedded dist frontend, traffic-light clearance, native dragging |
-| **TASK-R1.3A-05** | Performance & Accessibility Budget Verification | Critical | COMPLETED | QA Lead | TASK-R1.3A-01..04 | CPU <0.3%, RAM 52MB, max 2 blurs, WCAG AA, real screenshot captures |
+| **TASK-R1.3A-V-01** | Stage A: High-Fidelity Direction A+ Proposal | Critical | COMPLETED | Lead UI Designer | PO Review | High-res Direction A+ HTML prototype & 4 scenario screenshots |
+| **TASK-R1.3A-V-02** | Stage B: Spatial Monoliths & Stage Composition | Critical | COMPLETED | Frontend Lead | Stage A Gate | Translucent vertical monoliths, floor reflections, centered 3D perspective |
+| **TASK-R1.3A-V-03** | Stage B: Project Inspector Drawer Integration | High | COMPLETED | Desktop Engineer | TASK-R1.3A-V-02 | Slide-over inspector (`ProjectInspector.tsx`), technical telemetry, cURL helper |
+| **TASK-R1.3A-V-04** | Stage B: Honest Runtime & APFS Telemetry Binding | Critical | COMPLETED | Senior Rust Eng | TASK-R1.3A-V-02 | Zero fabricated data in production path; honest hero status derivation |
+| **TASK-R1.3A-V-05** | Stage B: Multi-Project & Desktop Visual Capture | Critical | COMPLETED | QA Lead | TASK-R1.3A-V-01..04 | 5 high-res screenshots (0, 2, 6 projects, inspector, 1024x768 responsive) |
 
 ### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.3B-01** | Native Workspace Detailed Inspector View | High | PLANNED | Frontend Lead | R1.3A Approval | Per-project detailed telemetry, live log stream, environment variable editor |
-| **TASK-R1.3B-02** | Interactive Human Approval Gate for Deletions | Critical | PLANNED | Security Engineer | R1.3A Approval | Multi-step human confirmation modal for destructive database drops |
+| **TASK-R1.3B-01** | Native Workspace Detailed Inspector View | High | PLANNED | Frontend Lead | R1.3A-V Approval | Per-project detailed telemetry, live log stream, environment variable editor |
+| **TASK-R1.3B-02** | Interactive Human Approval Gate for Deletions | Critical | PLANNED | Security Engineer | R1.3A-V Approval | Multi-step human confirmation modal for destructive database drops |
 
 ---
 
