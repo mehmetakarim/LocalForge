@@ -482,12 +482,21 @@ impl ProjectRuntimeService {
     }
 
     /// Queries runtime status for all registered projects.
+    /// Propagates genuine synchronization failures and prevents stale persisted statuses
+    /// from appearing as freshly verified by setting UNKNOWN state on probe errors.
     pub fn sync_all_projects_runtime_status(&self) -> Result<Vec<ProjectRuntimeStatus>> {
         let projects = self.metadata_store.list_projects()?;
         let mut list = Vec::new();
         for p in projects {
-            if let Ok(st) = self.get_runtime_status(&p.id) {
-                list.push(st);
+            match self.get_runtime_status(&p.id) {
+                Ok(st) => list.push(st),
+                Err(e) => {
+                    tracing::error!("Runtime status sync failed for project {}: {}", p.id, e);
+                    let _ = self
+                        .metadata_store
+                        .update_project_status(&p.id, ProjectStatus::Unknown);
+                    return Err(e);
+                }
             }
         }
         Ok(list)

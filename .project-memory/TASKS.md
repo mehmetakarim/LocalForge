@@ -63,7 +63,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | TASK-R1.2B-01 | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
 | **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | TASK-R1.2B-01..03 | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
-### Subphase R1.3A-V: Spatial Studio Visual Recovery (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.3A-V: Spatial Studio Visual Recovery (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3A-V-01** | Stage A: High-Fidelity Direction A+ Proposal | Critical | COMPLETED | Lead UI Designer | PO Review | High-res Direction A+ HTML prototype & 4 scenario screenshots |
@@ -71,6 +71,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3A-V-03** | Stage B: Project Inspector Drawer Integration | High | COMPLETED | Desktop Engineer | TASK-R1.3A-V-02 | Slide-over inspector (`ProjectInspector.tsx`), technical telemetry, cURL helper |
 | **TASK-R1.3A-V-04** | Stage B: Honest Runtime & APFS Telemetry Binding | Critical | COMPLETED | Senior Rust Eng | TASK-R1.3A-V-02 | Zero fabricated data in production path; honest hero status derivation |
 | **TASK-R1.3A-V-05** | Stage B: Multi-Project & Desktop Visual Capture | Critical | COMPLETED | QA Lead | TASK-R1.3A-V-01..04 | 5 high-res screenshots (0, 2, 6 projects, inspector, 1024x768 responsive) |
+
+### Subphase R1.3A-V1: Final Functional Acceptance Fixes (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3A-V1-01** | Remove Production-Accessible Fixtures | Critical | COMPLETED | Desktop Architect | R1.3A-V Findings | `visualFixtures.ts` with `import.meta.env.PROD` exclusion gate; fail-closed web fallback |
+| **TASK-R1.3A-V1-02** | Verified System-Health Messaging | Critical | COMPLETED | Frontend Lead | R1.3A-V Findings | `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, FPM |
+| **TASK-R1.3A-V1-03** | Propagate Synchronization Failures | Critical | COMPLETED | Senior Rust Eng | R1.3A-V Findings | Eliminated `let _ =`, synced `Unknown` status on probe failures, updated cards/inspector |
+| **TASK-R1.3A-V1-04** | Multi-Project Spatial Pagination (>6 Projects) | High | COMPLETED | Lead UI Designer | R1.3A-V Findings | Truthful project count, fluid pagination controls, keyboard arrow navigation |
+| **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | TASK-R1.3A-V1-01..04 | 50 Rust tests + 11 frontend tests pass (61/61 PASS); R1_3A_V1 Acceptance Report |
 
 ### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |

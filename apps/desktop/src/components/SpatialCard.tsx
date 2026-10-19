@@ -19,7 +19,66 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
   const [tilt, setTilt] = useState({ x: 8, y: 0, lift: -8 });
 
   const isRunning = project.status === "running";
+  const isFailed = project.status === "failed";
+  const isDegraded = project.status === "degraded";
+  const isDisconnected = project.status === "disconnected";
   const isExternal = volume ? volume.is_removable || !volume.is_internal : false;
+
+  const getStatusBadge = () => {
+    switch (project.status) {
+      case "running":
+        return {
+          dot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]",
+          text: "text-emerald-400",
+          label: "çevrimiçi",
+        };
+      case "failed":
+        return {
+          dot: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]",
+          text: "text-rose-400",
+          label: "arızalı",
+        };
+      case "degraded":
+        return {
+          dot: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]",
+          text: "text-amber-400",
+          label: "bozulmuş",
+        };
+      case "disconnected":
+        return {
+          dot: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]",
+          text: "text-amber-400",
+          label: "bağlantı kesik",
+        };
+      case "starting":
+        return {
+          dot: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
+          text: "text-blue-400",
+          label: "başlatılıyor",
+        };
+      case "stopping":
+        return {
+          dot: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
+          text: "text-blue-400",
+          label: "durduruluyor",
+        };
+      case "unknown":
+        return {
+          dot: "bg-zinc-400",
+          text: "text-zinc-400",
+          label: "bilinmiyor",
+        };
+      case "stopped":
+      default:
+        return {
+          dot: "bg-zinc-500",
+          text: "text-zinc-400",
+          label: "beklemede",
+        };
+    }
+  };
+
+  const statusBadge = getStatusBadge();
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -40,6 +99,19 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
   };
 
   const isCompact = scaleMode === "compact";
+
+  const getCardToneClasses = () => {
+    if (isFailed || isDegraded) {
+      return "bg-gradient-to-b from-[#24141E]/75 via-[#120A10]/85 to-[#F43F5E]/20 border-t-[1.5px] border-t-rose-400/40 border-x border-b border-rose-500/20 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(244,63,94,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
+    }
+    if (isDisconnected) {
+      return "bg-gradient-to-b from-[#241C14]/75 via-[#140F0A]/85 to-[#F59E0B]/20 border-t-[1.5px] border-t-amber-400/40 border-x border-b border-amber-500/20 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(245,158,11,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
+    }
+    if (isRunning) {
+      return "bg-gradient-to-b from-[#182034]/75 via-[#0C101C]/85 to-[#10B981]/20 border-t-[1.5px] border-t-white/30 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(16,185,129,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
+    }
+    return "bg-gradient-to-b from-[#161C2C]/70 via-[#0C101A]/85 to-[#64748B]/15 border-t-[1.5px] border-t-white/20 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15)]";
+  };
 
   return (
     <div
@@ -62,11 +134,9 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
       }}
       className={`relative select-none transition-all duration-300 ease-out cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
         isCompact ? "w-40 min-h-[230px] p-4 rounded-2xl" : "w-64 min-h-[290px] p-6 rounded-3xl"
-      } ${
-        isRunning
-          ? "bg-gradient-to-b from-[#182034]/75 via-[#0C101C]/85 to-[#10B981]/20 border-t-[1.5px] border-t-white/30 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(16,185,129,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]"
-          : "bg-gradient-to-b from-[#161C2C]/70 via-[#0C101A]/85 to-[#64748B]/15 border-t-[1.5px] border-t-white/20 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15)]"
-      } ${isSelected ? "ring-2 ring-indigo-400/80 shadow-[0_0_36px_rgba(79,110,247,0.35)]" : ""}`}
+      } ${getCardToneClasses()} ${
+        isSelected ? "ring-2 ring-indigo-400/80 shadow-[0_0_36px_rgba(79,110,247,0.35)]" : ""
+      }`}
     >
       {/* Monolith Header */}
       <div className="flex flex-col gap-1 mb-5">
@@ -79,16 +149,8 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
           {project.name}
         </h3>
         <div className="flex items-center gap-1.5 font-mono text-[11px]">
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              isRunning
-                ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
-                : "bg-zinc-500"
-            }`}
-          />
-          <span className={isRunning ? "text-emerald-400" : "text-zinc-400"}>
-            {isRunning ? "çevrimiçi" : "beklemede"}
-          </span>
+          <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
+          <span className={statusBadge.text}>{statusBadge.label}</span>
         </div>
       </div>
 

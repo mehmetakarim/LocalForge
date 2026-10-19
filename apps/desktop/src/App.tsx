@@ -14,6 +14,7 @@ import { StorageOverview } from "./components/StorageOverview";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ErrorState } from "./components/ErrorState";
 import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
+import { getVisualFixture } from "./fixtures/visualFixtures";
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -32,11 +33,26 @@ export const App: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Check for explicit visual test fixtures in query params for testing only
-      const searchParams = new URLSearchParams(window.location.search);
-      const fixture = searchParams.get("fixture");
+      const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isDev = Boolean(import.meta.env.DEV);
 
-      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window && !fixture) {
+      // STRICT PRODUCTION GUARD:
+      // In production builds, query parameters are NEVER evaluated for fixtures.
+      // Fixtures can only be requested in isolated development/testing mode.
+      const fixtureParam = isDev
+        ? new URLSearchParams(window.location.search).get("fixture")
+        : null;
+
+      const activeFixture = isDev && fixtureParam ? getVisualFixture(fixtureParam) : null;
+
+      if (activeFixture) {
+        setVolumes(activeFixture.volumes);
+        setProjects(activeFixture.projects);
+        setRuntime(activeFixture.runtime);
+        return;
+      }
+
+      if (isTauri) {
         // STRICT PRODUCTION PATH — Zero Fabricated Data
         const [vols, projs, rOverview] = await Promise.all([
           invoke<VolumeInfo[]>("get_volumes"),
@@ -49,187 +65,16 @@ export const App: React.FC = () => {
 
         setVolumes(vols);
         setProjects(projs); // When 0 records, strictly renders genuine Empty State
-        setRuntime(rOverview); // When failed, strictly renders UNKNOWN/UNAVAILABLE
-      } else if (fixture === "empty" || (!("__TAURI_INTERNALS__" in window) && fixture === "empty")) {
-        // Visual Test Fixture: 0 Projects
-        setVolumes([
-          {
-            uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            name: "Mac Harici Disk",
-            mount_point: "/Volumes/Mac Harici Disk",
-            filesystem: "apfs",
-            is_removable: true,
-            is_internal: false,
-            total_bytes: 1000204886016,
-            available_bytes: 144955146240,
-          },
-        ]);
-        setProjects([]);
-        setRuntime({
-          php_versions: ["8.4"],
-          nginx_port: 8080,
-          nginx_running: true,
-          mariadb_port: 3306,
-          mariadb_socket: "/Volumes/Mac Harici Disk/VibeProject/LocalForge/.localforge/run/mariadb.sock",
-          mariadb_alive: true,
-          mariadb_latency_ms: 0.4,
-        });
-      } else if (fixture === "6" || (!("__TAURI_INTERNALS__" in window) && fixture === "6")) {
-        // Visual Test Fixture: 6 Projects
-        setVolumes([
-          {
-            uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            name: "Mac Harici Disk",
-            mount_point: "/Volumes/Mac Harici Disk",
-            filesystem: "apfs",
-            is_removable: true,
-            is_internal: false,
-            total_bytes: 1000204886016,
-            available_bytes: 144955146240,
-          },
-        ]);
-        setProjects([
-          {
-            id: "p1",
-            name: "stepperskip",
-            path: "/Volumes/Mac Harici Disk/stepperskip",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "public",
-            php_version: "8.4",
-            local_domain: "stepperskip.test",
-            status: "running",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "p2",
-            name: "portal-api",
-            path: "/Volumes/Mac Harici Disk/portal",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "src/public",
-            php_version: "8.4",
-            local_domain: "portal.test",
-            status: "running",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "p3",
-            name: "docs-site",
-            path: "/Volumes/Mac Harici Disk/docs",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "docs",
-            php_version: "8.3",
-            local_domain: "docs.test",
-            status: "stopped",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "p4",
-            name: "admin-v2",
-            path: "/Volumes/Mac Harici Disk/admin",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "public",
-            php_version: "8.4",
-            local_domain: "admin.test",
-            status: "running",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "p5",
-            name: "billing-svc",
-            path: "/Volumes/Mac Harici Disk/billing",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "public",
-            php_version: "8.3",
-            local_domain: "billing.test",
-            status: "stopped",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "p6",
-            name: "analytics",
-            path: "/Volumes/Mac Harici Disk/analytics",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "web",
-            php_version: "8.4",
-            local_domain: "analytics.test",
-            status: "running",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-        setRuntime({
-          php_versions: ["8.4", "8.3"],
-          nginx_port: 8080,
-          nginx_running: true,
-          mariadb_port: 3306,
-          mariadb_socket: "/Volumes/Mac Harici Disk/VibeProject/LocalForge/.localforge/run/mariadb.sock",
-          mariadb_alive: true,
-          mariadb_latency_ms: 0.4,
-        });
+        setRuntime(rOverview);
       } else {
-        // Visual Test Fixture: 2 Projects (Reference Baseline)
-        setVolumes([
-          {
-            uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            name: "Mac Harici Disk",
-            mount_point: "/Volumes/Mac Harici Disk",
-            filesystem: "apfs",
-            is_removable: true,
-            is_internal: false,
-            total_bytes: 1000204886016,
-            available_bytes: 144955146240,
-          },
-          {
-            uuid: "E56231C9-4E24-4C59-A129-E452B5A83704",
-            name: "Macintosh HD",
-            mount_point: "/",
-            filesystem: "apfs",
-            is_removable: false,
-            is_internal: true,
-            total_bytes: 494384128000,
-            available_bytes: 120455146240,
-          },
-        ]);
-        setProjects([
-          {
-            id: "proj_01",
-            name: "stepperskip",
-            path: "/Volumes/Mac Harici Disk/VibeProject/stepperskip",
-            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65",
-            document_root: "public",
-            php_version: "8.4",
-            local_domain: "stepperskip.test",
-            status: "running",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "proj_02",
-            name: "client-portal",
-            path: "/Users/mehmetakar/Sites/portal",
-            volume_uuid: "E56231C9-4E24-4C59-A129-E452B5A83704",
-            document_root: "src/public",
-            php_version: "8.3",
-            local_domain: "portal.test",
-            status: "stopped",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-        setRuntime({
-          php_versions: ["8.4", "8.3"],
-          nginx_port: 8080,
-          nginx_running: true,
-          mariadb_port: 3306,
-          mariadb_socket: "/tmp/mariadb.sock",
-          mariadb_alive: true,
-          mariadb_latency_ms: 0.38,
-        });
+        // Running outside Tauri in production or without fixture:
+        // STRICT FAIL-CLOSED: Never invent fake projects.
+        setVolumes([]);
+        setProjects([]);
+        setRuntime(null);
+        if (!isDev) {
+          setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
+        }
       }
     } catch (err: any) {
       console.error("Failed to load LocalForge data:", err);

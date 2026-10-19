@@ -453,3 +453,83 @@ fn test_r1_1a_03_stale_or_dead_fpm_socket_never_reports_running() {
     let refreshed = store.get_project(&project.id).unwrap().unwrap();
     assert_eq!(refreshed.status, ProjectStatus::Failed);
 }
+
+#[test]
+fn test_r1_3a_v1_01_sync_all_projects_surfaces_failures_and_syncs_sqlite() {
+    let dir = tempdir().unwrap();
+    let store = Arc::new(MetadataStore::open_in_memory().unwrap());
+    let volume_manager = Arc::new(MacOSVolumeManager::new());
+    let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
+    // Project 1: On a nonexistent/unmounted external volume
+    let proj_disconnected = ProjectRecord {
+        id: ProjectId::from_string("proj_unmounted"),
+        name: "Unmounted Site".into(),
+        path: Path::new("/Volumes/NonexistentDisk/site").to_path_buf(),
+        volume_uuid: VolumeId::new("NONEXISTENT-UUID-999"),
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "unmounted.test".into(),
+        status: ProjectStatus::Running, // Stale persisted status!
+        created_at: "2026-10-18T00:00:00Z".into(),
+        updated_at: "2026-10-18T00:00:00Z".into(),
+    };
+    store.insert_project(&proj_disconnected).unwrap();
+
+    // Project 2: On a valid volume, but daemon is crashed
+    let vol_info = volume_manager
+        .find_volume_for_path(dir.path())
+        .unwrap()
+        .unwrap();
+
+    let proj_crashed = ProjectRecord {
+        id: ProjectId::from_string("proj_crashed_sync"),
+        name: "Crashed Site Sync".into(),
+        path: dir.path().to_path_buf(),
+        volume_uuid: vol_info.uuid,
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "crashed-sync.test".into(),
+        status: ProjectStatus::Running, // Stale persisted status!
+        created_at: "2026-10-18T00:00:00Z".into(),
+        updated_at: "2026-10-18T00:00:00Z".into(),
+    };
+    store.insert_project(&proj_crashed).unwrap();
+
+    let service = ProjectRuntimeService::create_default(
+        dir.path().join("runtime"),
+        store.clone(),
+        volume_manager,
+        volume_barrier,
+        process_manager,
+        18097,
+    );
+
+    // Perform sync
+    let sync_results = service.sync_all_projects_runtime_status().unwrap();
+    assert_eq!(sync_results.len(), 2);
+
+    let res_disconnected = sync_results
+        .iter()
+        .find(|s| s.project_id == proj_disconnected.id)
+        .unwrap();
+    assert_eq!(res_disconnected.status, ProjectStatus::Disconnected);
+    assert!(res_disconnected
+        .message
+        .contains("External storage volume unmounted"));
+
+    let res_crashed = sync_results
+        .iter()
+        .find(|s| s.project_id == proj_crashed.id)
+        .unwrap();
+    assert_eq!(res_crashed.status, ProjectStatus::Failed);
+    assert!(res_crashed.message.contains("terminated unexpectedly"));
+
+    // Verify persisted SQLite states: stale Running status MUST NOT remain!
+    let db_p1 = store.get_project(&proj_disconnected.id).unwrap().unwrap();
+    assert_eq!(db_p1.status, ProjectStatus::Disconnected);
+
+    let db_p2 = store.get_project(&proj_crashed.id).unwrap().unwrap();
+    assert_eq!(db_p2.status, ProjectStatus::Failed);
+}

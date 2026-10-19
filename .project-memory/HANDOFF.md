@@ -6,20 +6,21 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.3A-V Stage B — Spatial Studio Visual Recovery Completed**
-- **Active Git Branch**: `phase-r1/r1-3a-v-spatial-visual-implementation`
-- **Target Remote**: `origin/phase-r1/r1-3a-v-spatial-visual-implementation`
+- **Current State**: **Phase R1.3A-V1 — Final Functional Acceptance Fixes Completed**
+- **Active Git Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
+- **Target Remote**: `origin/phase-r1/r1-3a-v1-functional-acceptance-fixes`
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
-  - **Phase R1.3A-V Stage B**: COMPLETED & VERIFIED (Faithful reproduction of visual truth reference, vertical monoliths, floor reflections, Project Inspector drawer, zero fabricated data, 5 scenario screenshots captured).
-- **Completed Tasks in R1.3A-V Stage B**:
-  - `TASK-R1.3A-V-01`: Stage A High-Fidelity Direction A+ Proposal & PO Approval.
-  - `TASK-R1.3A-V-02`: Vertical glass monoliths (`SpatialCard.tsx`) with `-webkit-box-reflect` and 3D perspective stage (`StudioOverview.tsx`).
-  - `TASK-R1.3A-V-03`: Slide-over Project Inspector drawer (`ProjectInspector.tsx`) housing all technical telemetry and diagnostic actions.
-  - `TASK-R1.3A-V-04`: Zero fabricated production data guarantee in `App.tsx` (genuine empty states, honest `UNKNOWN`/`UNAVAILABLE` status tokens).
-  - `TASK-R1.3A-V-05`: High-resolution screen captures across 0, 2, 6 projects, inspector and responsive mode (`docs/screenshots/spatial_studio_v_*.png`).
-- **Next Permitted Action**: Submit R1.3A-V Stage B Acceptance Report to Product Owner. Await explicit authorization before proceeding to Phase R1.3B.
+  - **Phase R1.3A-V Stage B**: COMPLETED (Direction A+ visual baseline).
+  - **Phase R1.3A-V1**: COMPLETED & VERIFIED (Production fixture isolation, verified health messaging, synchronization failure propagation, and >6 project spatial pagination).
+- **Completed Tasks in R1.3A-V1**:
+  - `TASK-R1.3A-V1-01`: Isolated fixtures into `visualFixtures.ts` with strict production exclusion gate (`import.meta.env.PROD`).
+  - `TASK-R1.3A-V1-02`: Created `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, and real FPM pool state.
+  - `TASK-R1.3A-V1-03`: Propagated sync errors in `sync_projects` and updated failed project states to `Unknown` in SQLite.
+  - `TASK-R1.3A-V1-04`: Multi-project spatial pagination for >6 projects with truthful total project count and keyboard arrow navigation.
+  - `TASK-R1.3A-V1-05`: Verified with 50 Rust tests and 11 frontend automated regression tests (61/61 PASS).
+- **Next Permitted Action**: Submit R1.3A-V1 Acceptance Report to Product Owner. Await explicit authorization before proceeding to Phase R1.3B.
 
 ---
 

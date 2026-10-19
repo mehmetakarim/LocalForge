@@ -63,14 +63,23 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.2B-03** | Darwin Application Support Resolution | High | COMPLETED | Systems Engineer | Removed `/Users/mehmetakar` fallback, `resolve_application_support_dir` with getpwuid |
 | **TASK-R1.2B-04** | R1.2B Safety Regression Test Suite | Critical | COMPLETED | QA Lead | 13 MariaDB integration tests, occupied destination, broken dump diagnostics |
 
-### Subphase R1.3A: Spatial Studio Foundation & Shell (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.3A-V: Spatial Studio Visual Recovery (COMPLETED / ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.3A-01** | Spatial Studio Design System Token Integration | High | COMPLETED | Frontend Lead | CSS tokens, void canvas, atmospheric indigo glow in `index.css` |
-| **TASK-R1.3A-02** | SpatialCard & 3D Interactive Stage | High | COMPLETED | Frontend Engineer | 2.5D micro-tilt cards, status halos, action deck |
-| **TASK-R1.3A-03** | FloatingDock Navigation & AICommandCapsule | High | COMPLETED | Desktop Engineer | Liquid glass dock (`⌘1..7`), Cmd+K command palette with MCP actions |
-| **TASK-R1.3A-04** | Embedded Dist Distribution & Window Integration | Critical | COMPLETED | Tauri Architect | `devUrl: null`, embedded dist frontend, traffic-light clearance, native dragging |
-| **TASK-R1.3A-05** | Performance & Accessibility Budget Verification | Critical | COMPLETED | QA Lead | CPU <0.3%, RAM 52MB, max 2 blurs, WCAG AA, real screenshot captures |
+| **TASK-R1.3A-V-01** | Stage A: High-Fidelity Direction A+ Proposal | Critical | COMPLETED | Lead UI Designer | High-res Direction A+ HTML prototype & 4 scenario screenshots |
+| **TASK-R1.3A-V-02** | Stage B: Spatial Monoliths & Stage Composition | Critical | COMPLETED | Frontend Lead | Translucent vertical monoliths, floor reflections, centered 3D perspective |
+| **TASK-R1.3A-V-03** | Stage B: Project Inspector Drawer Integration | High | COMPLETED | Desktop Engineer | Slide-over inspector (`ProjectInspector.tsx`), technical telemetry, cURL helper |
+| **TASK-R1.3A-V-04** | Stage B: Honest Runtime & APFS Telemetry Binding | Critical | COMPLETED | Senior Rust Eng | Zero fabricated data in production path; honest hero status derivation |
+| **TASK-R1.3A-V-05** | Stage B: Multi-Project & Desktop Visual Capture | Critical | COMPLETED | QA Lead | 5 high-res screenshots (0, 2, 6 projects, inspector, 1024x768 responsive) |
+
+### Subphase R1.3A-V1: Final Functional Acceptance Fixes (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Deliverable |
+|---|---|---|---|---|---|
+| **TASK-R1.3A-V1-01** | Remove Production-Accessible Fixtures | Critical | COMPLETED | Desktop Architect | `visualFixtures.ts` with `import.meta.env.PROD` exclusion gate; fail-closed web fallback |
+| **TASK-R1.3A-V1-02** | Verified System-Health Messaging | Critical | COMPLETED | Frontend Lead | `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, FPM |
+| **TASK-R1.3A-V1-03** | Propagate Synchronization Failures | Critical | COMPLETED | Senior Rust Eng | Eliminated `let _ =`, synced `Unknown` status on probe failures, updated cards/inspector |
+| **TASK-R1.3A-V1-04** | Multi-Project Spatial Pagination (>6 Projects) | High | COMPLETED | Lead UI Designer | Truthful project count, fluid pagination controls, keyboard arrow navigation |
+| **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | 50 Rust tests + 11 frontend tests pass (61/61 PASS); R1_3A_V1 Acceptance Report |
 
 ### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |

@@ -329,3 +329,35 @@ This document records the chronological engineering log for all development sess
    - Verified `npm run build`: Vite v6.4.4 exit code 0.
 
 
+
+---
+
+## Session 010 — Phase R1.3A-V1 Final Functional Acceptance Fixes
+
+- **Date**: 2026-10-19
+- **Participants**: Principal Rust Security Engineer, Database Reliability Engineer, Desktop Architect, QA Lead
+- **Authorized Phase**: **Phase R1.3A-V1 — Final Functional Acceptance Fixes**
+- **Git Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
+
+### Summary of Activities
+1. **Removed Production-Accessible Fixtures (TASK-R1.3A-V1-01)**:
+   - Isolated fixtures into `apps/desktop/src/fixtures/visualFixtures.ts`.
+   - Enforced strict production gate with `import.meta.env.PROD || !import.meta.env.DEV`.
+   - Production URL query parameters (`?fixture=...`) cannot activate mock data; fail-closed execution outside Tauri.
+2. **Accurate & Verified System-Health Messaging (TASK-R1.3A-V1-02)**:
+   - Implemented `computeHeroHealthContent` in `StudioOverview.tsx`.
+   - Evaluates disconnected volumes, Nginx gateway, MariaDB socket, probe failures (`failed`, `degraded`, `unknown`), and active PHP-FPM pools (`php_fpm_running`).
+   - "Her şey yolunda." strictly gated behind complete health evidence; missing telemetry displays `UNKNOWN`.
+3. **Runtime Synchronization Failure Propagation (TASK-R1.3A-V1-03)**:
+   - Propagated errors in `apps/desktop/src-tauri/src/lib.rs` (`sync_projects`) and `crates/runtime/src/service.rs`.
+   - Marked failing projects as `ProjectStatus::Unknown` in SQLite to prevent stale persisted statuses from being served as freshly verified.
+   - Surfaced `failed`, `degraded`, `disconnected`, and `unknown` in `SpatialCard` and `ProjectInspector`.
+4. **Multi-Project Handling for Collections Larger than Six (TASK-R1.3A-V1-04)**:
+   - Preserved approved Direction A+ 6-card spatial perspective and lighting without data truncation.
+   - Implemented truthful project counter (`Toplam X Proje · Sayfa 1 / 2`) and pagination controls with keyboard arrow navigation.
+5. **Automated Verification & Tests (TASK-R1.3A-V1-05)**:
+   - Added `test_r1_3a_v1_01_sync_all_projects_surfaces_failures_and_syncs_sqlite` in `crates/runtime/tests/runtime_integration_test.rs`.
+   - Total Rust tests expanded from 49 to 50 (50 PASS, 0 FAIL).
+   - Added 11 automated frontend unit & regression tests in `apps/desktop/test/fixtures_safety.test.mjs` (11 PASS, 0 FAIL).
+   - Total automated tests: 61/61 PASS.
+   - Produced `docs/phases/R1_3A_V1_FUNCTIONAL_ACCEPTANCE_REPORT.md`.

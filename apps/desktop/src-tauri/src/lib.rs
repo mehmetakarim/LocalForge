@@ -66,11 +66,15 @@ fn get_projects(state: State<'_, AppState>) -> Result<Vec<ProjectDto>, String> {
 
 #[tauri::command]
 fn sync_projects(state: State<'_, AppState>) -> Result<Vec<ProjectDto>, String> {
-    let _ = state.runtime_service.sync_all_projects_runtime_status();
+    state
+        .runtime_service
+        .sync_all_projects_runtime_status()
+        .map_err(|e| format!("Synchronization failed: {e}"))?;
+
     let projs = state
         .metadata_store
         .list_projects()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to list projects: {e}"))?;
 
     Ok(projs.into_iter().map(ProjectDto::from).collect())
 }
@@ -164,6 +168,7 @@ pub struct RuntimeOverviewDto {
     pub mariadb_alive: bool,
     pub mariadb_version: Option<String>,
     pub mariadb_latency_ms: Option<u64>,
+    pub php_fpm_running: bool,
 }
 
 #[tauri::command]
@@ -172,6 +177,20 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
     let nginx_port = 8080;
     let nginx_running = !localforge_runtime::is_port_available(nginx_port);
     let db_status = state.runtime_service.get_database_status().ok();
+
+    let projs = state.metadata_store.list_projects().unwrap_or_default();
+    let running_projs: Vec<_> = projs
+        .into_iter()
+        .filter(|p| p.status == localforge_core::ProjectStatus::Running)
+        .collect();
+
+    let php_fpm_running = if running_projs.is_empty() {
+        false
+    } else {
+        running_projs
+            .iter()
+            .all(|p| state.runtime_service.php_supervisor().is_pool_alive(&p.id))
+    };
 
     Ok(RuntimeOverviewDto {
         php_versions,
@@ -185,6 +204,7 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
         mariadb_alive: db_status.as_ref().map(|s| s.is_alive).unwrap_or(false),
         mariadb_version: db_status.as_ref().and_then(|s| s.version.clone()),
         mariadb_latency_ms: db_status.as_ref().and_then(|s| s.latency_ms),
+        php_fpm_running,
     })
 }
 

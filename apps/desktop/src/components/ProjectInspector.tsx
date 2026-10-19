@@ -83,20 +83,58 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                isRunning
+                project.status === "running"
                   ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                  : project.status === "failed"
+                  ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                  : project.status === "degraded"
+                  ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+                  : project.status === "disconnected"
+                  ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"
                   : "bg-zinc-500"
               }`}
             />
             <span
               className={`text-xs font-mono font-bold uppercase ${
-                isRunning ? "text-emerald-400" : "text-zinc-400"
+                project.status === "running"
+                  ? "text-emerald-400"
+                  : project.status === "failed"
+                  ? "text-rose-400"
+                  : project.status === "degraded" || project.status === "disconnected"
+                  ? "text-amber-400"
+                  : "text-zinc-400"
               }`}
             >
               {project.status}
             </span>
           </div>
         </div>
+
+        {/* Runtime Probe / Failure Alert Banner */}
+        {project.status === "failed" && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-1">
+            <span className="font-semibold text-rose-200">Çalışma Zamanı Arızası:</span>
+            <span>PHP-FPM havuzu veya soketi beklenmedik biçimde sonlandı. Servisi yeniden başlatmayı deneyin.</span>
+          </div>
+        )}
+        {project.status === "degraded" && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col gap-1">
+            <span className="font-semibold text-amber-200">Kısmi Servis Bozulması:</span>
+            <span>HTTP loopback sondasında 502/504 veya aktarım hatası alındı. Nginx gateway veya FastCGI yanıt vermiyor.</span>
+          </div>
+        )}
+        {project.status === "disconnected" && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col gap-1">
+            <span className="font-semibold text-amber-200">Depolama Bağlantısı Kesildi:</span>
+            <span>Projenin bulunduğu APFS harici disk çıkarılmış veya unmount edilmiş. Başlatmadan önce diski bağlayın.</span>
+          </div>
+        )}
+        {project.status === "unknown" && (
+          <div className="p-3 rounded-xl bg-zinc-500/10 border border-zinc-500/30 text-zinc-300 text-xs flex flex-col gap-1">
+            <span className="font-semibold text-zinc-200">Durum Doğrulanamadı:</span>
+            <span>Çalışma zamanı sağlık sondası tamamlanamadı. Kalıcı durum doğrulanamadı olarak işaretlendi.</span>
+          </div>
+        )}
 
         {/* Runtime Engine Details */}
         <div className="space-y-2">
@@ -193,12 +231,18 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
         ) : (
           <button
             type="button"
-            disabled={isMutating}
+            disabled={isMutating || project.status === "disconnected"}
             onClick={() => onStartProject(project.id)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-[0_0_20px_rgba(79,110,247,0.4)]"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-semibold text-xs transition-all shadow-[0_0_20px_rgba(79,110,247,0.4)] disabled:cursor-not-allowed"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span>{isMutating ? "Başlatılıyor..." : "Başlat ▶"}</span>
+            <span>
+              {isMutating
+                ? "Başlatılıyor..."
+                : project.status === "disconnected"
+                ? "Disk Bağlı Değil"
+                : "Başlat ▶"}
+            </span>
           </button>
         )}
 

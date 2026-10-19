@@ -6,13 +6,13 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.3A-V Stage B — Spatial Studio Visual Recovery**
-- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER VISUAL & FUNCTIONAL ACCEPTANCE
-- **Active Branch**: `phase-r1/r1-3a-v-spatial-visual-implementation`
-- **Previous Phase Status**: **Phase R1.3A-V Stage A (Visual Gate Approved Direction A+)**
+- **Active Phase**: **Phase R1.3A-V1 — Final Functional Acceptance Fixes**
+- **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER ACCEPTANCE
+- **Active Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
+- **Previous Phase Status**: **Phase R1.3A-V Stage B (Spatial Studio Visual Recovery - Completed)**
 - **Approved Design Baseline**: **Direction A+ Spatial Studio Stage (1600×1000 Baseline)**.
-- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
-- **Test Matrix Status**: 25/25 automated tests pass across workspace; clean TypeScript & Vite v6.4.4 build; zero clippy warnings; 5 visual screenshots captured across 0, 2, 6 projects, inspector and 1024x768 responsive viewports.
+- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
+- **Test Matrix Status**: 50/50 automated Rust tests pass across workspace; 11/11 automated frontend tests pass (61 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; fixtures isolated to dev; verified health messaging; multi-project pagination.
 
 ---
 

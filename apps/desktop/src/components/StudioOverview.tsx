@@ -16,6 +16,133 @@ export interface StudioOverviewProps {
   onRefresh: () => void;
 }
 
+export interface HeroHealthContent {
+  prefix: string;
+  highlight: string;
+  desc: string;
+  tone: "neutral" | "unknown" | "critical" | "warning" | "ready" | "success";
+}
+
+export function computeHeroHealthContent(
+  projects: ProjectRecord[],
+  volumes: VolumeInfo[],
+  runtime: RuntimeOverview | null
+): HeroHealthContent {
+  if (projects.length === 0) {
+    return {
+      prefix: "Henüz proje",
+      highlight: "eklenmedi.",
+      desc: "Yerel PHP çalışma alanınızı başlatmak için harici veya dahili diskten bir proje bağlayın.",
+      tone: "neutral",
+    };
+  }
+
+  // Unavailable or incomplete backend telemetry
+  if (!runtime) {
+    return {
+      prefix: "Durum",
+      highlight: "BİLİNMİYOR (UNKNOWN).",
+      desc: "Çalışma zamanı telemetrisi okunamadı veya arka plan servisine ulaşılamıyor.",
+      tone: "unknown",
+    };
+  }
+
+  // Disconnected workspace volumes check
+  const disconnectedProjects = projects.filter(
+    (p) =>
+      p.status === "disconnected" ||
+      !volumes.some((v) => v.uuid === p.volume_uuid)
+  );
+  if (disconnectedProjects.length > 0) {
+    return {
+      prefix: "Harici disk",
+      highlight: "bağlantısı kesildi.",
+      desc: `${disconnectedProjects.length} projenin APFS depolama birimi bağlı değil veya unmount edildi.`,
+      tone: "critical",
+    };
+  }
+
+  // Nginx Gateway infrastructure health
+  if (!runtime.nginx_running) {
+    return {
+      prefix: "Nginx Gateway",
+      highlight: "çevrimdışı.",
+      desc: "Yerel 8080 ters proxy portu yanıt vermiyor. Servis denetleyicisini kontrol edin.",
+      tone: "critical",
+    };
+  }
+
+  // MariaDB database health
+  if (!runtime.mariadb_alive) {
+    return {
+      prefix: "MariaDB Veritabanı",
+      highlight: "çevrimdışı.",
+      desc: "Yerel MariaDB soketi yanıt vermiyor. Veritabanı hizmeti beklemede.",
+      tone: "warning",
+    };
+  }
+
+  // Project probe failure classification
+  const failedProjects = projects.filter((p) => p.status === "failed");
+  if (failedProjects.length > 0) {
+    return {
+      prefix: "Çalışma zamanı hatası",
+      highlight: "saptandı.",
+      desc: `${failedProjects.length} projenin PHP-FPM havuzu veya soketi beklenmedik şekilde çöktü.`,
+      tone: "critical",
+    };
+  }
+
+  const degradedProjects = projects.filter((p) => p.status === "degraded");
+  if (degradedProjects.length > 0) {
+    return {
+      prefix: "Kısmi servis",
+      highlight: "bozulması.",
+      desc: `${degradedProjects.length} projenin HTTP loopback sondasında 502/504 veya aktarım hatası alındı.`,
+      tone: "warning",
+    };
+  }
+
+  const unknownProjects = projects.filter((p) => p.status === "unknown");
+  if (unknownProjects.length > 0) {
+    return {
+      prefix: "Durum",
+      highlight: "BİLİNMİYOR (UNKNOWN).",
+      desc: `${unknownProjects.length} projenin sağlık durumu arka plan denetleyicisi tarafından doğrulanamadı.`,
+      tone: "unknown",
+    };
+  }
+
+  const runningProjects = projects.filter((p) => p.status === "running");
+
+  // Verified PHP-FPM pool health check (do not assume binary list equals health)
+  if (runningProjects.length > 0 && runtime.php_fpm_running === false) {
+    return {
+      prefix: "PHP-FPM denetleyicisi",
+      highlight: "yanıt vermiyor.",
+      desc: "Aktif projeler için beklenen PHP-FPM havuz soketleri doğrulanamadı.",
+      tone: "critical",
+    };
+  }
+
+  // Genuinely verified operational health
+  if (runningProjects.length > 0) {
+    return {
+      prefix: "Her şey",
+      highlight: "yolunda.",
+      desc: `${runningProjects.length} aktif projede Nginx 8080, MariaDB ve PHP-FPM servisleri doğrulandı.`,
+      tone: "success",
+    };
+  }
+
+  return {
+    prefix: "Çalışma alanı",
+    highlight: "hazır.",
+    desc: "Tüm altyapı servisleri (Nginx 8080, MariaDB) sağlıklı. Projeler beklemede.",
+    tone: "ready",
+  };
+}
+
 export const StudioOverview: React.FC<StudioOverviewProps> = ({
   projects,
   volumes,
@@ -28,9 +155,12 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
   onRefresh,
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const runningProjects = projects.filter((p) => p.status === "running");
 
+  // Inspector auto-selection: only active in DEV mode
   React.useEffect(() => {
-    if (typeof window !== "undefined" && projects.length > 0) {
+    if (import.meta.env.DEV && typeof window !== "undefined" && projects.length > 0) {
       const param = new URLSearchParams(window.location.search).get("inspector");
       if (param) {
         const found = projects.find((p) => p.id === param || p.name === param);
@@ -41,44 +171,44 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
     }
   }, [projects]);
 
-  const runningProjects = projects.filter((p) => p.status === "running");
+  const PAGE_SIZE = 6;
+  const totalPages = Math.max(1, Math.ceil(projects.length / PAGE_SIZE));
+  const safePageIndex = Math.min(pageIndex, totalPages - 1);
+
+  // Keyboard navigation for multi-page collections (ArrowLeft / ArrowRight)
+  React.useEffect(() => {
+    if (totalPages <= 1) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        setPageIndex((prev) => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setPageIndex((prev) => Math.min(totalPages - 1, prev + 1));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [totalPages]);
+
+  const displayedProjects = projects.slice(
+    safePageIndex * PAGE_SIZE,
+    (safePageIndex + 1) * PAGE_SIZE
+  );
+
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
   const selectedVolume = selectedProject
     ? volumes.find((v) => v.uuid === selectedProject.volume_uuid) || null
     : null;
 
-  // Real hero text derived strictly from verified backend state
-  const getHeroContent = () => {
-    if (projects.length === 0) {
-      return {
-        prefix: "Henüz proje",
-        highlight: "eklenmedi.",
-        desc: "Yerel PHP çalışma alanınızı başlatmak için harici veya dahili diskten bir proje bağlayın.",
-      };
-    }
-    if (!runtime) {
-      return {
-        prefix: "Durum",
-        highlight: "doğrulanamadı.",
-        desc: "Çalışma zamanı telemetrisi okunamadı. Servis denetleyicisini yeniden başlatmayı deneyin.",
-      };
-    }
-    if (runtime.nginx_running && runtime.php_versions.length > 0) {
-      return {
-        prefix: "Her şey",
-        highlight: "yolunda.",
-        desc: `${runningProjects.length > 0 ? `${runningProjects.length} aktif projede` : "Kayıtlı projelerde"} Nginx 8080 ve PHP-FPM servisleri sorunsuz çalışıyor.`,
-      };
-    }
-    return {
-      prefix: "Bazı servisler",
-      highlight: "dikkat istiyor.",
-      desc: "Nginx gateway veya PHP-FPM denetleyicisi aktif değil. Servisleri başlatın.",
-    };
-  };
-
-  const hero = getHeroContent();
-  const scaleMode = projects.length > 4 ? "compact" : "default";
+  const hero = computeHeroHealthContent(projects, volumes, runtime);
+  const scaleMode = displayedProjects.length > 4 ? "compact" : "default";
 
   return (
     <div className="relative min-h-[calc(100vh-140px)] flex flex-col justify-between items-center select-none pb-24">
@@ -174,13 +304,13 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
             </span>
           </div>
         ) : (
-          /* Projects Rendered (2, 6, or more) */
+          /* Projects Rendered (2, 6, or more with pagination) */
           <div
             className={`flex flex-wrap items-center justify-center z-10 ${
               scaleMode === "compact" ? "gap-4 max-w-5xl" : "gap-8"
             }`}
           >
-            {projects.slice(0, 6).map((project) => {
+            {displayedProjects.map((project) => {
               const vol = volumes.find((v) => v.uuid === project.volume_uuid) || null;
               return (
                 <SpatialCard
@@ -194,7 +324,7 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
               );
             })}
 
-            {/* Quick Add Slot when space permits */}
+            {/* Quick Add Slot when space permits on current page and total projects < 6 */}
             {projects.length < 6 && (
               <div
                 role="button"
@@ -217,6 +347,59 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Truthful Total Project Counter & Pagination Navigation for >6 Projects */}
+        {projects.length > 6 && (
+          <div className="flex items-center justify-between w-full max-w-xl mx-auto mt-6 px-4 py-2.5 rounded-2xl bg-[#0F1424]/80 backdrop-blur-md border border-white/10 text-xs text-zinc-300 shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">
+                Toplam {projects.length} Proje
+              </span>
+              <span className="text-zinc-600">·</span>
+              <span className="text-zinc-400">
+                Sayfa {safePageIndex + 1} / {totalPages}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                disabled={safePageIndex === 0}
+                aria-label="Önceki Proje Sayfası"
+                className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                ← Önceki
+              </button>
+
+              <div className="flex items-center gap-1.5 px-1">
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setPageIndex(idx)}
+                    aria-label={`Sayfa ${idx + 1}`}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      idx === safePageIndex
+                        ? "bg-indigo-400 w-4 shadow-[0_0_8px_rgba(99,102,241,0.8)]"
+                        : "bg-white/20 hover:bg-white/40"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={safePageIndex >= totalPages - 1}
+                aria-label="Sonraki Proje Sayfası"
+                className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                Sonraki →
+              </button>
+            </div>
           </div>
         )}
 

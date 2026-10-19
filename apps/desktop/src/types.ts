@@ -33,6 +33,7 @@ export interface RuntimeOverview {
   mariadb_alive: boolean;
   mariadb_version?: string;
   mariadb_latency_ms?: number;
+  php_fpm_running?: boolean;
 }
 
 export type ViewMode = "studio" | "projects" | "services" | "storage" | "deployments" | "mcp" | "settings";
