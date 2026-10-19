@@ -161,23 +161,49 @@ Phase **R1.3A-V1** implements targeted functional and architectural corrections 
    - `paths::tests::test_tricky_nested_traversal_bypass_attempts`
    - `paths::tests::test_valid_nested_and_normalized_subpaths`
 
-### 4.2 Frontend Automated Regression Suite (11 Tests, 100% PASS)
+### 4.2 Frontend Automated Regression Suite (15 Tests, 100% PASS)
 Executed via `npm test` (`node --test test/*.test.mjs`):
-1. `R1.3A-V1 Negative Regression: Production builds strictly reject fixtures`
-2. `R1.3A-V1 Health Messaging: Empty projects yields neutral tone`
-3. `R1.3A-V1 Health Messaging: Null runtime telemetry yields UNKNOWN`
-4. `R1.3A-V1 Health Messaging: Disconnected volume yields critical tone`
-5. `R1.3A-V1 Health Messaging: Nginx down yields critical tone`
-6. `R1.3A-V1 Health Messaging: Failed project status yields critical tone`
-7. `R1.3A-V1 Health Messaging: Degraded project status yields warning tone`
-8. `R1.3A-V1 Health Messaging: Unknown project status yields UNKNOWN tone`
-9. `R1.3A-V1 Health Messaging: Active project with php_fpm_running=false yields critical tone`
-10. `R1.3A-V1 Health Messaging: All verified yields success 'Her şey yolunda'`
-11. `R1.3A-V1 Multi-Project Handling: Pagination covers collections >6 without hiding records`
+1. `R1.3A-V1 Fixture Isolation: Production gate strictly rejects fixture activation`
+2. `R1.3A-V1 Production Bundle Inspection: Built bundle excludes fixture activation`
+3. `Acceptance Case 1: php_fpm_running: true with all checks healthy yields SUCCESS`
+4. `Acceptance Case 2: php_fpm_running: false for a running project yields failure`
+5. `Acceptance Case 3: php_fpm_running: undefined yields UNKNOWN`
+6. `Acceptance Case 4: Missing runtime response yields UNKNOWN`
+7. `Acceptance Case 5: Disconnected project volume yields appropriate warning/failure`
+8. `Acceptance Case 6: Stopped projects must not automatically imply a malfunction`
+9. `Health Messaging: Empty project list yields neutral tone`
+10. `Health Messaging: Nginx Gateway down yields critical tone`
+11. `Health Messaging: MariaDB down yields warning tone`
+12. `Health Messaging: Project probe failure yields critical tone`
+13. `Health Messaging: Degraded project status yields warning tone`
+14. `Health Messaging: Unknown project status yields UNKNOWN tone`
+15. `Multi-Project Handling: Pagination covers collections >6 without hiding records`
+
+Total Frontend Unit Tests: **15 passed, 0 failed**.
+All tests directly exercise production modules (`apps/desktop/src/utils/healthClassification.ts` and `apps/desktop/src/fixtures/visualFixtures.ts`) without reimplementing or duplicating business logic.
 
 ---
 
-## 5. Visual Verification & Screen Captures
+## 5. Health-State Decision Matrix
+
+| Scenario | Projects State | Runtime Signals | Volumes | Result Tone | Result Headline |
+|---|---|---|---|---|---|
+| **Case 1: All Healthy** | 1+ running | `nginx: up`, `mariadb: up`, `php_fpm_running: true` | Connected | `success` | "Her şey yolunda." |
+| **Case 2: Active FPM Dead** | 1+ running | `nginx: up`, `mariadb: up`, `php_fpm_running: false` | Connected | `critical` | "PHP-FPM denetleyicisi yanıt vermiyor." |
+| **Case 3: Indeterminate Telemetry** | Any (running or stopped) | `php_fpm_running: undefined` | Connected | `unknown` | "Durum BİLİNMİYOR (UNKNOWN)." |
+| **Case 4: Missing Telemetry** | Any | `runtime: null \| undefined` | Any | `unknown` | "Durum BİLİNMİYOR (UNKNOWN)." |
+| **Case 5: Disconnected Storage** | 1+ projects unmounted | Any | Missing UUID or `disconnected` | `critical` | "Harici disk bağlantısı kesildi." |
+| **Case 6: Stopped Projects** | All stopped (0 running) | `nginx: up`, `mariadb: up`, `php_fpm_running: false` | Connected | `neutral` | "Çalışma alanı hazır." (Not a malfunction) |
+| **Case 7: Empty State** | 0 projects | Any | Any | `neutral` | "Henüz proje eklenmedi." |
+| **Case 8: Degraded Probe** | 1+ `degraded` | Any | Connected | `warning` | "Kısmi servis bozulması." |
+| **Case 9: Failed Probe** | 1+ `failed` | Any | Connected | `critical` | "Çalışma zamanı hatası saptandı." |
+| **Case 10: Unknown Status** | 1+ `unknown` | Any | Connected | `unknown` | "Durum BİLİNMİYOR (UNKNOWN)." |
+| **Case 11: Nginx Gateway Down** | 1+ projects | `nginx_running: false` | Connected | `critical` | "Nginx Gateway çevrimdışı." |
+| **Case 12: MariaDB Dead** | 1+ projects | `mariadb_alive: false` | Connected | `warning` | "MariaDB Veritabanı çevrimdışı." |
+
+---
+
+## 6. Visual Verification & Screen Captures
 
 Screenshots clearly distinguish **Controlled Visual Fixtures (Development/Testing Mode)** from **Live Application State (Tauri/SQLite Integration)**:
 
@@ -192,17 +218,18 @@ Screenshots clearly distinguish **Controlled Visual Fixtures (Development/Testin
 
 ---
 
-## 6. Security & Safety Invariants Preserved
+## 7. Security & Safety Invariants Preserved
 
 1. **Database Deletion Guard**: Remains locked in `crates/runtime/src/mariadb.rs` returning `DatabaseError::DatabaseDeletionUnavailable`.
 2. **Fail-Closed SFTP Engine**: Transfer engine in `crates/deployment/src/sftp.rs` rejects non-dry-run deployments with `DeploymentNotImplemented`.
 3. **PID Identity Safeguard**: Prevents process reuse spoofing in `macos::process`.
 4. **Volume Barrier Protection**: Prevents phantom directory creation on unmounted external drives (`VolumeBarrier`).
 5. **No Fabricated Data**: 24-hour activity timeline remains removed. Zero synthetic data in production mode.
+6. **Non-Tauri Preview Mutation Guard**: Non-Tauri web development previews cannot simulate successful Start, Stop or Create Project operations unless an explicit isolated visual fixture mode is active.
 
 ---
 
-## 7. Known Remaining Issues & Limitations
+## 8. Known Remaining Issues & Limitations
 
 1. **DNS Resolver Configuration**: `.test` domains require external macOS resolver setup (`/etc/resolver/test`) for browser address bar resolution. Direct testing utilizes loopback port 8080 (`http://127.0.0.1:8080`) with `Host: <domain>` headers.
 2. **Database Deletion Modal**: Database drops remain locked until the interactive human confirmation modal is implemented in Phase R1.3B.
@@ -210,8 +237,8 @@ Screenshots clearly distinguish **Controlled Visual Fixtures (Development/Testin
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
-All functional defects identified in the review—production-accessible fixtures, unverified health messaging, swallowed synchronization errors, and truncation of >6 projects—have been resolved. The test baseline has expanded from 49 to **50 passing Rust tests** and **11 passing frontend regression tests** with 100% pass rate.
+All functional defects and acceptance patch requirements—pure production module testing, undefined health evidence gating, production bundle verification, and non-Tauri preview safeguards—have been resolved. The test baseline stands at **50 passing Rust tests** and **15 passing frontend regression tests** (65 total tests) with 100% pass rate.
 
-**R1.3A-V1 — AWAITING PRODUCT OWNER ACCEPTANCE.**
+**R1.3A-V1 FINAL ACCEPTANCE PATCH — AWAITING PRODUCT OWNER REVIEW.**

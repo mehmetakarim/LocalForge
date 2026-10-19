@@ -6,7 +6,7 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.3A-V1 — Final Functional Acceptance Fixes Completed**
+- **Current State**: **Phase R1.3A-V1 — Final Acceptance Patch Completed**
 - **Active Git Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
 - **Target Remote**: `origin/phase-r1/r1-3a-v1-functional-acceptance-fixes`
 - **Previous Milestone Status**:
@@ -14,13 +14,14 @@
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
   - **Phase R1.3A-V Stage B**: COMPLETED (Direction A+ visual baseline).
   - **Phase R1.3A-V1**: COMPLETED & VERIFIED (Production fixture isolation, verified health messaging, synchronization failure propagation, and >6 project spatial pagination).
+  - **R1.3A-V1 Final Acceptance Patch**: COMPLETED & VERIFIED (Extracted pure production health classification module, tested production modules directly with zero code duplication, gated undefined PHP-FPM telemetry to UNKNOWN, verified built bundle excludes fixtures, guarded non-Tauri preview mutations).
 - **Completed Tasks in R1.3A-V1**:
   - `TASK-R1.3A-V1-01`: Isolated fixtures into `visualFixtures.ts` with strict production exclusion gate (`import.meta.env.PROD`).
   - `TASK-R1.3A-V1-02`: Created `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, and real FPM pool state.
   - `TASK-R1.3A-V1-03`: Propagated sync errors in `sync_projects` and updated failed project states to `Unknown` in SQLite.
   - `TASK-R1.3A-V1-04`: Multi-project spatial pagination for >6 projects with truthful total project count and keyboard arrow navigation.
-  - `TASK-R1.3A-V1-05`: Verified with 50 Rust tests and 11 frontend automated regression tests (61/61 PASS).
-- **Next Permitted Action**: Submit R1.3A-V1 Acceptance Report to Product Owner. Await explicit authorization before proceeding to Phase R1.3B.
+  - `TASK-R1.3A-V1-05`: Verified with 50 Rust tests and 15 frontend automated regression tests (65/65 PASS).
+- **Next Permitted Action**: Submit R1.3A-V1 Final Acceptance Patch report to Product Owner. Await explicit review and authorization before proceeding to Phase R1.3B.
 
 ---
 

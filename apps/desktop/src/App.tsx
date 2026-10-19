@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [isCapsuleOpen, setIsCapsuleOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isFixtureMode, setIsFixtureMode] = useState(false);
   const [_loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mutatingProject, setMutatingProject] = useState<string | null>(null);
@@ -46,11 +47,14 @@ export const App: React.FC = () => {
       const activeFixture = isDev && fixtureParam ? getVisualFixture(fixtureParam) : null;
 
       if (activeFixture) {
+        setIsFixtureMode(true);
         setVolumes(activeFixture.volumes);
         setProjects(activeFixture.projects);
         setRuntime(activeFixture.runtime);
         return;
       }
+
+      setIsFixtureMode(false);
 
       if (isTauri) {
         // STRICT PRODUCTION PATH — Zero Fabricated Data
@@ -95,10 +99,14 @@ export const App: React.FC = () => {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
         await invoke("start_project", { id: projectId });
         await loadData();
-      } else {
+      } else if (isFixtureMode) {
+        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, status: "running" } : p))
         );
+      } else {
+        // Non-Tauri environment without explicit fixture mode must NOT simulate success
+        setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
       }
     } catch (err: any) {
       console.error("Start project failed:", err);
@@ -115,10 +123,14 @@ export const App: React.FC = () => {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
         await invoke("stop_project", { id: projectId });
         await loadData();
-      } else {
+      } else if (isFixtureMode) {
+        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, status: "stopped" } : p))
         );
+      } else {
+        // Non-Tauri environment without explicit fixture mode must NOT simulate success
+        setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
       }
     } catch (err: any) {
       console.error("Stop project failed:", err);
@@ -147,7 +159,8 @@ export const App: React.FC = () => {
           phpVersion,
         });
         await loadData();
-      } else {
+      } else if (isFixtureMode) {
+        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         const newProj: ProjectRecord = {
           id: `proj_${Date.now()}`,
           name,
@@ -161,6 +174,10 @@ export const App: React.FC = () => {
           updated_at: new Date().toISOString(),
         };
         setProjects((prev) => [newProj, ...prev]);
+      } else {
+        // Non-Tauri environment without explicit fixture mode must NOT simulate success
+        setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
+        return;
       }
       setIsCreateModalOpen(false);
     } catch (err: any) {

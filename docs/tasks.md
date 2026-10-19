@@ -79,7 +79,7 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.3A-V1-02** | Verified System-Health Messaging | Critical | COMPLETED | Frontend Lead | `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, FPM |
 | **TASK-R1.3A-V1-03** | Propagate Synchronization Failures | Critical | COMPLETED | Senior Rust Eng | Eliminated `let _ =`, synced `Unknown` status on probe failures, updated cards/inspector |
 | **TASK-R1.3A-V1-04** | Multi-Project Spatial Pagination (>6 Projects) | High | COMPLETED | Lead UI Designer | Truthful project count, fluid pagination controls, keyboard arrow navigation |
-| **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | 50 Rust tests + 11 frontend tests pass (61/61 PASS); R1_3A_V1 Acceptance Report |
+| **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | 50 Rust tests + 15 frontend tests pass (65/65 PASS); Final Acceptance Patch Report |
 
 ### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |

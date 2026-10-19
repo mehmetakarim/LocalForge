@@ -361,3 +361,34 @@ This document records the chronological engineering log for all development sess
    - Added 11 automated frontend unit & regression tests in `apps/desktop/test/fixtures_safety.test.mjs` (11 PASS, 0 FAIL).
    - Total automated tests: 61/61 PASS.
    - Produced `docs/phases/R1_3A_V1_FUNCTIONAL_ACCEPTANCE_REPORT.md`.
+
+---
+
+## Session 011 — Phase R1.3A-V1 Final Acceptance Patch
+
+- **Date**: 2026-10-19
+- **Participants**: Principal Rust Security Engineer, Database Reliability Engineer, Desktop Architect, QA Lead
+- **Authorized Phase**: **Phase R1.3A-V1 — Final Acceptance Patch**
+- **Git Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
+
+### Summary of Activities
+1. **Extracted Pure Production Health Classification Module (Finding 02)**:
+   - Created `apps/desktop/src/utils/healthClassification.ts` implementing `computeHeroHealthContent` and exporting pure TypeScript logic.
+   - Updated `StudioOverview.tsx` to import the production module rather than duplicating or keeping logic inline.
+2. **Resolved Incomplete Health Evidence (Finding 01)**:
+   - Gated `php_fpm_running: undefined` (missing or indeterminate telemetry) strictly to `tone: "unknown"`.
+   - Distinguished stopped projects from active failures (`runningProjects.length === 0` with `php_fpm_running: false` yields `tone: "neutral"` / "Çalışma alanı hazır.", avoiding false error alarms).
+   - Active running projects require verified `php_fpm_running: true` along with Nginx 8080 and MariaDB before producing `tone: "success"`.
+3. **Eliminated Reimplemented Logic in Tests (Finding 02)**:
+   - Rewrote `apps/desktop/test/fixtures_safety.test.mjs` using `jiti.import` to directly test the real production functions `computeHeroHealthContent` and `getVisualFixture`.
+   - Added automated inspection of the built production bundle (`dist/assets/*.js`) to verify visual fixture UUIDs and code are eliminated.
+   - Expanded frontend test suite from 11 to 15 tests covering all 6 Acceptance Cases and edge cases (15 PASS, 0 FAIL).
+4. **Additional Safety Check (Non-Tauri Preview Guards)**:
+   - Hardened `handleStartProject`, `handleStopProject`, and `handleCreateProject` in `App.tsx` so non-Tauri browser previews cannot simulate successful mutations unless an explicit isolated visual fixture mode is active.
+5. **Comprehensive Verification**:
+   - Rust workspace tests: 50 passed, 0 failed.
+   - Frontend tests: 15 passed, 0 failed. Total: 65 passed, 0 failed (%100 PASS).
+   - `cargo fmt --check`: 0 diffs.
+   - `cargo clippy --all-targets -- -D warnings`: 0 warnings.
+   - `npm run build`: Vite v6.4.4 + tsc clean build (0 errors).
+   - Updated `docs/phases/R1_3A_V1_FUNCTIONAL_ACCEPTANCE_REPORT.md`.

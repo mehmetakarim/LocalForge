@@ -12,9 +12,20 @@ export interface FixtureData {
  * In production builds (import.meta.env.PROD === true), strictly returns null.
  * Production URL query parameters can NEVER activate fixture data.
  */
-export function getVisualFixture(key: string | null): FixtureData | null {
+export function getVisualFixture(
+  key: string | null,
+  overrideEnv?: { PROD?: boolean; DEV?: boolean }
+): FixtureData | null {
+  const isProd = overrideEnv !== undefined
+    ? Boolean(overrideEnv.PROD)
+    : (typeof import.meta !== "undefined" && import.meta.env ? Boolean(import.meta.env.PROD) : true);
+
+  const isDev = overrideEnv !== undefined
+    ? Boolean(overrideEnv.DEV)
+    : (typeof import.meta !== "undefined" && import.meta.env ? Boolean(import.meta.env.DEV) : false);
+
   // STRICT PRODUCTION SAFETY GATE
-  if (import.meta.env.PROD || !import.meta.env.DEV) {
+  if (isProd || !isDev) {
     return null;
   }
 
