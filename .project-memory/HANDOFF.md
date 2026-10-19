@@ -6,22 +6,21 @@
 
 ## 1. Current Status
 
-- **Current State**: **Phase R1.3A-V1 — Final Acceptance Patch Completed**
-- **Active Git Branch**: `phase-r1/r1-3a-v1-functional-acceptance-fixes`
-- **Target Remote**: `origin/phase-r1/r1-3a-v1-functional-acceptance-fixes`
+- **Current State**: **R1.3B Preparation — Completed & Verified**
+- **Active Git Branch**: `phase-r1/r1-3b-preparation`
+- **Target Remote**: `origin/phase-r1/r1-3b-preparation`
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
-  - **Phase R1.3A-V Stage B**: COMPLETED (Direction A+ visual baseline).
-  - **Phase R1.3A-V1**: COMPLETED & VERIFIED (Production fixture isolation, verified health messaging, synchronization failure propagation, and >6 project spatial pagination).
-  - **R1.3A-V1 Final Acceptance Patch**: COMPLETED & VERIFIED (Extracted pure production health classification module, tested production modules directly with zero code duplication, gated undefined PHP-FPM telemetry to UNKNOWN, verified built bundle excludes fixtures, guarded non-Tauri preview mutations).
-- **Completed Tasks in R1.3A-V1**:
-  - `TASK-R1.3A-V1-01`: Isolated fixtures into `visualFixtures.ts` with strict production exclusion gate (`import.meta.env.PROD`).
-  - `TASK-R1.3A-V1-02`: Created `computeHeroHealthContent` checking volumes, Nginx 8080, MariaDB, probe failures, and real FPM pool state.
-  - `TASK-R1.3A-V1-03`: Propagated sync errors in `sync_projects` and updated failed project states to `Unknown` in SQLite.
-  - `TASK-R1.3A-V1-04`: Multi-project spatial pagination for >6 projects with truthful total project count and keyboard arrow navigation.
-  - `TASK-R1.3A-V1-05`: Verified with 50 Rust tests and 15 frontend automated regression tests (65/65 PASS).
-- **Next Permitted Action**: Submit R1.3A-V1 Final Acceptance Patch report to Product Owner. Await explicit review and authorization before proceeding to Phase R1.3B.
+  - **Phase R1.3A-V Stage B**: ACCEPTED by Product Owner.
+  - **Phase R1.3A-V1 Final Acceptance Patch**: ACCEPTED by Product Owner.
+  - **R1.3B Preparation**: COMPLETED & VERIFIED (Nginx process ownership & port conflict detection, SQLite persistent metadata failure safety, metadata query error propagation, 53 Rust + 16 frontend tests pass).
+- **Completed Tasks in R1.3B Preparation**:
+  - `TASK-R1.3B-PREP-01`: Verified Nginx ownership against legitimate binary paths; report port conflicts for unverified occupants.
+  - `TASK-R1.3B-PREP-02`: Removed `list_projects().unwrap_or_default()`, propagating database errors explicitly as UNKNOWN or error responses.
+  - `TASK-R1.3B-PREP-03`: Removed silent `open_in_memory()` fallback in Tauri initialization, failing closed while preserving user data.
+  - `TASK-R1.3B-PREP-04`: Verified with 53 Rust tests and 16 frontend automated regression tests (69/69 PASS).
+- **Next Permitted Action**: Submit R1.3B Implementation Plan and preparation report to Product Owner. Await explicit review and authorization before proceeding with R1.3B screen implementations.
 
 ---
 

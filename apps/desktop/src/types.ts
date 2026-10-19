@@ -28,6 +28,7 @@ export interface RuntimeOverview {
   php_versions: string[];
   nginx_port: number;
   nginx_running: boolean;
+  nginx_port_conflict?: boolean;
   mariadb_port: number;
   mariadb_socket: string;
   mariadb_alive: boolean;

@@ -81,6 +81,14 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3A-V1-04** | Multi-Project Spatial Pagination (>6 Projects) | High | COMPLETED | Lead UI Designer | R1.3A-V Findings | Truthful project count, fluid pagination controls, keyboard arrow navigation |
 | **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | TASK-R1.3A-V1-01..04 | 50 Rust tests + 15 frontend tests pass (65/65 PASS); Final Acceptance Patch Report |
 
+### Subphase R1.3B Preparation: Backend Reliability Hardening (COMPLETED)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-PREP-01** | Nginx Process Ownership & Port Conflict Verification | Critical | COMPLETED | Senior Rust Eng | R1.3A-V1 Acceptance | `check_gateway_health`, `GatewayHealth::PortConflict`, legitimate binary validation |
+| **TASK-R1.3B-PREP-02** | Metadata Query Error Propagation | High | COMPLETED | Senior Rust Eng | TASK-R1.3B-PREP-01 | Removed `list_projects().unwrap_or_default()`, propagate DB errors to UI |
+| **TASK-R1.3B-PREP-03** | Persistent Metadata Safety & Startup Failure Handling | Critical | COMPLETED | Database Architect | TASK-R1.3B-PREP-02 | Removed `open_in_memory()` fallback, fail-closed SQLite init in AppState |
+| **TASK-R1.3B-PREP-04** | Regression Suite & Workspace Test Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-PREP-01..03 | 53 Rust tests + 16 frontend tests (69/69 PASS); R1.3B Implementation Plan |
+
 ### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|

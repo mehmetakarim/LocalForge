@@ -12,7 +12,7 @@ pub use mariadb::{
     DatabaseDeletionApproval, DatabaseDeletionRequest, DatabaseHealthStatus, MariaDbBinaries,
     MariaDbSupervisor,
 };
-pub use nginx::NginxSupervisor;
+pub use nginx::{GatewayHealth, NginxSupervisor};
 pub use php::PhpFpmSupervisor;
 pub use service::{
     classify_probe_result, GatewayHealthAssessment, ProjectRuntimeService, ProjectRuntimeStatus,

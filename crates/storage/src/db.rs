@@ -24,7 +24,9 @@ pub struct MetadataStore {
 impl MetadataStore {
     pub fn open(db_path: &Path) -> Result<Self> {
         if let Some(parent) = db_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent).map_err(|e| {
+                LocalForgeError::DatabaseError(format!("Failed to create database directory: {e}"))
+            })?;
         }
 
         let conn = Connection::open(db_path).map_err(|e| {

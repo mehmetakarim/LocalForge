@@ -198,6 +198,17 @@ test("Health Messaging: Empty project list yields neutral tone", () => {
   assert.equal(result.highlight, "eklenmedi.");
 });
 
+test("Health Messaging: Nginx port conflict yields critical tone", () => {
+  const result = computeHeroHealthContent(
+    [mockRunningProject],
+    [mockVolume],
+    { ...mockHealthyRuntime, nginx_running: false, nginx_port_conflict: true }
+  );
+  assert.equal(result.tone, "critical");
+  assert.equal(result.prefix, "Port çakışması");
+  assert.equal(result.highlight, "algılandı (8080).");
+});
+
 test("Health Messaging: Nginx Gateway down yields critical tone", () => {
   const result = computeHeroHealthContent(
     [mockRunningProject],

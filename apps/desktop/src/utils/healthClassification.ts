@@ -53,6 +53,16 @@ export function computeHeroHealthContent(
     };
   }
 
+  // Nginx Port conflict check (unrelated/unverified process occupying port 8080)
+  if (runtime.nginx_port_conflict) {
+    return {
+      prefix: "Port çakışması",
+      highlight: "algılandı (8080).",
+      desc: "8080 portu LocalForge dışındaki yabancı bir süreç tarafından işgal edilmiş. Port çakışmasını giderin.",
+      tone: "critical",
+    };
+  }
+
   // Nginx Gateway infrastructure health
   if (!runtime.nginx_running) {
     return {

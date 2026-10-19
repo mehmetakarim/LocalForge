@@ -4,7 +4,7 @@ use localforge_runtime::{
     health::probe_http_health, NginxSupervisor, PhpFpmSupervisor, ProjectRuntimeService,
 };
 use localforge_storage::{MetadataStore, ProjectRecord, VolumeBarrier};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -532,4 +532,97 @@ fn test_r1_3a_v1_01_sync_all_projects_surfaces_failures_and_syncs_sqlite() {
 
     let db_p2 = store.get_project(&proj_crashed.id).unwrap().unwrap();
     assert_eq!(db_p2.status, ProjectStatus::Failed);
+}
+
+#[test]
+fn test_r1_3b_prep_01_nginx_ownership_verification_and_port_conflict() {
+    use localforge_runtime::GatewayHealth;
+    use std::net::TcpListener;
+
+    // 1. Bind an unrelated dummy TCP listener on an ephemeral unprivileged port
+    let dummy_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = dummy_listener.local_addr().unwrap().port();
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let sup = NginxSupervisor::new(dir.path().join("conf"), dir.path().join("run"), port, pm);
+
+    // 2. An unrelated process occupying the port must be reported as a PortConflict, NOT Running
+    let health = sup.check_gateway_health();
+    match health {
+        GatewayHealth::PortConflict {
+            port: p, details, ..
+        } => {
+            assert_eq!(p, port);
+            assert!(details.contains("unrelated or unverified process"));
+        }
+        other => panic!("Expected PortConflict, got {:?}", other),
+    }
+
+    // 3. is_gateway_alive must return false
+    assert!(!sup.is_gateway_alive());
+
+    // 4. When the dummy listener is dropped, the port becomes free and status transitions to Stopped
+    drop(dummy_listener);
+    let mut stopped = false;
+    for _ in 0..40 {
+        if sup.check_gateway_health() == GatewayHealth::Stopped {
+            stopped = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    assert!(
+        stopped,
+        "Gateway should transition to Stopped once port is freed"
+    );
+    assert!(!sup.is_gateway_alive());
+}
+
+#[test]
+fn test_r1_3b_prep_02_persistent_metadata_safety_and_error_propagation() {
+    let dir = tempdir().unwrap();
+
+    // 1. Verify opening a persistent SQLite database at a valid path works
+    let db_path = dir.path().join("valid_store.db");
+    let store = MetadataStore::open(&db_path).expect("Failed to open valid persistent store");
+    let initial_projects = store
+        .list_projects()
+        .expect("list_projects should succeed on valid DB");
+    assert_eq!(initial_projects.len(), 0);
+
+    // 2. Insert a real project
+    let proj = ProjectRecord {
+        id: ProjectId::from_string("proj_p1"),
+        name: "Test P1".into(),
+        path: PathBuf::from("/tmp/p1"),
+        volume_uuid: VolumeId::new("UUID-P1"),
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "p1.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-20T00:00:00Z".into(),
+        updated_at: "2026-10-20T00:00:00Z".into(),
+    };
+    store.insert_project(&proj).unwrap();
+
+    // 3. Drop store connection and reopen to verify true SQLite disk persistence
+    drop(store);
+    let reopened =
+        MetadataStore::open(&db_path).expect("Reopening persistent store should succeed");
+    let listed = reopened
+        .list_projects()
+        .expect("list_projects should succeed");
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, proj.id);
+
+    // 4. Verify invalid/corrupt path produces explicit error and NEVER silently falls back to in-memory
+    let blocker_file = dir.path().join("blocker_file");
+    std::fs::write(&blocker_file, b"not a directory").unwrap();
+    let invalid_path = blocker_file.join("sub_dir").join("db.sqlite");
+    let open_res = MetadataStore::open(&invalid_path);
+    assert!(
+        open_res.is_err(),
+        "Opening an invalid path must return Err and not silently open in-memory"
+    );
 }

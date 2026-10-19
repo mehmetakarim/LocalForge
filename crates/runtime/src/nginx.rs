@@ -8,6 +8,20 @@ use std::process::{Child, Command};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum GatewayHealth {
+    Running {
+        pid: u32,
+        port: u16,
+    },
+    Stopped,
+    PortConflict {
+        port: u16,
+        occupying_pid: Option<u32>,
+        details: String,
+    },
+}
+
 pub struct NginxSupervisor {
     conf_dir: PathBuf,
     run_dir: PathBuf,
@@ -399,9 +413,45 @@ fastcgi_param  REDIRECT_STATUS    200;
         Ok(())
     }
 
-    /// Checks if the Nginx gateway is alive and bound.
-    pub fn is_gateway_alive(&self) -> bool {
-        let lock = self.master_process.lock().unwrap();
+    /// Validates whether a given executable path is an authentic canonical Nginx binary.
+    pub fn is_legitimate_nginx_binary(path: &Path) -> bool {
+        let canonical = match dunce::canonicalize(path) {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+
+        if let Ok(bin) = Self::find_nginx_binary() {
+            if let Ok(c) = dunce::canonicalize(&bin) {
+                if c == canonical {
+                    return true;
+                }
+            }
+        }
+
+        let candidates = [
+            "/opt/homebrew/bin/nginx",
+            "/opt/homebrew/sbin/nginx",
+            "/usr/local/bin/nginx",
+            "/usr/local/sbin/nginx",
+        ];
+        for c in candidates {
+            let p = Path::new(c);
+            if let Ok(can) = dunce::canonicalize(p) {
+                if can == canonical {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Evaluates the true ownership, process identity and operational health of the gateway.
+    /// Distinguishes verified LocalForge Nginx from an unrelated process occupying the port.
+    pub fn check_gateway_health(&self) -> GatewayHealth {
+        let mut lock = self.master_process.lock().unwrap();
+
+        // 1. Check in-memory master process
         if let Some((identity, _)) = lock.as_ref() {
             let verified = self.process_manager.verify_process_identity(
                 identity.pid,
@@ -409,24 +459,65 @@ fastcgi_param  REDIRECT_STATUS    200;
                 identity.start_time_secs,
                 identity.start_time_usecs,
             );
-            if !verified {
-                return false;
-            }
-            if !is_port_available(self.listen_port) {
-                return true;
-            }
-            // Allow brief grace period for workers to cycle and bind the port after reload
-            let wait_start = Instant::now();
-            while wait_start.elapsed() < Duration::from_millis(350) {
-                std::thread::sleep(Duration::from_millis(25));
+            if verified {
                 if !is_port_available(self.listen_port) {
-                    return true;
+                    return GatewayHealth::Running {
+                        pid: identity.pid,
+                        port: self.listen_port,
+                    };
+                }
+                // Port might be in a brief reload cycle
+                let wait_start = Instant::now();
+                while wait_start.elapsed() < Duration::from_millis(350) {
+                    std::thread::sleep(Duration::from_millis(25));
+                    if !is_port_available(self.listen_port) {
+                        return GatewayHealth::Running {
+                            pid: identity.pid,
+                            port: self.listen_port,
+                        };
+                    }
                 }
             }
-            false
-        } else {
-            !is_port_available(self.listen_port)
         }
+
+        // 2. Check disk pid file and verify process identity & binary authenticity
+        let pid_file = self.run_dir.join("nginx.pid");
+        if pid_file.exists() {
+            if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
+                if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                    if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
+                        if Self::is_legitimate_nginx_binary(identity.executable_path())
+                            && !is_port_available(self.listen_port)
+                        {
+                            *lock = Some((identity.clone(), None));
+                            return GatewayHealth::Running {
+                                pid: identity.pid,
+                                port: self.listen_port,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Port conflict check: if the port is bound by a foreign/unverified process
+        if !is_port_available(self.listen_port) {
+            return GatewayHealth::PortConflict {
+                port: self.listen_port,
+                occupying_pid: None,
+                details: format!(
+                    "Port {} is occupied by an unrelated or unverified process",
+                    self.listen_port
+                ),
+            };
+        }
+
+        GatewayHealth::Stopped
+    }
+
+    /// Checks if the Nginx gateway is alive and bound by verified LocalForge Nginx.
+    pub fn is_gateway_alive(&self) -> bool {
+        matches!(self.check_gateway_health(), GatewayHealth::Running { .. })
     }
 
     /// Returns process identity of the running Nginx gateway.
@@ -531,5 +622,29 @@ mod tests {
         assert!(vhost.contains("server_name site1.test"));
         assert!(vhost.contains("fastcgi_pass unix:/tmp/localforge/site1.sock;"));
         assert!(vhost.contains("root \"/Volumes/Mac Harici Disk/Projects/site1/public\";"));
+    }
+
+    #[test]
+    fn test_nginx_ownership_verification_unrelated_process_port_conflict() {
+        use std::net::TcpListener;
+
+        // Bind a dummy TCP listener on an ephemeral unprivileged port to simulate an unrelated process
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let dir = tempdir().unwrap();
+        let pm = Arc::new(MacOSProcessManager::new());
+        let sup = NginxSupervisor::new(dir.path().join("conf"), dir.path().join("run"), port, pm);
+
+        // Even though the port is occupied, it must NOT report running because it is not verified LocalForge Nginx
+        let health = sup.check_gateway_health();
+        assert!(matches!(health, GatewayHealth::PortConflict { port: p, .. } if p == port));
+        assert!(!sup.is_gateway_alive());
+
+        // When the dummy listener is dropped, the port becomes free and status transitions to Stopped
+        drop(listener);
+        let health_after = sup.check_gateway_health();
+        assert_eq!(health_after, GatewayHealth::Stopped);
+        assert!(!sup.is_gateway_alive());
     }
 }

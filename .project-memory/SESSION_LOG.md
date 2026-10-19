@@ -392,3 +392,38 @@ This document records the chronological engineering log for all development sess
    - `cargo clippy --all-targets -- -D warnings`: 0 warnings.
    - `npm run build`: Vite v6.4.4 + tsc clean build (0 errors).
    - Updated `docs/phases/R1_3A_V1_FUNCTIONAL_ACCEPTANCE_REPORT.md`.
+
+---
+
+## Session 012 — Phase R1.3B Preparation & Reliability Hardening
+
+- **Date**: 2026-10-20
+- **Participants**: Principal Systems Architect, Database Reliability Engineer, Senior Security Engineer, QA Lead
+- **Authorized Phase**: **Phase R1.3B Preparation — Backend Reliability & Safety Hardening**
+- **Git Branch**: `phase-r1/r1-3b-preparation`
+
+### Summary of Activities
+1. **Nginx Process Ownership & Port Conflict Verification (Finding 01)**:
+   - Added `GatewayHealth` enum in `crates/runtime/src/nginx.rs` (`Running { pid, port }`, `Stopped`, `PortConflict { port, occupying_pid, details }`).
+   - Implemented `is_legitimate_nginx_binary` validating canonical system binary paths (`/opt/homebrew`, `/usr/local`).
+   - Implemented `check_gateway_health()` to verify in-memory master process, on-disk PID file via `process_manager.inspect_process(pid)`, and detect foreign port occupants.
+   - Refactored `is_gateway_alive()` to strictly require `matches!(self.check_gateway_health(), GatewayHealth::Running { .. })`.
+   - Exposed `nginx_port_conflict` in Tauri `RuntimeOverviewDto` and React `types.ts`, and highlighted port conflict in `healthClassification.ts`.
+2. **Metadata Query Error Propagation (Finding 02)**:
+   - Removed `list_projects().unwrap_or_default()` in Tauri application commands and runtime health reporting.
+   - Propagated database errors explicitly as `LocalForgeError::DatabaseError` / `UNKNOWN` states rather than masking failures as zero projects.
+3. **Persistent Metadata Safety & Startup Failure Handling (Finding 03)**:
+   - Removed unsafe `MetadataStore::open_in_memory()` fallback in Tauri initialization (`apps/desktop/src-tauri/src/lib.rs`).
+   - Managed `metadata_store: RwLock<Result<Arc<MetadataStore>, String>>` in `AppState` so startup failures surface gracefully with user-recoverable errors while protecting on-disk database integrity.
+   - Propagated directory creation errors in `MetadataStore::open()`.
+4. **Comprehensive Automated Verification & Testing**:
+   - Added unit test: `test_nginx_ownership_verification_unrelated_process_port_conflict` in `crates/runtime/src/nginx.rs`.
+   - Added integration test: `test_r1_3b_prep_01_nginx_ownership_verification_and_port_conflict` in `crates/runtime/tests/runtime_integration_test.rs`.
+   - Added integration test: `test_r1_3b_prep_02_persistent_metadata_safety_and_error_propagation` in `crates/runtime/tests/runtime_integration_test.rs`.
+   - Added frontend regression test in `apps/desktop/test/fixtures_safety.test.mjs` verifying Nginx port conflict health messaging.
+   - Workspace Rust tests: 53 passed, 0 failed (up from 50).
+   - Frontend tests: 16 passed, 0 failed (up from 15). Total: 69/69 automated tests pass.
+   - `cargo fmt --check`: 0 diffs.
+   - `cargo clippy --all-targets -- -D warnings`: 0 warnings.
+   - `npm run build`: Vite v6.4.4 + tsc clean build (0 errors).
+   - Formulated detailed R1.3B Implementation Plan.
