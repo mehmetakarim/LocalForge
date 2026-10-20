@@ -81,15 +81,17 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.3A-V1-04** | Multi-Project Spatial Pagination (>6 Projects) | High | COMPLETED | Lead UI Designer | Truthful project count, fluid pagination controls, keyboard arrow navigation |
 | **TASK-R1.3A-V1-05** | Negative Regression & Verification Suite | Critical | COMPLETED | QA Lead | 50 Rust tests + 15 frontend tests pass (65/65 PASS); Final Acceptance Patch Report |
 
-### Subphase R1.3B Preparation: Backend Reliability Hardening (COMPLETED)
+### Subphase R1.3B Visual Design Gate & Narrow Reliability Review (COMPLETED / AWAITING APPROVAL)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.3B-PREP-01** | Nginx Process Ownership & Port Conflict Verification | Critical | COMPLETED | Senior Rust Eng | `check_gateway_health`, `find_listening_pids`, `get_process_cmdline`, legitimate binary validation |
+| **TASK-R1.3B-PREP-01** | Nginx Canonical Exact Path & Port Conflict Hardening | Critical | COMPLETED | Senior Rust Eng | Exact canonical config path matching, substring rejection, fail-closed multi-listener conflict handling |
 | **TASK-R1.3B-PREP-02** | Metadata Query Error Propagation | High | COMPLETED | Senior Rust Eng | Removed `list_projects().unwrap_or_default()`, propagate DB errors to UI |
 | **TASK-R1.3B-PREP-03** | Persistent Metadata Safety & Startup Failure Handling | Critical | COMPLETED | Database Architect | In-memory store isolation, `reconnect_metadata_store`, fail-closed SQLite init in AppState |
-| **TASK-R1.3B-PREP-04** | Regression Suite & Workspace Test Verification | Critical | COMPLETED | QA Lead | 55 Rust tests + 16 frontend tests (71/71 PASS); R1.3B Implementation Plan |
+| **TASK-R1.3B-PREP-04** | Adversarial Regression Suite & Workspace Test Verification | Critical | COMPLETED | QA Lead | 57 Rust tests + 16 frontend tests (73/73 PASS); `test_is_localforge_nginx_cmdline_exact_path_matching_and_substring_rejection`, `test_r1_3b_prep_04` |
+| **TASK-R1.3B-GATE-01** | Direction A+ 4 High-Fidelity Visual Prototypes & PNGs | Critical | COMPLETED | Lead UI Designer | 4 1600x1000 HTML prototypes & rendered PNGs (Projects, Services, Storage, Inspector) in `docs/design/r1_3b/` |
+| **TASK-R1.3B-GATE-02** | Data Capability Mapping & Log Safeguards Matrix | Critical | COMPLETED | Systems Architect | Metric-to-command mapping, backend availability audit, safe fallbacks, ring-buffer log specification |
 
-### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED AWAITING APPROVAL)
+### Subphase R1.3B: Native Workspace Implementation (PLANNED / LOCKED AWAITING APPROVAL)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
 | **TASK-R1.3B-01** | Native Workspace Multi-View Spatial Navigation | High | PLANNED | Frontend Lead | Projects Workspace, Services & Runtime, Storage & Volumes views |

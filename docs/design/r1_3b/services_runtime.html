@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>LocalForge R1.3B — Services & Runtime Diagnostics Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg-canvas: #07090F;
+    --bg-window: rgba(10, 13, 22, 0.94);
+    --bg-card: rgba(18, 24, 38, 0.72);
+    --border-specular: rgba(255, 255, 255, 0.20);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --glow-emerald: rgba(16, 185, 129, 0.35);
+    --glow-indigo: rgba(99, 102, 241, 0.30);
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.65);
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: var(--bg-canvas);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 15%, rgba(30, 44, 82, 0.45) 0%, rgba(10, 13, 22, 0.96) 65%, #07090F 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .halo-top {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1000px;
+    height: 500px;
+    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.16) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 75%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: var(--bg-window);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    z-index: 50;
+    background: rgba(10, 13, 22, 0.4);
+    backdrop-filter: blur(20px);
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 140px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .titlebar-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .titlebar-center span.active-tab {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .titlebar-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .telemetry-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+  }
+
+  /* Slender Floating Left Dock */
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 130px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 10px;
+    border-radius: 26px;
+    background: rgba(16, 21, 34, 0.60);
+    backdrop-filter: blur(36px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.7);
+    z-index: 40;
+  }
+  .dock-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+  }
+  .dock-btn:hover {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(99, 102, 241, 0.50);
+    box-shadow: 0 0 18px rgba(99, 102, 241, 0.40);
+  }
+  .dock-btn svg { width: 20px; height: 20px; stroke-width: 1.8; }
+  .dock-divider { width: 24px; height: 1px; background: rgba(255, 255, 255, 0.08); margin: 2px 0; }
+
+  /* Main Workspace Area */
+  .workspace-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 40px 24px 104px;
+    gap: 20px;
+    z-index: 20;
+    overflow-y: auto;
+  }
+
+  /* KPI Summary Banner */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .kpi-card {
+    background: rgba(18, 24, 38, 0.55);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kpi-title {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .kpi-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  /* Two Column Main Technical Grid */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    flex: 1;
+  }
+
+  .tech-card {
+    background: rgba(18, 24, 38, 0.65);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 22px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 14px;
+  }
+  .service-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .service-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #818CF8;
+  }
+  .service-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .service-meta {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+  }
+
+  .badge-health {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.30);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: #10B981;
+  }
+
+  /* Route & Telemetry Tables */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .data-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .data-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+  }
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+  .data-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .tag-domain {
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  .tag-sock {
+    color: #818CF8;
+  }
+
+  .property-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(10, 14, 24, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .prop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .prop-k { color: var(--text-muted); }
+  .prop-v { color: var(--text-primary); font-weight: 500; }
+
+  .actions-strip {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+  }
+  .action-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #FFFFFF;
+  }
+  .action-btn.primary {
+    background: rgba(99, 102, 241, 0.20);
+    border: 1px solid rgba(99, 102, 241, 0.40);
+    color: #FFFFFF;
+  }
+  .action-btn.primary:hover {
+    background: rgba(99, 102, 241, 0.35);
+  }
+
+  /* Diagnostic Audit Callout */
+  .security-callout {
+    border-radius: 14px;
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.20);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .callout-title {
+    color: #10B981;
+    font-weight: 600;
+  }
+  .callout-desc {
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="studio-backdrop"></div>
+<div class="halo-top"></div>
+
+<div class="macos-window">
+  <!-- Titlebar -->
+  <div class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">
+      <span>LOCALFORGE SPATIAL STUDIO</span>
+      <span>/</span>
+      <span class="active-tab">ALTYAPI & SERVİS DENETİMİ</span>
+    </div>
+    <div class="titlebar-right">
+      <div class="telemetry-pill">
+        <div class="sync-dot"></div>
+        <span>PORT 8080 EXCLUSIVE OWNERSHIP</span>
+      </div>
+      <div class="telemetry-pill">
+        <span style="color: #10B981;">DAEMON INTEGRITY VERIFIED</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Dock -->
+  <div class="left-dock">
+    <div class="dock-btn" title="Projeler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+      </svg>
+    </div>
+    <div class="dock-btn active" title="Altyapı & Servisler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="2" y="4" width="20" height="8" rx="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+        <line x1="6" y1="8" x2="6" y2="8.01"></line>
+        <line x1="6" y1="18" x2="6" y2="18.01"></line>
+      </svg>
+    </div>
+    <div class="dock-btn" title="Depolama & Diskler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+      </svg>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-btn" title="CLI & Ayarlar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="workspace-content">
+    <!-- KPI Summary Row -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">Nginx Ağ Geçidi</div>
+        <div class="kpi-value">
+          <div class="sync-dot"></div>
+          <span>127.0.0.1:8080</span>
+        </div>
+        <div class="kpi-sub">PID 62010 · Doğrulanmış Master</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Yönlendirme Tablosu</div>
+        <div class="kpi-value" style="color: #818CF8;">3 Aktif VHost</div>
+        <div class="kpi-sub">0 Çakışma · Host Header Routing</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">PHP-FPM Havuzları</div>
+        <div class="kpi-value" style="color: #34D399;">2 Çalışan / 1 Boşta</div>
+        <div class="kpi-sub">PHP 8.5 & 8.3 · FastCGI Sockets</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">MariaDB 13.0.2</div>
+        <div class="kpi-value" style="color: #60A5FA;">0.38 ms Gecikme</div>
+        <div class="kpi-sub">SELECT 1; Probe · 3 Veritabanı</div>
+      </div>
+    </div>
+
+    <!-- Tech Grid -->
+    <div class="tech-grid">
+      <!-- Card A: Nginx Reverse Proxy -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">Nginx 1.31.7 Ters Proxy Ağ Geçidi</div>
+              <div class="service-meta">Unprivileged Loopback Master Process (PID 62010)</div>
+            </div>
+          </div>
+          <span class="badge-health">● DOĞRULANDI</span>
+        </div>
+
+        <div class="property-list">
+          <div class="prop-row">
+            <span class="prop-k">Binary Yolu</span>
+            <span class="prop-v">/opt/homebrew/bin/nginx</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Yapılandırma Dosyası</span>
+            <span class="prop-v">~/.localforge/conf/nginx.conf</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Port Dinleme Sahipliği</span>
+            <span class="prop-v" style="color: #10B981;">Doğrulandı (Yabancı dinleyici yok)</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; font-weight: 600; color: #FFFFFF; letter-spacing: 0.05em; text-transform: uppercase;">
+          Sanal Host & FastCGI Eşleştirme Tablosu
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Host Header (.test)</th>
+              <th>Upstream FastCGI Soketi</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="tag-domain">stepperskip.test</td>
+              <td class="tag-sock">stepperskip.sock</td>
+              <td><span style="color: #10B981;">HTTP 200 (Canlı)</span></td>
+            </tr>
+            <tr>
+              <td class="tag-domain">store-api.test</td>
+              <td class="tag-sock">store-api.sock</td>
+              <td><span style="color: #10B981;">HTTP 200 (Canlı)</span></td>
+            </tr>
+            <tr>
+              <td class="tag-domain">client-portal.test</td>
+              <td class="tag-sock">client-portal.sock</td>
+              <td><span style="color: var(--text-muted);">Soket Kapalı (Durduruldu)</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="actions-strip">
+          <div class="action-btn primary">Yeniden Yükle (nginx -s reload)</div>
+          <div class="action-btn">Doğrula (nginx -t)</div>
+          <div class="action-btn">Erişim Logları ↗</div>
+        </div>
+      </div>
+
+      <!-- Card B: PHP-FPM Supervisor -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #34D399;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                <rect x="9" y="9" width="6" height="6"></rect>
+                <line x1="9" y1="1" x2="9" y2="4"></line>
+                <line x1="15" y1="1" x2="15" y2="4"></line>
+                <line x1="9" y1="20" x2="9" y2="23"></line>
+                <line x1="15" y1="20" x2="15" y2="23"></line>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">PHP-FPM Süreç Yöneticisi</div>
+              <div class="service-meta">Kullanıcı İzinlerinde Çoklu Sürüm Havuz İzolasyonu</div>
+            </div>
+          </div>
+          <span class="badge-health">● DOĞRULANDI</span>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Havuz / Proje</th>
+              <th>Sürüm</th>
+              <th>Process / PGID</th>
+              <th>Bellek</th>
+              <th>Soket İzinleri</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="tag-domain">stepperskip</td>
+              <td>PHP 8.5.3</td>
+              <td style="color: #818CF8;">PID 62012 (PGID 62012)</td>
+              <td>28.4 MB</td>
+              <td style="color: #10B981;">0660 (Korumalı)</td>
+            </tr>
+            <tr>
+              <td class="tag-domain">store-api</td>
+              <td>PHP 8.5.3</td>
+              <td style="color: #818CF8;">PID 62056 (PGID 62056)</td>
+              <td>34.1 MB</td>
+              <td style="color: #10B981;">0660 (Korumalı)</td>
+            </tr>
+            <tr>
+              <td class="tag-domain">client-portal</td>
+              <td>PHP 8.3.14</td>
+              <td style="color: var(--text-muted);">—</td>
+              <td>0 MB</td>
+              <td style="color: var(--text-muted);">Süreç Yok</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="property-list">
+          <div class="prop-row">
+            <span class="prop-k">PID Reuse Güvenlik Koruması</span>
+            <span class="prop-v" style="color: #10B981;">Darwin proc_pidinfo Timestamp Doğrulaması Aktif</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Root Yetkisi Gereksinimi</span>
+            <span class="prop-v" style="color: #10B981;">Sıfır Root / Non-root User UID (501)</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">FastCGI Soket Dizini</span>
+            <span class="prop-v">~/.localforge/run/</span>
+          </div>
+        </div>
+
+        <div class="actions-strip">
+          <div class="action-btn primary">Tüm Havuzları Yenile</div>
+          <div class="action-btn">PHP Hata Logları ↗</div>
+        </div>
+      </div>
+
+      <!-- Card C: MariaDB Database -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box" style="background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); color: #60A5FA;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">MariaDB 13.0.2 İzole Veritabanı</div>
+              <div class="service-meta">Dahili Güvenli Datadir · Soket Ping 0.38ms</div>
+            </div>
+          </div>
+          <span class="badge-health">● DOĞRULANDI</span>
+        </div>
+
+        <div class="property-list">
+          <div class="prop-row">
+            <span class="prop-k">Datadir Konumu</span>
+            <span class="prop-v">~/Library/Application Support/LocalForge/mariadb/</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Unix Domain Soketi</span>
+            <span class="prop-v">mariadb/run/mariadb.sock</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Loopback Port</span>
+            <span class="prop-v">127.0.0.1:13306</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Silme Güvenlik Kilidi</span>
+            <span class="prop-v" style="color: #F87171;">Devre Dışı (DatabaseDeletionUnavailable)</span>
+          </div>
+        </div>
+
+        <div class="actions-strip">
+          <div class="action-btn primary">SQL Konsolu Başlat</div>
+          <div class="action-btn">Atomik 0600 Yedek Al</div>
+        </div>
+      </div>
+
+      <!-- Card D: Port Conflict & Process Integrity Audit -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); color: #FBBF24;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">Port Sahipliği & Çakışma Denetimi</div>
+              <div class="service-meta">lsof + KERN_PROCARGS2 Kernel Doğrulaması</div>
+            </div>
+          </div>
+          <span class="badge-health">● ÇAKIŞMA YOK</span>
+        </div>
+
+        <div class="security-callout">
+          <div>
+            <div class="callout-title">Port 8080 Doğrulandı & Güvende</div>
+            <div class="callout-desc">İlgisiz süreçler veya üçüncü parti Nginx örnekleri engellenir.</div>
+          </div>
+          <span style="color: #10B981; font-weight: 700;">FAIL-CLOSED</span>
+        </div>
+
+        <div class="property-list">
+          <div class="prop-row">
+            <span class="prop-k">Port 8080 Dinleyici Sayısı</span>
+            <span class="prop-v">1 (PID 62010 - LocalForge Nginx)</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Yabancı Süreç Varlığı</span>
+            <span class="prop-v" style="color: #10B981;">0 Saptandı</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Komut Satırı Bayrak Eşleşmesi</span>
+            <span class="prop-v" style="color: #10B981;">-p & -c Kanonik Tam Eşleşme (Substring Yok)</span>
+          </div>
+        </div>
+
+        <div class="actions-strip">
+          <div class="action-btn primary">Canlı Port Taraması Yap</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

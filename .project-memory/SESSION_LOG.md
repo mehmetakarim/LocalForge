@@ -437,3 +437,46 @@ This document records the chronological engineering log for all development sess
    - `cargo clippy --all-targets -- -D warnings`: 0 warnings.
    - `npm run build`: Vite v6.4.4 + tsc clean build (0 errors).
    - Formulated high-fidelity Direction A+ visual proposals for 4 core views awaiting Product Owner approval.
+
+---
+
+## Session 013 — Phase R1.3B Visual Design Gate & Narrow Reliability Review
+
+- **Date**: 2026-10-20
+- **Participants**: Principal Software Architect, Senior Rust Security Engineer, Lead UI Designer, QA Lead
+- **Authorized Phase**: **Phase R1.3B Visual Design Gate**
+- **Git Branch**: `phase-r1/r1-3b-preparation`
+
+### Summary of Activities
+1. **Task A — Final Narrow Nginx Reliability Review**:
+   - Refactored `is_localforge_nginx_cmdline(&self, args: &[String])` to enforce exact canonical path matching for configuration file (`-c`) and prefix (`-p`) via `dunce::canonicalize`.
+   - Strictly eliminated accidental substring path matches (`arg.contains(...)`), preventing directory traversal or path prefix spoofing attacks (e.g. `/tmp/attacker/<conf_dir>/nginx.conf`).
+   - Added support for attached command-line arguments (`-c<path>`, `-p<path>`).
+   - Hardened `check_gateway_health()` so that if ANY listening process on the gateway port is unverified or foreign, it immediately fails closed to `GatewayHealth::PortConflict`, even if a legitimate LocalForge Nginx process also listens on the port.
+   - Added unit test: `test_is_localforge_nginx_cmdline_exact_path_matching_and_substring_rejection` in `crates/runtime/src/nginx.rs`.
+   - Added adversarial integration test: `test_r1_3b_prep_04_adversarial_cmdline_spoofing_and_substring_matching_fails_closed` in `crates/runtime/tests/runtime_integration_test.rs`.
+2. **Task B — High-Fidelity Native Workspace Design**:
+   - Authored four 1600×1000 standalone HTML prototypes implementing the approved Direction A+ Spatial Studio visual reference:
+     * `docs/design/r1_3b/projects_workspace.html`
+     * `docs/design/r1_3b/services_runtime.html`
+     * `docs/design/r1_3b/storage_volumes.html`
+     * `docs/design/r1_3b/project_inspector.html`
+   - Rendered full-resolution PNG screenshots using headless Chrome automation with genuine Apple Silicon macOS display parameters:
+     * `docs/design/r1_3b/projects_workspace.png` (184 KB)
+     * `docs/design/r1_3b/services_runtime.png` (229 KB)
+     * `docs/design/r1_3b/storage_volumes.png` (166 KB)
+     * `docs/design/r1_3b/project_inspector.png` (160 KB)
+   - Formulated unified interaction model (dock shortcuts, `⌘K` command capsule, Esc drawer dismissal, high information density for runtime diagnostics).
+3. **Task C — Data Capability Mapping & Log Safeguards**:
+   - Produced rigorous mapping of all displayed UI elements to existing and proposed backend commands.
+   - Specified log streaming architecture: 200-line memory-bounded ring buffer, file permission constraints (0640/0660), credential redaction rules, and frozen pause state.
+4. **Safety Verification**:
+   - Database deletion confirmed strictly disabled (`DatabaseDeletionUnavailable`).
+   - SFTP non-dry-run confirmed fail-closed (`DeploymentNotImplemented`).
+   - APFS volume barrier and Darwin process identity safeguards maintained without weakening.
+5. **Comprehensive Verification**:
+   - Cargo workspace tests: 57 passed, 0 failed (up from 55).
+   - Frontend tests: 16 passed, 0 failed. Total: 73 passed, 0 failed (%100 PASS).
+   - `cargo fmt --check`: 0 diffs.
+   - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+   - `npm --prefix apps/desktop run build`: Clean TypeScript compilation & Vite bundle (0 errors).

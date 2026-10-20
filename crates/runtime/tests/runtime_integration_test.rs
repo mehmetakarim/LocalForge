@@ -702,3 +702,25 @@ fn test_r1_3b_prep_03_adversarial_legitimate_nginx_exists_but_unrelated_process_
     // 6. Clean up legitimate Nginx instance
     let _ = legitimate_sup.stop();
 }
+
+#[test]
+fn test_r1_3b_prep_04_adversarial_cmdline_spoofing_and_substring_matching_fails_closed() {
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let conf_dir = dir.path().join("conf");
+    let run_dir = dir.path().join("run");
+    std::fs::create_dir_all(&conf_dir).unwrap();
+    let conf_file = conf_dir.join("nginx.conf");
+    std::fs::write(&conf_file, b"events {}\nhttp {}\n").unwrap();
+
+    let sup = NginxSupervisor::new(conf_dir.clone(), run_dir, 18099, pm);
+
+    // Substring attempt: /tmp/attacker/path_to_conf/nginx.conf
+    let attack_arg = format!("/tmp/attacker{}", conf_file.to_string_lossy());
+    let attack_cmdline = vec!["nginx".into(), "-c".into(), attack_arg];
+
+    assert!(
+        !sup.is_localforge_nginx_cmdline(&attack_cmdline),
+        "Adversarial substring attack must be strictly rejected"
+    );
+}

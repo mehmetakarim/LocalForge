@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>LocalForge R1.3B — Detailed Project Inspector Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg-canvas: #07090F;
+    --bg-window: rgba(10, 13, 22, 0.94);
+    --bg-card: rgba(18, 24, 38, 0.72);
+    --border-specular: rgba(255, 255, 255, 0.20);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --glow-emerald: rgba(16, 185, 129, 0.35);
+    --glow-indigo: rgba(99, 102, 241, 0.30);
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.65);
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: var(--bg-canvas);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 40% 18%, rgba(30, 44, 82, 0.45) 0%, rgba(10, 13, 22, 0.96) 65%, #07090F 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: var(--bg-window);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  /* Titlebar */
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    z-index: 50;
+    background: rgba(10, 13, 22, 0.4);
+    backdrop-filter: blur(20px);
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 140px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .titlebar-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .titlebar-center span.active-tab {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  /* Workspace Layout with Slide-Over Drawer */
+  .layout-body {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Left Dock */
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 10px;
+    border-radius: 26px;
+    background: rgba(16, 21, 34, 0.60);
+    backdrop-filter: blur(36px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.7);
+    z-index: 40;
+  }
+  .dock-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(99, 102, 241, 0.50);
+  }
+  .dock-btn svg { width: 20px; height: 20px; stroke-width: 1.8; }
+
+  /* Background Dimmed Stage */
+  .dimmed-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 40px 40px 40px 104px;
+    opacity: 0.35;
+    filter: blur(3px);
+    pointer-events: none;
+  }
+  .mini-card {
+    width: 280px;
+    height: 400px;
+    background: rgba(18, 24, 38, 0.6);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 20px;
+  }
+
+  /* Slide-Over Inspector Drawer (Right 520px) */
+  .inspector-drawer {
+    width: 520px;
+    height: 100%;
+    background: rgba(12, 16, 28, 0.88);
+    backdrop-filter: blur(45px) saturate(210%);
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.75);
+    display: flex;
+    flex-direction: column;
+    z-index: 60;
+    overflow-y: auto;
+  }
+
+  .drawer-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(12, 16, 28, 0.95);
+    backdrop-filter: blur(30px);
+    z-index: 10;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .close-btn:hover { background: rgba(255, 255, 255, 0.12); color: #FFF; }
+  .drawer-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+
+  .drawer-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .badge-running {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.30);
+    color: #10B981;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+  }
+
+  /* Quick Actions Strip */
+  .quick-strip {
+    display: flex;
+    gap: 10px;
+  }
+  .btn-strip {
+    flex: 1;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-stop {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.30);
+    color: #F87171;
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: var(--text-secondary);
+  }
+
+  /* Section Card */
+  .section-card {
+    background: rgba(18, 24, 38, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: #A5B4FC;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .info-table {
+    width: 100%;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    border-collapse: collapse;
+  }
+  .info-table td {
+    padding: 6px 0;
+  }
+  .info-table td.k { color: var(--text-muted); width: 42%; }
+  .info-table td.v { color: var(--text-primary); font-weight: 500; }
+
+  /* cURL Box */
+  .curl-box {
+    background: rgba(8, 11, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #818CF8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .copy-tag {
+    font-size: 9px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #FFF;
+    cursor: pointer;
+  }
+
+  /* Bounded Log Viewer */
+  .log-container {
+    background: rgba(6, 9, 16, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+  .log-tabs {
+    display: flex;
+    gap: 8px;
+  }
+  .log-tab {
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .log-tab.active {
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  .log-body {
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    height: 120px;
+    overflow-y: hidden;
+  }
+  .log-200 { color: #10B981; }
+  .log-time { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="studio-backdrop"></div>
+
+<div class="macos-window">
+  <!-- Titlebar -->
+  <div class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">
+      <span>LOCALFORGE SPATIAL STUDIO</span>
+      <span>/</span>
+      <span class="active-tab">PROJE DENETLEYİCİSİ (INSPECTOR)</span>
+    </div>
+    <div style="font-size: 11px; font-family: var(--font-mono); color: #10B981;">
+      ● stepperskip.test SEÇİLDİ
+    </div>
+  </div>
+
+  <div class="layout-body">
+    <!-- Floating Left Dock -->
+    <div class="left-dock">
+      <div class="dock-btn active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+        </svg>
+      </div>
+      <div class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="2" y="4" width="20" height="8" rx="2"></rect>
+          <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+        </svg>
+      </div>
+      <div class="dock-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Dimmed Background Stage -->
+    <div class="dimmed-stage">
+      <div class="mini-card" style="border-top-color: #10B981;">
+        <div style="font-weight: 700; color: #FFF; font-size: 18px;">stepperskip.test</div>
+        <div style="font-size: 11px; font-family: var(--font-mono); color: #10B981; margin-top: 6px;">● RUNNING</div>
+      </div>
+      <div class="mini-card">
+        <div style="font-weight: 700; color: #FFF; font-size: 18px;">client-portal.test</div>
+        <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 6px;">○ STOPPED</div>
+      </div>
+      <div class="mini-card" style="border-top-color: #10B981;">
+        <div style="font-weight: 700; color: #FFF; font-size: 18px;">store-api.test</div>
+        <div style="font-size: 11px; font-family: var(--font-mono); color: #10B981; margin-top: 6px;">● RUNNING</div>
+      </div>
+    </div>
+
+    <!-- Slide-Over Inspector Drawer -->
+    <div class="inspector-drawer">
+      <div class="drawer-header">
+        <div class="header-left">
+          <div class="close-btn" title="Kapat (Esc)">✕</div>
+          <div class="drawer-title">stepperskip.test</div>
+        </div>
+        <span class="badge-running">● RUNNING</span>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Quick Action Strip -->
+        <div class="quick-strip">
+          <div class="btn-strip btn-stop">■ Durdur</div>
+          <div class="btn-strip btn-secondary">Terminalde Aç</div>
+          <div class="btn-strip btn-secondary">Finder'da Göster</div>
+        </div>
+
+        <!-- Section 1: Process & Telemetry -->
+        <div class="section-card">
+          <div class="section-title">Süreç & FastCGI Telemetrisi</div>
+          <table class="info-table">
+            <tr>
+              <td class="k">FastCGI Soket</td>
+              <td class="v" style="color: #818CF8;">~/.localforge/run/stepperskip.sock</td>
+            </tr>
+            <tr>
+              <td class="k">Process / PGID</td>
+              <td class="v">PID 62012 (PGID 62012)</td>
+            </tr>
+            <tr>
+              <td class="k">Başlatma Zamanı</td>
+              <td class="v">2026-10-20 22:30:11 UTC</td>
+            </tr>
+            <tr>
+              <td class="k">Bellek / CPU</td>
+              <td class="v">28.4 MB · %0.2 CPU</td>
+            </tr>
+            <tr>
+              <td class="k">PHP Çalıştırıcı</td>
+              <td class="v">/opt/homebrew/opt/php@8.5/sbin/php-fpm</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Section 2: Loopback cURL Helper -->
+        <div class="section-card">
+          <div class="section-title">Yerel Ağ Geçidi & cURL Testi</div>
+          <div style="font-size: 11px; color: var(--text-secondary);">
+            DNS resolver henüz yapılandırılmadıysa Host başlığı ile test edin:
+          </div>
+          <div class="curl-box">
+            <span>curl -I -H "Host: stepperskip.test" http://127.0.0.1:8080/</span>
+            <span class="copy-tag">KOPYALA</span>
+          </div>
+        </div>
+
+        <!-- Section 3: Storage & APFS Identity -->
+        <div class="section-card">
+          <div class="section-title">Depolama & APFS Birim Kimliği</div>
+          <table class="info-table">
+            <tr>
+              <td class="k">Harici Dizin Yolu</td>
+              <td class="v">/Volumes/Mac Harici Disk/Projects/stepperskip</td>
+            </tr>
+            <tr>
+              <td class="k">Doküman Kökü</td>
+              <td class="v">public/ (index.php)</td>
+            </tr>
+            <tr>
+              <td class="k">Birim UUID</td>
+              <td class="v">E2399201-9C99-4A9B-89E1-00293481AB42</td>
+            </tr>
+            <tr>
+              <td class="k">VolumeBarrier</td>
+              <td class="v" style="color: #10B981;">Aktif (Fail-Closed Korumalı)</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Section 4: Live Bounded Log Stream -->
+        <div class="section-card">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div class="section-title">Canlı Log Akışı (Son 200 Satır)</div>
+            <span style="font-size: 10px; font-family: var(--font-mono); color: #10B981;">● CANLI</span>
+          </div>
+
+          <div class="log-container">
+            <div class="log-header">
+              <div class="log-tabs">
+                <span class="log-tab active">Nginx Access</span>
+                <span class="log-tab">Nginx Error</span>
+                <span class="log-tab">PHP-FPM Log</span>
+              </div>
+              <div style="color: var(--text-muted); cursor: pointer;">Dondur ⏸</div>
+            </div>
+            <div class="log-body">
+              <div><span class="log-time">[22:30:14]</span> "GET / HTTP/1.1" <span class="log-200">200 OK</span> (FastCGI: 1.2ms)</div>
+              <div><span class="log-time">[22:30:18]</span> "GET /assets/app.css HTTP/1.1" <span class="log-200">200 OK</span> (Static: 0.3ms)</div>
+              <div><span class="log-time">[22:30:22]</span> "GET /api/status HTTP/1.1" <span class="log-200">200 OK</span> (PDO: 0.8ms)</div>
+              <div><span class="log-time">[22:30:25]</span> "GET /favicon.ico HTTP/1.1" <span class="log-200">200 OK</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Database Connection -->
+        <div class="section-card">
+          <div class="section-title">İlişkili Veritabanı</div>
+          <table class="info-table">
+            <tr>
+              <td class="k">Veritabanı Adı</td>
+              <td class="v">stepperskip_prod</td>
+            </tr>
+            <tr>
+              <td class="k">Kullanıcı</td>
+              <td class="v">stepperskip_user</td>
+            </tr>
+            <tr>
+              <td class="k">Silme Koruması</td>
+              <td class="v" style="color: #F87171;">Kilitli (R1.3B Kapsam Dışı)</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

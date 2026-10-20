@@ -6,13 +6,13 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.3B Preparation — Backend Reliability & Safety Hardening**
+- **Active Phase**: **Phase R1.3B Visual Design Gate & Narrow Reliability Review**
 - **Phase Status**: COMPLETED / AWAITING PRODUCT OWNER APPROVAL FOR R1.3B
 - **Active Branch**: `phase-r1/r1-3b-preparation`
-- **Previous Phase Status**: **Phase R1.3A-V1 (Final Acceptance Patch - Accepted)**
+- **Previous Phase Status**: **Phase R1.3B Preparation (Conditionally Accepted)**
 - **Approved Design Baseline**: **Direction A+ Spatial Studio Stage (1600×1000 Baseline)**.
-- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes & Patch - Accepted), R1.3B Preparation (Nginx Ownership, Metadata Error Propagation, SQLite Persistence - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
-- **Test Matrix Status**: 55/55 automated Rust tests pass across workspace; 16/16 automated frontend tests pass (71 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; verified Nginx process ownership & port conflict detection via `find_listening_pids` and `get_process_cmdline`; safe SQLite persistent metadata storage with dynamic service reconnection without ephemeral fallback; database deletion strictly excluded and locked to `DatabaseDeletionUnavailable`.
+- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes & Patch - Accepted), R1.3B Preparation (Nginx Ownership, Metadata Error Propagation, SQLite Persistence - Completed), R1.3B Visual Design Gate (Task A Nginx Path Matching, Task B 4 High-Fidelity Prototypes & PNGs, Task C Data Mapping - Completed), R1.3B (Native Workspace Implementation - Next).
+- **Test Matrix Status**: 57/57 automated Rust tests pass across workspace; 16/16 automated frontend tests pass (73 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; canonical exact path matching in `is_localforge_nginx_cmdline` with strict substring spoofing rejection; fail-closed `check_gateway_health` when any foreign listener coexists; 4 high-fidelity Direction A+ prototypes rendered to PNG (Projects, Services, Storage, Inspector); database deletion strictly excluded and locked to `DatabaseDeletionUnavailable`.
 
 ---
 

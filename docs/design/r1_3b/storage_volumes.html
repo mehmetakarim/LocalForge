@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>LocalForge R1.3B — Storage & APFS Volumes Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --bg-canvas: #07090F;
+    --bg-window: rgba(10, 13, 22, 0.94);
+    --bg-card: rgba(18, 24, 38, 0.72);
+    --border-specular: rgba(255, 255, 255, 0.20);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --glow-emerald: rgba(16, 185, 129, 0.35);
+    --glow-indigo: rgba(99, 102, 241, 0.30);
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.65);
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: var(--bg-canvas);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 15%, rgba(30, 44, 82, 0.45) 0%, rgba(10, 13, 22, 0.96) 65%, #07090F 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .halo-top {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1000px;
+    height: 500px;
+    background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.14) 0%, rgba(99, 102, 241, 0.10) 45%, transparent 75%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: var(--bg-window);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .macos-titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    z-index: 50;
+    background: rgba(10, 13, 22, 0.4);
+    backdrop-filter: blur(20px);
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 140px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .titlebar-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .titlebar-center span.active-tab {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .titlebar-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .telemetry-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+  }
+
+  /* Slender Floating Left Dock */
+  .left-dock {
+    position: absolute;
+    left: 28px;
+    top: 130px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 10px;
+    border-radius: 26px;
+    background: rgba(16, 21, 34, 0.60);
+    backdrop-filter: blur(36px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.7);
+    z-index: 40;
+  }
+  .dock-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.45);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+  }
+  .dock-btn:hover {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .dock-btn.active {
+    color: #FFFFFF;
+    background: rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(99, 102, 241, 0.50);
+    box-shadow: 0 0 18px rgba(99, 102, 241, 0.40);
+  }
+  .dock-btn svg { width: 20px; height: 20px; stroke-width: 1.8; }
+  .dock-divider { width: 24px; height: 1px; background: rgba(255, 255, 255, 0.08); margin: 2px 0; }
+
+  /* Workspace Content */
+  .workspace-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 40px 24px 104px;
+    gap: 20px;
+    z-index: 20;
+    overflow-y: auto;
+  }
+
+  /* KPI Summary Row */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .kpi-card {
+    background: rgba(18, 24, 38, 0.55);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kpi-title {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .kpi-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  /* Two Column Main Technical Grid */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 20px;
+  }
+
+  .tech-card {
+    background: rgba(18, 24, 38, 0.65);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 22px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 14px;
+  }
+  .service-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .service-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #10B981;
+  }
+  .service-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+  .service-meta {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+  }
+
+  .badge-health {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.30);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: #10B981;
+  }
+
+  /* Storage Meter Bar */
+  .storage-meter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(10, 14, 24, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .bar-container {
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    display: flex;
+  }
+  .bar-segment-projects {
+    width: 15%;
+    background: linear-gradient(90deg, #6366F1, #818CF8);
+  }
+  .bar-segment-other {
+    width: 70%;
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .bar-segment-free {
+    width: 15%;
+    background: transparent;
+  }
+  .bar-legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+  }
+
+  /* Tables */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .data-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .data-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+  }
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .property-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(10, 14, 24, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .prop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .prop-k { color: var(--text-muted); }
+  .prop-v { color: var(--text-primary); font-weight: 500; }
+
+  .actions-strip {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+  }
+  .action-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #FFFFFF;
+  }
+  .action-btn.primary {
+    background: rgba(16, 185, 129, 0.20);
+    border: 1px solid rgba(16, 185, 129, 0.40);
+    color: #FFFFFF;
+  }
+  .action-btn.primary:hover {
+    background: rgba(16, 185, 129, 0.35);
+  }
+</style>
+</head>
+<body>
+
+<div class="studio-backdrop"></div>
+<div class="halo-top"></div>
+
+<div class="macos-window">
+  <!-- Titlebar -->
+  <div class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+    <div class="titlebar-center">
+      <span>LOCALFORGE SPATIAL STUDIO</span>
+      <span>/</span>
+      <span class="active-tab">DEPOLAMA & HARİCİ APFS BİRİMLERİ</span>
+    </div>
+    <div class="titlebar-right">
+      <div class="telemetry-pill">
+        <div class="sync-dot"></div>
+        <span>VOLUMEBARRIER ACTIVE (FAIL-CLOSED)</span>
+      </div>
+      <div class="telemetry-pill">
+        <span style="color: #10B981;">931 GiB APFS EXTERNAL SSD</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Dock -->
+  <div class="left-dock">
+    <div class="dock-btn" title="Projeler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+      </svg>
+    </div>
+    <div class="dock-btn" title="Altyapı & Servisler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="2" y="4" width="20" height="8" rx="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+        <line x1="6" y1="8" x2="6" y2="8.01"></line>
+        <line x1="6" y1="18" x2="6" y2="18.01"></line>
+      </svg>
+    </div>
+    <div class="dock-btn active" title="Depolama & Diskler">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+      </svg>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-btn" title="CLI & Ayarlar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="workspace-content">
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-title">Aktif Harici Birim</div>
+        <div class="kpi-value">
+          <div class="sync-dot"></div>
+          <span>Mac Harici Disk</span>
+        </div>
+        <div class="kpi-sub">APFS Encrypted · UUID Doğrulandı</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">VolumeBarrier Güvenliği</div>
+        <div class="kpi-value" style="color: #10B981;">FAIL-CLOSED</div>
+        <div class="kpi-sub">Sökülme durumunda sahte dizin engeli</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Dahili DB İzolasyonu</div>
+        <div class="kpi-value" style="color: #818CF8;">Macintosh HD</div>
+        <div class="kpi-sub">~/Library/Application Support/</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Boş Alan (Harici)</div>
+        <div class="kpi-value" style="color: #60A5FA;">135 GiB Boş</div>
+        <div class="kpi-sub">931 GiB Toplam Kapasite</div>
+      </div>
+    </div>
+
+    <!-- Tech Grid -->
+    <div class="tech-grid">
+      <!-- Left: External APFS Volume -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">Harici APFS Proje Birimi (/Volumes/Mac Harici Disk)</div>
+              <div class="service-meta">Hardware UUID: E2399201-9C99-4A9B-89E1-00293481AB42</div>
+            </div>
+          </div>
+          <span class="badge-health">● KORUMALI & BAĞLI</span>
+        </div>
+
+        <div class="storage-meter">
+          <div class="bar-legend">
+            <span>Kapasite Kullanım Dağılımı</span>
+            <span style="color: #818CF8;">14.8 GiB LocalForge Projeleri (3 Proje)</span>
+          </div>
+          <div class="bar-container">
+            <div class="bar-segment-projects" title="LocalForge Projeleri: 14.8 GiB"></div>
+            <div class="bar-segment-other" title="Diğer Veriler: 781.2 GiB"></div>
+            <div class="bar-segment-free" title="Boş Alan: 135 GiB"></div>
+          </div>
+          <div class="bar-legend" style="color: var(--text-muted); font-size: 10px;">
+            <span>■ LocalForge: 14.8 GiB</span>
+            <span>■ Diğer: 781.2 GiB</span>
+            <span>□ Boş: 135 GiB</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; font-weight: 600; color: #FFFFFF; letter-spacing: 0.05em; text-transform: uppercase;">
+          Harici Disk Proje Dizin Envanteri
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Proje</th>
+              <th>Bağıl Yol</th>
+              <th>Boyut</th>
+              <th>Yedek Durumu (0600)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color: #FFFFFF; font-weight: 600;">stepperskip</td>
+              <td>Projects/stepperskip/public</td>
+              <td>6.2 GB</td>
+              <td><span style="color: #10B981;">● 0600 Atomik Yedek Var</span></td>
+            </tr>
+            <tr>
+              <td style="color: #FFFFFF; font-weight: 600;">store-api</td>
+              <td>Projects/store-api/public</td>
+              <td>4.8 GB</td>
+              <td><span style="color: #10B981;">● 0600 Atomik Yedek Var</span></td>
+            </tr>
+            <tr>
+              <td style="color: #FFFFFF; font-weight: 600;">client-portal</td>
+              <td>Projects/client-portal/public</td>
+              <td>3.8 GB</td>
+              <td><span style="color: #10B981;">● 0600 Atomik Yedek Var</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="actions-strip">
+          <div class="action-btn primary">Birim Sağlık Testi Çalıştır</div>
+          <div class="action-btn">Finder'da Göster ↗</div>
+        </div>
+      </div>
+
+      <!-- Right: Internal Storage & Safeguards -->
+      <div class="tech-card">
+        <div class="card-top">
+          <div class="service-heading">
+            <div class="service-icon-box" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.3); color: #818CF8;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div>
+              <div class="service-title">Dahili Sistem & İzolasyon</div>
+              <div class="service-meta">getpwuid Çözümlü Uygulama Desteği</div>
+            </div>
+          </div>
+          <span class="badge-health">● AKTİF</span>
+        </div>
+
+        <div class="property-list">
+          <div class="prop-row">
+            <span class="prop-k">Uygulama Destek Dizini</span>
+            <span class="prop-v">~/Library/Application Support/LocalForge/</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">MariaDB Datadir (İç Disk)</span>
+            <span class="prop-v">mariadb/data (182 MB)</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">Kalıcı Metadata (SQLite)</span>
+            <span class="prop-v">localforge.db (1.2 MB WAL)</span>
+          </div>
+          <div class="prop-row">
+            <span class="prop-k">VolumeBarrier Koruması</span>
+            <span class="prop-v" style="color: #10B981;">Dahili Diske Sızma Engelli</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; font-weight: 600; color: #FFFFFF; letter-spacing: 0.05em; text-transform: uppercase;">
+          Güvenlik ve Çıkarma Politikası
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5; background: rgba(10, 14, 24, 0.4); padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.04);">
+          Harici SSD bağlantısı koptuğunda LocalForge, internal disk üzerinde eksik dizinleri otomatik oluşturmaz (<span style="color: #10B981; font-family: var(--font-mono);">VolumeBarrier</span>). Çalışan projeler güvenli biçimde durdurulur ve veri kaybı önlenir.
+        </div>
+
+        <div class="actions-strip">
+          <div class="action-btn">Güvenli Çıkarma Kontrolü</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

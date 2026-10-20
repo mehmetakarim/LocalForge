@@ -6,7 +6,7 @@
 
 ## 1. Current Status
 
-- **Current State**: **R1.3B Preparation — Completed & Reliability Review / Visual Proposals Awaiting Approval**
+- **Current State**: **R1.3B Visual Design Gate & Narrow Reliability Review — Completed & Awaiting Approval**
 - **Active Git Branch**: `phase-r1/r1-3b-preparation`
 - **Target Remote**: `origin/phase-r1/r1-3b-preparation`
 - **Previous Milestone Status**:
@@ -14,13 +14,14 @@
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
   - **Phase R1.3A-V Stage B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V1 Final Acceptance Patch**: ACCEPTED by Product Owner.
-  - **R1.3B Preparation**: COMPLETED & VERIFIED (Nginx process ownership via `find_listening_pids` and sysctl cmdline config inspection, SQLite persistent metadata recovery guard & dynamic service reconnection, metadata query error propagation, 55 Rust + 16 frontend tests pass, database deletion strictly excluded from R1.3B).
-- **Completed Tasks in R1.3B Preparation**:
-  - `TASK-R1.3B-PREP-01`: Verified Nginx ownership against listening PIDs, legitimate binary paths, and config directory matches; reports port conflicts for unverified occupants or unrelated listeners. Adversarial test verified.
-  - `TASK-R1.3B-PREP-02`: Removed `list_projects().unwrap_or_default()`, propagating database errors explicitly as UNKNOWN or error responses.
-  - `TASK-R1.3B-PREP-03`: Removed silent `open_in_memory()` fallback; isolated temporary store; dynamic reconnection of `ProjectService` and `ProjectRuntimeService` to recovered persistent database without stale references. Recovery test verified.
-  - `TASK-R1.3B-PREP-04`: Verified with 55 Rust tests and 16 frontend automated regression tests (71/71 PASS).
-- **Next Permitted Action**: Submit reliability findings, adversarial test results, scope lock, and high-fidelity Direction A+ visual proposals for the 4 core views to Product Owner. Await explicit review and authorization before proceeding with R1.3B code implementation.
+  - **R1.3B Preparation**: CONDITIONALLY ACCEPTED by Product Owner.
+  - **R1.3B Visual Design Gate**: COMPLETED (Exact path matching in `is_localforge_nginx_cmdline`, substring spoofing rejection, fail-closed multi-listener conflict handling, 4 high-fidelity visual prototypes & rendered PNGs in `docs/design/r1_3b/`, full data capability mapping, 57 Rust + 16 frontend tests pass).
+- **Completed Tasks in R1.3B Gate**:
+  - `TASK-R1.3B-PREP-01`: Exact canonical path matching for Nginx config and prefix, elimination of substring matching, fail-closed multi-listener conflict handling.
+  - `TASK-R1.3B-PREP-04`: Verified with 57 Rust tests and 16 frontend automated tests (73/73 PASS).
+  - `TASK-R1.3B-GATE-01`: 4 1600x1000 Direction A+ HTML prototypes and rendered PNG screenshots in `docs/design/r1_3b/`.
+  - `TASK-R1.3B-GATE-02`: Comprehensive Data Capability Mapping and bounded log specification.
+- **Next Permitted Action**: Submit Visual Design Gate report with PNG screenshots and data capability mapping to Product Owner. Await explicit review and selection before proceeding with R1.3B code implementation.
 
 ---
 

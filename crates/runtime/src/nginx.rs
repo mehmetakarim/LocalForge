@@ -447,36 +447,56 @@ fastcgi_param  REDIRECT_STATUS    200;
     }
 
     /// Checks if command line arguments match LocalForge Nginx configuration.
+    ///
+    /// Requires exact canonical path matches for configuration (`-c`) and prefix (`-p`).
+    /// Accidental substring matches (e.g. `/tmp/spoof/<conf_dir>/nginx.conf`) are strictly rejected.
     pub fn is_localforge_nginx_cmdline(&self, args: &[String]) -> bool {
-        let expected_conf = self.conf_dir.join("nginx.conf");
-        let expected_conf_str = expected_conf.to_string_lossy();
-        let expected_dir_str = self.conf_dir.to_string_lossy();
+        let expected_conf = dunce::canonicalize(self.conf_dir.join("nginx.conf"))
+            .unwrap_or_else(|_| self.conf_dir.join("nginx.conf"));
+        let expected_dir =
+            dunce::canonicalize(&self.conf_dir).unwrap_or_else(|_| self.conf_dir.clone());
 
-        let mut has_conf = false;
-        let mut has_prefix = false;
+        let mut observed_conf: Option<PathBuf> = None;
+        let mut observed_prefix: Option<PathBuf> = None;
 
-        for (i, arg) in args.iter().enumerate() {
+        let mut iter = args.iter().peekable();
+        while let Some(arg) = iter.next() {
             if arg == "-c" {
-                if let Some(next) = args.get(i + 1) {
-                    if next == expected_conf_str.as_ref() || next.contains(&*expected_dir_str) {
-                        has_conf = true;
-                    }
+                if let Some(next) = iter.next() {
+                    let p = PathBuf::from(next);
+                    observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
                 }
-            } else if arg.starts_with("-c") && arg.contains(&*expected_dir_str) {
-                has_conf = true;
-            }
-            if arg == "-p" {
-                if let Some(next) = args.get(i + 1) {
-                    if next == expected_dir_str.as_ref() || next.contains(&*expected_dir_str) {
-                        has_prefix = true;
-                    }
+            } else if let Some(stripped) = arg.strip_prefix("-c") {
+                if !stripped.is_empty() {
+                    let p = PathBuf::from(stripped);
+                    observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
                 }
-            } else if arg.starts_with("-p") && arg.contains(&*expected_dir_str) {
-                has_prefix = true;
+            } else if arg == "-p" {
+                if let Some(next) = iter.next() {
+                    let p = PathBuf::from(next);
+                    observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
+                }
+            } else if let Some(stripped) = arg.strip_prefix("-p") {
+                if !stripped.is_empty() {
+                    let p = PathBuf::from(stripped);
+                    observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
+                }
             }
         }
 
-        has_conf || has_prefix
+        // Exact canonical match required for the configuration file
+        let conf_matches = match observed_conf {
+            Some(ref c) => c == &expected_conf,
+            None => false,
+        };
+
+        // If prefix is provided, it must match expected_dir exactly
+        let prefix_matches = match observed_prefix {
+            Some(ref p) => p == &expected_dir,
+            None => true,
+        };
+
+        conf_matches && prefix_matches
     }
 
     /// Evaluates the true ownership, process identity and operational health of the gateway.
@@ -535,7 +555,10 @@ fastcgi_param  REDIRECT_STATUS    200;
             };
         }
 
-        // 3. For each listening PID, verify whether it belongs to LocalForge's Nginx
+        // 3. For each listening PID, verify whether it belongs to LocalForge's Nginx.
+        // If ANY listening process is unrelated or foreign, we must fail closed to PortConflict
+        // even if a legitimate LocalForge process is also present on the port.
+        let mut verified_localforge_pids = Vec::new();
         let mut first_conflict = None;
 
         for &lpid in &listening_pids {
@@ -604,17 +627,29 @@ fastcgi_param  REDIRECT_STATUS    200;
                     _ => false,
                 };
 
-                if cmdline_matches && (disk_pid == Some(lpid) || disk_pid == Some(identity.pgid)) {
-                    *lock = Some((identity.clone(), None));
-                    is_localforge = true;
+                if let Some(dpid) = disk_pid {
+                    if let Ok(Some(disk_master_id)) = self.process_manager.inspect_process(dpid) {
+                        if Self::is_legitimate_nginx_binary(disk_master_id.executable_path()) {
+                            let disk_cmdline_matches =
+                                match self.process_manager.get_process_cmdline(dpid) {
+                                    Ok(Some(args)) => self.is_localforge_nginx_cmdline(&args),
+                                    _ => false,
+                                };
+                            if disk_cmdline_matches
+                                && (lpid == dpid
+                                    || identity.pgid == disk_master_id.pgid
+                                    || cmdline_matches)
+                            {
+                                *lock = Some((disk_master_id, None));
+                                is_localforge = true;
+                            }
+                        }
+                    }
                 }
             }
 
             if is_localforge {
-                return GatewayHealth::Running {
-                    pid: lpid,
-                    port: self.listen_port,
-                };
+                verified_localforge_pids.push(lpid);
             } else if first_conflict.is_none() {
                 first_conflict = Some(GatewayHealth::PortConflict {
                     port: self.listen_port,
@@ -625,6 +660,18 @@ fastcgi_param  REDIRECT_STATUS    200;
                     ),
                 });
             }
+        }
+
+        // An unrelated listener must never be masked even if a legitimate LocalForge process also listens.
+        if let Some(conflict) = first_conflict {
+            return conflict;
+        }
+
+        if let Some(&first_pid) = verified_localforge_pids.first() {
+            return GatewayHealth::Running {
+                pid: first_pid,
+                port: self.listen_port,
+            };
         }
 
         if let Some(conflict) = first_conflict {
@@ -772,5 +819,96 @@ mod tests {
         let health_after = sup.check_gateway_health();
         assert_eq!(health_after, GatewayHealth::Stopped);
         assert!(!sup.is_gateway_alive());
+    }
+
+    #[test]
+    fn test_is_localforge_nginx_cmdline_exact_path_matching_and_substring_rejection() {
+        let dir = tempdir().unwrap();
+        let conf_dir = dir.path().join("conf");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+        let conf_file = conf_dir.join("nginx.conf");
+        std::fs::write(&conf_file, b"events {}\nhttp {}\n").unwrap();
+
+        let pm = Arc::new(MacOSProcessManager::new());
+        let sup = NginxSupervisor::new(conf_dir.clone(), dir.path().join("run"), 8080, pm);
+
+        let conf_str = conf_file.to_string_lossy().to_string();
+        let dir_str = conf_dir.to_string_lossy().to_string();
+
+        // 1. Valid invocation with -p and -c separated
+        let valid_args = vec![
+            "nginx".into(),
+            "-p".into(),
+            dir_str.clone(),
+            "-c".into(),
+            conf_str.clone(),
+        ];
+        assert!(
+            sup.is_localforge_nginx_cmdline(&valid_args),
+            "Exact canonical configuration paths must be accepted"
+        );
+
+        // 2. Valid invocation with -c alone matching exact configuration
+        let valid_args_c_only = vec!["nginx".into(), "-c".into(), conf_str.clone()];
+        assert!(
+            sup.is_localforge_nginx_cmdline(&valid_args_c_only),
+            "Exact configuration file must be accepted"
+        );
+
+        // 3. Valid invocation with attached flags (-c<path> and -p<path>)
+        let valid_args_attached = vec![
+            "nginx".into(),
+            format!("-p{}", dir_str),
+            format!("-c{}", conf_str),
+        ];
+        assert!(
+            sup.is_localforge_nginx_cmdline(&valid_args_attached),
+            "Attached flags with exact paths must be accepted"
+        );
+
+        // 4. Adversarial: Substring spoofing attack where path contains conf_dir but is actually nested elsewhere
+        let spoofed_conf = format!("/tmp/spoofed_attacker_dir{}/nginx.conf", conf_str);
+        let spoofed_args = vec![
+            "nginx".into(),
+            "-p".into(),
+            dir_str.clone(),
+            "-c".into(),
+            spoofed_conf,
+        ];
+        assert!(
+            !sup.is_localforge_nginx_cmdline(&spoofed_args),
+            "Substring path match must be strictly rejected"
+        );
+
+        // 5. Adversarial: Trailing extension tampering (e.g., nginx.conf.bak)
+        let tampered_conf = format!("{}.bak", conf_str);
+        let tampered_args = vec![
+            "nginx".into(),
+            "-p".into(),
+            dir_str.clone(),
+            "-c".into(),
+            tampered_conf,
+        ];
+        assert!(
+            !sup.is_localforge_nginx_cmdline(&tampered_args),
+            "Tampered config filename must be rejected"
+        );
+
+        // 6. Adversarial: Prefix mismatch pointing to foreign directory
+        let foreign_prefix_args = vec![
+            "nginx".into(),
+            "-p".into(),
+            "/etc/nginx".into(),
+            "-c".into(),
+            conf_str.clone(),
+        ];
+        assert!(
+            !sup.is_localforge_nginx_cmdline(&foreign_prefix_args),
+            "Conflicting prefix path must be rejected"
+        );
+
+        // 7. Empty or unrelated args
+        assert!(!sup.is_localforge_nginx_cmdline(&["nginx".into()]));
+        assert!(!sup.is_localforge_nginx_cmdline(&[]));
     }
 }
