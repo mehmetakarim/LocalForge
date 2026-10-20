@@ -61,4 +61,14 @@ pub trait ProcessManager: Send + Sync {
         expected_start_usecs: u32,
         grace_period_secs: u64,
     ) -> Result<()>;
+
+    /// Identifies the PIDs of processes listening on the given TCP port.
+    fn find_listening_pids(&self, _port: u16) -> Result<Vec<u32>> {
+        Ok(Vec::new())
+    }
+
+    /// Retrieves the command-line arguments for the given PID.
+    fn get_process_cmdline(&self, _pid: u32) -> Result<Option<Vec<String>>> {
+        Ok(None)
+    }
 }

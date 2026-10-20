@@ -26,3 +26,6 @@ localforge-storage = { path = "../../../crates/storage" }
 localforge-project-manager = { path = "../../../crates/project-manager" }
 localforge-runtime = { path = "../../../crates/runtime" }
 
+[dev-dependencies]
+tempfile.workspace = true
+

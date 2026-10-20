@@ -183,4 +183,8 @@ impl ProjectService {
 
         Ok(updated)
     }
+
+    pub fn metadata_store(&self) -> Arc<MetadataStore> {
+        self.metadata_store.clone()
+    }
 }

@@ -121,7 +121,7 @@ pub fn classify_probe_result(
 }
 
 pub struct ProjectRuntimeService {
-    metadata_store: Arc<MetadataStore>,
+    metadata_store: std::sync::RwLock<Arc<MetadataStore>>,
     volume_manager: Arc<dyn VolumeManager>,
     volume_barrier: Arc<VolumeBarrier>,
     process_manager: Arc<dyn ProcessManager>,
@@ -144,7 +144,7 @@ impl ProjectRuntimeService {
         gateway_port: u16,
     ) -> Self {
         Self {
-            metadata_store,
+            metadata_store: std::sync::RwLock::new(metadata_store),
             volume_manager,
             volume_barrier,
             process_manager,
@@ -153,6 +153,17 @@ impl ProjectRuntimeService {
             mariadb_supervisor,
             gateway_port,
         }
+    }
+
+    /// Reconnects the runtime service to a newly recovered persistent metadata store.
+    pub fn reconnect_metadata_store(&self, store: Arc<MetadataStore>) {
+        let mut lock = self.metadata_store.write().unwrap();
+        *lock = store;
+    }
+
+    /// Returns the currently active metadata store reference.
+    pub fn metadata_store(&self) -> Arc<MetadataStore> {
+        self.metadata_store.read().unwrap().clone()
     }
 
     /// Convenience constructor initializing default paths under base runtime directory.
@@ -217,8 +228,8 @@ impl ProjectRuntimeService {
 
     /// Starts development runtime for the given project.
     pub fn start_project(&self, project_id: &ProjectId) -> Result<ProjectRuntimeStatus> {
-        let project = self
-            .metadata_store
+        let store = self.metadata_store();
+        let project = store
             .get_project(project_id)?
             .ok_or_else(|| RuntimeError::ProjectNotFound(project_id.0.clone()))?;
 
@@ -227,9 +238,7 @@ impl ProjectRuntimeService {
             .volume_barrier
             .verify_volume_available(&project.path, &project.volume_uuid)
         {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Disconnected);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Disconnected);
             return Err(RuntimeError::VolumeDisconnected(e.to_string()));
         }
 
@@ -238,16 +247,12 @@ impl ProjectRuntimeService {
             .php_supervisor
             .validate_php_version(&project.php_version)
         {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Degraded);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Degraded);
             return Err(e);
         }
 
         // 3. Mark project STARTING
-        let _ = self
-            .metadata_store
-            .update_project_status(&project.id, ProjectStatus::Starting);
+        let _ = store.update_project_status(&project.id, ProjectStatus::Starting);
 
         // 4. Start isolated PHP-FPM pool
         let socket_path =
@@ -257,9 +262,7 @@ impl ProjectRuntimeService {
             {
                 Ok(sock) => sock,
                 Err(e) => {
-                    let _ = self
-                        .metadata_store
-                        .update_project_status(&project.id, ProjectStatus::Failed);
+                    let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
                     return Err(e);
                 }
             };
@@ -270,9 +273,7 @@ impl ProjectRuntimeService {
             .add_or_update_vhost(&project, &socket_path)
         {
             let _ = self.php_supervisor.stop_pool(&project.id);
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Failed);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
             return Err(e);
         }
 
@@ -282,9 +283,7 @@ impl ProjectRuntimeService {
         let nginx_alive = self.nginx_supervisor.is_gateway_alive();
 
         if !fpm_alive || !socket_alive {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Failed);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
             return Err(RuntimeError::ServiceUnhealthy {
                 service: format!("php-fpm-{}", project.id),
                 reason: "PHP-FPM worker or FastCGI socket failed immediately upon startup".into(),
@@ -292,9 +291,7 @@ impl ProjectRuntimeService {
         }
 
         if !nginx_alive {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Failed);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
             return Err(RuntimeError::ServiceUnhealthy {
                 service: "nginx".into(),
                 reason: "Nginx gateway master process is unresponsive or failed to launch".into(),
@@ -319,9 +316,7 @@ impl ProjectRuntimeService {
         let message = assessment.message().to_string();
 
         // 8. Update verified status in metadata store (never false RUNNING)
-        let _ = self
-            .metadata_store
-            .update_project_status(&project.id, final_status);
+        let _ = store.update_project_status(&project.id, final_status);
 
         let fpm_id = self.php_supervisor.get_pool_identity(&project.id);
         let nginx_id = self.nginx_supervisor.get_gateway_identity();
@@ -343,15 +338,13 @@ impl ProjectRuntimeService {
 
     /// Stops development runtime for the given project cleanly.
     pub fn stop_project(&self, project_id: &ProjectId) -> Result<ProjectRuntimeStatus> {
-        let project = self
-            .metadata_store
+        let store = self.metadata_store();
+        let project = store
             .get_project(project_id)?
             .ok_or_else(|| RuntimeError::ProjectNotFound(project_id.0.clone()))?;
 
         // 1. Mark project STOPPING
-        let _ = self
-            .metadata_store
-            .update_project_status(&project.id, ProjectStatus::Stopping);
+        let _ = store.update_project_status(&project.id, ProjectStatus::Stopping);
 
         // 2. Stop independent PHP-FPM pool (Project A stopped, Project B untouched)
         self.php_supervisor.stop_pool(&project.id)?;
@@ -360,9 +353,7 @@ impl ProjectRuntimeService {
         self.nginx_supervisor.remove_vhost(&project.id)?;
 
         // 4. Mark project STOPPED in metadata store
-        let _ = self
-            .metadata_store
-            .update_project_status(&project.id, ProjectStatus::Stopped);
+        let _ = store.update_project_status(&project.id, ProjectStatus::Stopped);
 
         Ok(ProjectRuntimeStatus {
             project_id: project.id,
@@ -381,8 +372,8 @@ impl ProjectRuntimeService {
 
     /// Returns verified runtime health status for a project.
     pub fn get_runtime_status(&self, project_id: &ProjectId) -> Result<ProjectRuntimeStatus> {
-        let project = self
-            .metadata_store
+        let store = self.metadata_store();
+        let project = store
             .get_project(project_id)?
             .ok_or_else(|| RuntimeError::ProjectNotFound(project_id.0.clone()))?;
 
@@ -393,9 +384,7 @@ impl ProjectRuntimeService {
             .is_ok();
 
         if !volume_ok {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, ProjectStatus::Disconnected);
+            let _ = store.update_project_status(&project.id, ProjectStatus::Disconnected);
 
             return Ok(ProjectRuntimeStatus {
                 project_id: project.id,
@@ -457,9 +446,7 @@ impl ProjectRuntimeService {
 
         // Sync verified status to SQLite if it diverged
         if verified_status != project.status {
-            let _ = self
-                .metadata_store
-                .update_project_status(&project.id, verified_status);
+            let _ = store.update_project_status(&project.id, verified_status);
         }
 
         Ok(ProjectRuntimeStatus {
@@ -485,16 +472,15 @@ impl ProjectRuntimeService {
     /// Propagates genuine synchronization failures and prevents stale persisted statuses
     /// from appearing as freshly verified by setting UNKNOWN state on probe errors.
     pub fn sync_all_projects_runtime_status(&self) -> Result<Vec<ProjectRuntimeStatus>> {
-        let projects = self.metadata_store.list_projects()?;
+        let store = self.metadata_store();
+        let projects = store.list_projects()?;
         let mut list = Vec::new();
         for p in projects {
             match self.get_runtime_status(&p.id) {
                 Ok(st) => list.push(st),
                 Err(e) => {
                     tracing::error!("Runtime status sync failed for project {}: {}", p.id, e);
-                    let _ = self
-                        .metadata_store
-                        .update_project_status(&p.id, ProjectStatus::Unknown);
+                    let _ = store.update_project_status(&p.id, ProjectStatus::Unknown);
                     return Err(e);
                 }
             }

@@ -268,6 +268,122 @@ impl ProcessManager for MacOSProcessManager {
 
         Ok(())
     }
+
+    fn find_listening_pids(&self, port: u16) -> Result<Vec<u32>> {
+        let output = std::process::Command::new("/usr/sbin/lsof")
+            .arg("-nP")
+            .arg(format!("-iTCP:{port}"))
+            .arg("-sTCP:LISTEN")
+            .arg("-t")
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => {
+                match std::process::Command::new("lsof")
+                    .arg("-nP")
+                    .arg(format!("-iTCP:{port}"))
+                    .arg("-sTCP:LISTEN")
+                    .arg("-t")
+                    .output()
+                {
+                    Ok(o) => o,
+                    Err(e) => {
+                        return Err(LocalForgeError::PlatformError(format!(
+                            "Failed to execute lsof: {e}"
+                        )))
+                    }
+                }
+            }
+        };
+
+        if !output.status.success() {
+            return Ok(Vec::new());
+        }
+
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut pids = Vec::new();
+        for line in text.lines() {
+            if let Ok(pid) = line.trim().parse::<u32>() {
+                if !pids.contains(&pid) {
+                    pids.push(pid);
+                }
+            }
+        }
+        Ok(pids)
+    }
+
+    fn get_process_cmdline(&self, pid: u32) -> Result<Option<Vec<String>>> {
+        if pid == 0 {
+            return Ok(None);
+        }
+        const CTL_KERN: libc::c_int = 1;
+        const KERN_PROCARGS2: libc::c_int = 49;
+        let mut mib = [CTL_KERN, KERN_PROCARGS2, pid as libc::c_int];
+        let mut size: libc::size_t = 0;
+
+        unsafe {
+            if libc::sysctl(
+                mib.as_mut_ptr(),
+                3,
+                std::ptr::null_mut(),
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            ) != 0
+                || size == 0
+            {
+                return Ok(None);
+            }
+
+            let mut buffer = vec![0u8; size];
+            if libc::sysctl(
+                mib.as_mut_ptr(),
+                3,
+                buffer.as_mut_ptr() as *mut libc::c_void,
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            ) != 0
+            {
+                return Ok(None);
+            }
+
+            if buffer.len() < std::mem::size_of::<libc::c_int>() {
+                return Ok(None);
+            }
+
+            let argc = *(buffer.as_ptr() as *const libc::c_int) as usize;
+            let mut offset = std::mem::size_of::<libc::c_int>();
+
+            // Skip executable path (null-terminated string)
+            while offset < buffer.len() && buffer[offset] != 0 {
+                offset += 1;
+            }
+            // Skip trailing null bytes after exec path
+            while offset < buffer.len() && buffer[offset] == 0 {
+                offset += 1;
+            }
+
+            let mut args = Vec::with_capacity(argc);
+            for _ in 0..argc {
+                if offset >= buffer.len() {
+                    break;
+                }
+                let start = offset;
+                while offset < buffer.len() && buffer[offset] != 0 {
+                    offset += 1;
+                }
+                let arg_bytes = &buffer[start..offset];
+                args.push(String::from_utf8_lossy(arg_bytes).to_string());
+                if offset < buffer.len() {
+                    offset += 1; // skip null byte
+                }
+            }
+
+            Ok(Some(args))
+        }
+    }
 }
 
 #[cfg(test)]

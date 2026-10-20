@@ -405,25 +405,35 @@ This document records the chronological engineering log for all development sess
 ### Summary of Activities
 1. **Nginx Process Ownership & Port Conflict Verification (Finding 01)**:
    - Added `GatewayHealth` enum in `crates/runtime/src/nginx.rs` (`Running { pid, port }`, `Stopped`, `PortConflict { port, occupying_pid, details }`).
+   - Implemented `find_listening_pids(port)` in `ProcessManager` and Darwin implementation via `/usr/sbin/lsof -nP -iTCP:{port} -sTCP:LISTEN -t`.
+   - Implemented `get_process_cmdline(pid)` via macOS kernel `sysctl(KERN_PROCARGS2)`.
+   - Implemented `is_localforge_nginx_cmdline(&self, args: &[String])` validating that the process configuration points strictly to LocalForge's `conf_dir` with `-c` and `-p`.
    - Implemented `is_legitimate_nginx_binary` validating canonical system binary paths (`/opt/homebrew`, `/usr/local`).
-   - Implemented `check_gateway_health()` to verify in-memory master process, on-disk PID file via `process_manager.inspect_process(pid)`, and detect foreign port occupants.
-   - Refactored `is_gateway_alive()` to strictly require `matches!(self.check_gateway_health(), GatewayHealth::Running { .. })`.
-   - Exposed `nginx_port_conflict` in Tauri `RuntimeOverviewDto` and React `types.ts`, and highlighted port conflict in `healthClassification.ts`.
+   - Hardened `check_gateway_health()` to inspect listening PIDs on the gateway port, verify legitimate executable paths, ensure PID reuse protection, and validate command-line arguments match LocalForge configuration. Any unrelated process or third-party Nginx occupying the port is flagged as `GatewayHealth::PortConflict`.
+   - Added adversarial test `test_r1_3b_prep_03_adversarial_legitimate_nginx_exists_but_unrelated_process_owns_port`: proves that when a legitimate Nginx process runs on the system but an unrelated process binds to the port, `check_gateway_health()` correctly reports `PortConflict` and `is_gateway_alive()` returns false.
 2. **Metadata Query Error Propagation (Finding 02)**:
    - Removed `list_projects().unwrap_or_default()` in Tauri application commands and runtime health reporting.
    - Propagated database errors explicitly as `LocalForgeError::DatabaseError` / `UNKNOWN` states rather than masking failures as zero projects.
-3. **Persistent Metadata Safety & Startup Failure Handling (Finding 03)**:
+3. **Persistent Metadata Safety, In-Memory Isolation & Dynamic Reconnection (Finding 03)**:
    - Removed unsafe `MetadataStore::open_in_memory()` fallback in Tauri initialization (`apps/desktop/src-tauri/src/lib.rs`).
    - Managed `metadata_store: RwLock<Result<Arc<MetadataStore>, String>>` in `AppState` so startup failures surface gracefully with user-recoverable errors while protecting on-disk database integrity.
-   - Propagated directory creation errors in `MetadataStore::open()`.
-4. **Comprehensive Automated Verification & Testing**:
+   - Guarded in-memory store so it is never populated with user projects and mutations fail safely.
+   - Added `reconnect_metadata_store(&self, store: Arc<MetadataStore>)` in `ProjectRuntimeService` and wrapped store in `RwLock` to allow seamless dynamic reconnection to recovered persistent stores without stale references.
+   - Added desktop recovery test `tests::test_app_state_recovery_guard_and_reconnection` validating startup error visibility, in-memory isolation, non-destructive recovery, and runtime reconnection.
+4. **Scope Lock: Database Deletion Excluded**:
+   - Reaffirmed that database deletion is strictly OUT OF SCOPE for R1.3B.
+   - `DatabaseDeletionUnavailable` remains enforced in `crates/runtime/src/mariadb.rs`.
+   - No deletion approval modal or backend enablement is included in R1.3B.
+5. **Comprehensive Automated Verification & Testing**:
    - Added unit test: `test_nginx_ownership_verification_unrelated_process_port_conflict` in `crates/runtime/src/nginx.rs`.
    - Added integration test: `test_r1_3b_prep_01_nginx_ownership_verification_and_port_conflict` in `crates/runtime/tests/runtime_integration_test.rs`.
    - Added integration test: `test_r1_3b_prep_02_persistent_metadata_safety_and_error_propagation` in `crates/runtime/tests/runtime_integration_test.rs`.
+   - Added adversarial integration test: `test_r1_3b_prep_03_adversarial_legitimate_nginx_exists_but_unrelated_process_owns_port`.
+   - Added desktop unit test: `tests::test_app_state_recovery_guard_and_reconnection` in `apps/desktop/src-tauri/src/lib.rs`.
    - Added frontend regression test in `apps/desktop/test/fixtures_safety.test.mjs` verifying Nginx port conflict health messaging.
-   - Workspace Rust tests: 53 passed, 0 failed (up from 50).
-   - Frontend tests: 16 passed, 0 failed (up from 15). Total: 69/69 automated tests pass.
+   - Workspace Rust tests: 55 passed, 0 failed (up from 50 in R1.3A-V1).
+   - Frontend tests: 16 passed, 0 failed (up from 15 in R1.3A-V1). Total: 71/71 automated tests pass (%100 PASS).
    - `cargo fmt --check`: 0 diffs.
    - `cargo clippy --all-targets -- -D warnings`: 0 warnings.
    - `npm run build`: Vite v6.4.4 + tsc clean build (0 errors).
-   - Formulated detailed R1.3B Implementation Plan.
+   - Formulated high-fidelity Direction A+ visual proposals for 4 core views awaiting Product Owner approval.

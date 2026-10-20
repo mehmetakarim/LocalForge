@@ -446,73 +446,199 @@ fastcgi_param  REDIRECT_STATUS    200;
         false
     }
 
+    /// Checks if command line arguments match LocalForge Nginx configuration.
+    pub fn is_localforge_nginx_cmdline(&self, args: &[String]) -> bool {
+        let expected_conf = self.conf_dir.join("nginx.conf");
+        let expected_conf_str = expected_conf.to_string_lossy();
+        let expected_dir_str = self.conf_dir.to_string_lossy();
+
+        let mut has_conf = false;
+        let mut has_prefix = false;
+
+        for (i, arg) in args.iter().enumerate() {
+            if arg == "-c" {
+                if let Some(next) = args.get(i + 1) {
+                    if next == expected_conf_str.as_ref() || next.contains(&*expected_dir_str) {
+                        has_conf = true;
+                    }
+                }
+            } else if arg.starts_with("-c") && arg.contains(&*expected_dir_str) {
+                has_conf = true;
+            }
+            if arg == "-p" {
+                if let Some(next) = args.get(i + 1) {
+                    if next == expected_dir_str.as_ref() || next.contains(&*expected_dir_str) {
+                        has_prefix = true;
+                    }
+                }
+            } else if arg.starts_with("-p") && arg.contains(&*expected_dir_str) {
+                has_prefix = true;
+            }
+        }
+
+        has_conf || has_prefix
+    }
+
     /// Evaluates the true ownership, process identity and operational health of the gateway.
     /// Distinguishes verified LocalForge Nginx from an unrelated process occupying the port.
     pub fn check_gateway_health(&self) -> GatewayHealth {
         let mut lock = self.master_process.lock().unwrap();
 
-        // 1. Check in-memory master process
-        if let Some((identity, _)) = lock.as_ref() {
-            let verified = self.process_manager.verify_process_identity(
-                identity.pid,
-                identity.executable_path(),
-                identity.start_time_secs,
-                identity.start_time_usecs,
-            );
-            if verified {
-                if !is_port_available(self.listen_port) {
-                    return GatewayHealth::Running {
-                        pid: identity.pid,
-                        port: self.listen_port,
-                    };
-                }
-                // Port might be in a brief reload cycle
-                let wait_start = Instant::now();
-                while wait_start.elapsed() < Duration::from_millis(350) {
-                    std::thread::sleep(Duration::from_millis(25));
-                    if !is_port_available(self.listen_port) {
-                        return GatewayHealth::Running {
-                            pid: identity.pid,
-                            port: self.listen_port,
-                        };
-                    }
-                }
-            }
-        }
-
-        // 2. Check disk pid file and verify process identity & binary authenticity
-        let pid_file = self.run_dir.join("nginx.pid");
-        if pid_file.exists() {
-            if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
-                if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                    if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                        if Self::is_legitimate_nginx_binary(identity.executable_path())
-                            && !is_port_available(self.listen_port)
-                        {
-                            *lock = Some((identity.clone(), None));
-                            return GatewayHealth::Running {
-                                pid: identity.pid,
-                                port: self.listen_port,
-                            };
+        // 1. Check if the port is available
+        if is_port_available(self.listen_port) {
+            // Port might be in a brief reload cycle if master was previously active
+            if let Some((identity, _)) = lock.as_ref() {
+                if self.process_manager.verify_process_identity(
+                    identity.pid,
+                    identity.executable_path(),
+                    identity.start_time_secs,
+                    identity.start_time_usecs,
+                ) {
+                    let wait_start = Instant::now();
+                    while wait_start.elapsed() < Duration::from_millis(250) {
+                        std::thread::sleep(Duration::from_millis(25));
+                        if !is_port_available(self.listen_port) {
+                            break;
                         }
                     }
                 }
             }
+            if is_port_available(self.listen_port) {
+                return GatewayHealth::Stopped;
+            }
         }
 
-        // 3. Port conflict check: if the port is bound by a foreign/unverified process
-        if !is_port_available(self.listen_port) {
+        // 2. Port is bound. Find the actual process(es) holding the listening socket on this port.
+        let listening_pids = match self.process_manager.find_listening_pids(self.listen_port) {
+            Ok(pids) => pids,
+            Err(e) => {
+                return GatewayHealth::PortConflict {
+                    port: self.listen_port,
+                    occupying_pid: None,
+                    details: format!(
+                        "Port {} is occupied, but listener inspection failed: {e}",
+                        self.listen_port
+                    ),
+                };
+            }
+        };
+
+        if listening_pids.is_empty() {
+            // Ambiguous state: Port is bound, but listening PID could not be determined
             return GatewayHealth::PortConflict {
                 port: self.listen_port,
                 occupying_pid: None,
                 details: format!(
-                    "Port {} is occupied by an unrelated or unverified process",
+                    "Port {} is occupied by an unverified or transient process",
                     self.listen_port
                 ),
             };
         }
 
-        GatewayHealth::Stopped
+        // 3. For each listening PID, verify whether it belongs to LocalForge's Nginx
+        let mut first_conflict = None;
+
+        for &lpid in &listening_pids {
+            let identity = match self.process_manager.inspect_process(lpid) {
+                Ok(Some(id)) => id,
+                _ => {
+                    if first_conflict.is_none() {
+                        first_conflict = Some(GatewayHealth::PortConflict {
+                            port: self.listen_port,
+                            occupying_pid: Some(lpid),
+                            details: format!(
+                                "Port {} is occupied by an unverified or foreign process (PID {lpid})",
+                                self.listen_port
+                            ),
+                        });
+                    }
+                    continue;
+                }
+            };
+
+            // Must be a legitimate Nginx binary
+            if !Self::is_legitimate_nginx_binary(identity.executable_path()) {
+                if first_conflict.is_none() {
+                    first_conflict = Some(GatewayHealth::PortConflict {
+                        port: self.listen_port,
+                        occupying_pid: Some(lpid),
+                        details: format!(
+                            "Port {} is occupied by an unrelated non-Nginx process '{}' (PID {lpid})",
+                            self.listen_port,
+                            identity.executable_path().display()
+                        ),
+                    });
+                }
+                continue;
+            }
+
+            // Verify configuration or ownership linkage to LocalForge
+            let mut is_localforge = false;
+
+            // Check A: Match verified in-memory master process (PID or worker in PGID)
+            if let Some((master_id, _)) = lock.as_ref() {
+                let verified_master = self.process_manager.verify_process_identity(
+                    master_id.pid,
+                    master_id.executable_path(),
+                    master_id.start_time_secs,
+                    master_id.start_time_usecs,
+                );
+                if verified_master && (lpid == master_id.pid || identity.pgid == master_id.pgid) {
+                    is_localforge = true;
+                }
+            }
+
+            // Check B: Match disk pid file and command-line arguments referencing LocalForge configuration
+            if !is_localforge {
+                let pid_file = self.run_dir.join("nginx.pid");
+                let disk_pid = if pid_file.exists() {
+                    std::fs::read_to_string(&pid_file)
+                        .ok()
+                        .and_then(|s| s.trim().parse::<u32>().ok())
+                } else {
+                    None
+                };
+
+                let cmdline_matches = match self.process_manager.get_process_cmdline(lpid) {
+                    Ok(Some(args)) => self.is_localforge_nginx_cmdline(&args),
+                    _ => false,
+                };
+
+                if cmdline_matches && (disk_pid == Some(lpid) || disk_pid == Some(identity.pgid)) {
+                    *lock = Some((identity.clone(), None));
+                    is_localforge = true;
+                }
+            }
+
+            if is_localforge {
+                return GatewayHealth::Running {
+                    pid: lpid,
+                    port: self.listen_port,
+                };
+            } else if first_conflict.is_none() {
+                first_conflict = Some(GatewayHealth::PortConflict {
+                    port: self.listen_port,
+                    occupying_pid: Some(lpid),
+                    details: format!(
+                        "Port {} is occupied by an external Nginx instance (PID {lpid}) not managed by LocalForge",
+                        self.listen_port
+                    ),
+                });
+            }
+        }
+
+        if let Some(conflict) = first_conflict {
+            return conflict;
+        }
+
+        GatewayHealth::PortConflict {
+            port: self.listen_port,
+            occupying_pid: listening_pids.first().copied(),
+            details: format!(
+                "Port {} is occupied by an unverified process",
+                self.listen_port
+            ),
+        }
     }
 
     /// Checks if the Nginx gateway is alive and bound by verified LocalForge Nginx.

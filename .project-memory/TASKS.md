@@ -84,16 +84,17 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 ### Subphase R1.3B Preparation: Backend Reliability Hardening (COMPLETED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.3B-PREP-01** | Nginx Process Ownership & Port Conflict Verification | Critical | COMPLETED | Senior Rust Eng | R1.3A-V1 Acceptance | `check_gateway_health`, `GatewayHealth::PortConflict`, legitimate binary validation |
+| **TASK-R1.3B-PREP-01** | Nginx Process Ownership & Port Conflict Verification | Critical | COMPLETED | Senior Rust Eng | R1.3A-V1 Acceptance | `check_gateway_health`, `find_listening_pids`, `get_process_cmdline`, legitimate binary validation |
 | **TASK-R1.3B-PREP-02** | Metadata Query Error Propagation | High | COMPLETED | Senior Rust Eng | TASK-R1.3B-PREP-01 | Removed `list_projects().unwrap_or_default()`, propagate DB errors to UI |
-| **TASK-R1.3B-PREP-03** | Persistent Metadata Safety & Startup Failure Handling | Critical | COMPLETED | Database Architect | TASK-R1.3B-PREP-02 | Removed `open_in_memory()` fallback, fail-closed SQLite init in AppState |
-| **TASK-R1.3B-PREP-04** | Regression Suite & Workspace Test Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-PREP-01..03 | 53 Rust tests + 16 frontend tests (69/69 PASS); R1.3B Implementation Plan |
+| **TASK-R1.3B-PREP-03** | Persistent Metadata Safety & Startup Failure Handling | Critical | COMPLETED | Database Architect | TASK-R1.3B-PREP-02 | In-memory store isolation, `reconnect_metadata_store`, fail-closed SQLite init in AppState |
+| **TASK-R1.3B-PREP-04** | Regression Suite & Workspace Test Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-PREP-01..03 | 65 Rust tests + 16 frontend tests (81/81 PASS); R1.3B Implementation Plan |
 
-### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED)
+### Subphase R1.3B: Native Workspace & Detailed Inspector (PLANNED / LOCKED AWAITING APPROVAL)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.3B-01** | Native Workspace Detailed Inspector View | High | PLANNED | Frontend Lead | R1.3A-V Approval | Per-project detailed telemetry, live log stream, environment variable editor |
-| **TASK-R1.3B-02** | Interactive Human Approval Gate for Deletions | Critical | PLANNED | Security Engineer | R1.3A-V Approval | Multi-step human confirmation modal for destructive database drops |
+| **TASK-R1.3B-01** | Native Workspace Multi-View Spatial Navigation | High | PLANNED | Frontend Lead | R1.3B Prep Approval | Projects Workspace, Services & Runtime, Storage & Volumes views |
+| **TASK-R1.3B-02** | Detailed Project Inspector & Diagnostic Drawer | High | PLANNED | Frontend Lead | TASK-R1.3B-01 | Per-project telemetry, FastCGI socket inspection, bounded live logs, cURL helper |
+| **TASK-R1.3B-03** | Database Deletion UI Exclusion (Safety Guard) | Critical | SCOPE LOCKED | Security Engineer | ADR-0011 | Database deletion strictly OUT OF SCOPE; `DatabaseDeletionUnavailable` enforced |
 
 ---
 

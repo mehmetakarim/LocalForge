@@ -1987,6 +1987,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",

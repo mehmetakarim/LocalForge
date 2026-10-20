@@ -12,7 +12,7 @@ This document tracks the canonical technical and operational state of the LocalF
 - **Previous Phase Status**: **Phase R1.3A-V1 (Final Acceptance Patch - Accepted)**
 - **Approved Design Baseline**: **Direction A+ Spatial Studio Stage (1600×1000 Baseline)**.
 - **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes & Patch - Accepted), R1.3B Preparation (Nginx Ownership, Metadata Error Propagation, SQLite Persistence - Completed), R1.3B (Native Workspace & Detailed Inspector - Next).
-- **Test Matrix Status**: 53/53 automated Rust tests pass across workspace; 16/16 automated frontend tests pass (69 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; verified Nginx process ownership & port conflict detection; safe SQLite persistent metadata storage without ephemeral fallback.
+- **Test Matrix Status**: 55/55 automated Rust tests pass across workspace; 16/16 automated frontend tests pass (71 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; verified Nginx process ownership & port conflict detection via `find_listening_pids` and `get_process_cmdline`; safe SQLite persistent metadata storage with dynamic service reconnection without ephemeral fallback; database deletion strictly excluded and locked to `DatabaseDeletionUnavailable`.
 
 ---
 

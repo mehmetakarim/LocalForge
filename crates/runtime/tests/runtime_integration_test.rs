@@ -554,7 +554,7 @@ fn test_r1_3b_prep_01_nginx_ownership_verification_and_port_conflict() {
             port: p, details, ..
         } => {
             assert_eq!(p, port);
-            assert!(details.contains("unrelated or unverified process"));
+            assert!(details.contains("unrelated") && details.contains(&format!("Port {port}")));
         }
         other => panic!("Expected PortConflict, got {:?}", other),
     }
@@ -625,4 +625,80 @@ fn test_r1_3b_prep_02_persistent_metadata_safety_and_error_propagation() {
         open_res.is_err(),
         "Opening an invalid path must return Err and not silently open in-memory"
     );
+}
+
+#[test]
+fn test_r1_3b_prep_03_adversarial_legitimate_nginx_exists_but_unrelated_process_owns_port() {
+    use localforge_runtime::GatewayHealth;
+    use std::net::TcpListener;
+
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+
+    // 1. Discover legitimate system Nginx binary
+    if NginxSupervisor::find_nginx_binary().is_err() {
+        eprintln!("Skipping test: Nginx binary not available in test environment");
+        return;
+    }
+
+    // 2. Spawn a legitimate Nginx instance on an ephemeral unprivileged port (18097)
+    let conf_dir = dir.path().join("conf");
+    let run_dir = dir.path().join("run");
+    let legitimate_sup = NginxSupervisor::new(conf_dir.clone(), run_dir.clone(), 18097, pm.clone());
+    let spawn_res = legitimate_sup.ensure_running_and_reloaded();
+    if spawn_res.is_err() {
+        eprintln!(
+            "Skipping test: unable to spawn Nginx daemon: {:?}",
+            spawn_res
+        );
+        return;
+    }
+    assert!(legitimate_sup.is_gateway_alive());
+    let nginx_id = legitimate_sup
+        .get_gateway_identity()
+        .expect("Legitimate Nginx identity must exist");
+
+    // 3. Bind an unrelated dummy TCP listener on an ephemeral unprivileged port
+    let dummy_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let occupied_port = dummy_listener.local_addr().unwrap().port();
+
+    // 4. Create a supervisor pointing to occupied_port
+    // (Simulating scenario where a legitimate Nginx daemon exists, but an unrelated process owns the target port)
+    let hijacked_sup = NginxSupervisor::new(
+        dir.path().join("hijacked_conf"),
+        dir.path().join("hijacked_run"),
+        occupied_port,
+        pm.clone(),
+    );
+
+    // 5. Evaluate gateway health on occupied_port:
+    // Even though legitimate Nginx is running on the host system, occupied_port is owned by dummy_listener!
+    let health = hijacked_sup.check_gateway_health();
+    match health {
+        GatewayHealth::PortConflict {
+            port,
+            occupying_pid,
+            details,
+        } => {
+            assert_eq!(port, occupied_port);
+            assert!(
+                occupying_pid.is_some()
+                    || details.contains("unrelated")
+                    || details.contains("occupied")
+            );
+            // The occupying process must NOT be the legitimate Nginx PID
+            if let Some(pid) = occupying_pid {
+                assert_ne!(pid, nginx_id.pid);
+            }
+        }
+        other => panic!(
+            "Expected PortConflict when port is occupied by unrelated process, got {:?}",
+            other
+        ),
+    }
+
+    assert!(!hijacked_sup.is_gateway_alive());
+
+    // 6. Clean up legitimate Nginx instance
+    let _ = legitimate_sup.stop();
 }

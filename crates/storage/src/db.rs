@@ -21,6 +21,12 @@ pub struct MetadataStore {
     conn: Mutex<Connection>,
 }
 
+impl std::fmt::Debug for MetadataStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MetadataStore").finish()
+    }
+}
+
 impl MetadataStore {
     pub fn open(db_path: &Path) -> Result<Self> {
         if let Some(parent) = db_path.parent() {

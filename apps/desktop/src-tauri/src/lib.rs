@@ -68,6 +68,7 @@ impl AppState {
                             self.volume_manager.clone(),
                             self.volume_barrier.clone(),
                         )));
+                        self.runtime_service.reconnect_metadata_store(store_arc.clone());
                         Ok(store_arc)
                     }
                     Err(retry_err) => Err(format!(
@@ -347,4 +348,102 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalForge application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use localforge_core::{ProjectId, ProjectStatus, VolumeId};
+    use localforge_platform::{MacOSProcessManager, MacOSVolumeManager};
+    use localforge_storage::ProjectRecord;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_app_state_recovery_guard_and_reconnection() {
+        let dir = tempdir().unwrap();
+        let blocker = dir.path().join("blocker_file");
+        std::fs::write(&blocker, b"not a dir").unwrap();
+        let invalid_db_path = blocker.join("sub").join("localforge.db");
+
+        let volume_manager = Arc::new(MacOSVolumeManager::new());
+        let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+        let process_manager = Arc::new(MacOSProcessManager::new());
+        let runtime_base = dir.path().join("runtime");
+
+        // 1. Simulate startup when persistent database fails to open
+        let err_msg = "Kalıcı SQLite veritabanı açılamadı (test error)".to_string();
+        let mem_store = Arc::new(MetadataStore::open_in_memory().unwrap());
+        let rs = Arc::new(ProjectRuntimeService::create_default(
+            runtime_base.clone(),
+            mem_store.clone(),
+            volume_manager.clone(),
+            volume_barrier.clone(),
+            process_manager.clone(),
+            18080,
+        ));
+
+        let mut state = AppState {
+            db_path: invalid_db_path,
+            metadata_store: std::sync::RwLock::new(Err(err_msg.clone())),
+            service: std::sync::RwLock::new(Err(err_msg.clone())),
+            runtime_service: rs.clone(),
+            volume_manager: volume_manager.clone(),
+            volume_barrier: volume_barrier.clone(),
+        };
+
+        // 2. Verify all operations fail closed while in error state:
+        // Recovery error remains visible and no operations touch in-memory placeholder
+        let store_res = state.get_metadata_store();
+        assert!(store_res.is_err());
+        assert!(store_res
+            .unwrap_err()
+            .contains("Kalıcı SQLite veritabanı açılamadı"));
+
+        let svc_res = state.get_service();
+        assert!(svc_res.is_err());
+
+        // In-memory placeholder must have 0 projects
+        assert_eq!(mem_store.list_projects().unwrap().len(), 0);
+
+        // 3. Prepare real on-disk persistent database with an existing project
+        let valid_db_path = dir.path().join("valid_localforge.db");
+        let persistent_store = MetadataStore::open(&valid_db_path).unwrap();
+        let existing_project = ProjectRecord {
+            id: ProjectId::from_string("proj_persisted"),
+            name: "Persistent Project".into(),
+            path: dir.path().join("persisted_site"),
+            volume_uuid: VolumeId::new("UUID-PERSIST"),
+            document_root: "".into(),
+            php_version: "8.4".into(),
+            local_domain: "persisted.test".into(),
+            status: ProjectStatus::Stopped,
+            created_at: "2026-10-20T00:00:00Z".into(),
+            updated_at: "2026-10-20T00:00:00Z".into(),
+        };
+        persistent_store.insert_project(&existing_project).unwrap();
+        drop(persistent_store);
+
+        // 4. Update state db_path to the valid database to simulate recovery (e.g. disk remounted / repaired)
+        state.db_path = valid_db_path.clone();
+
+        // 5. Trigger recovery via get_metadata_store()
+        let recovered_store = state.get_metadata_store().expect("Recovery must succeed");
+        let listed = recovered_store.list_projects().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id.0, "proj_persisted");
+
+        // 6. Verify existing on-disk data was NEVER overwritten or lost
+        assert_eq!(listed[0].name, "Persistent Project");
+
+        // 7. Verify all services reconnected to recovered persistent store (NO stale references!)
+        let active_svc = state.get_service().expect("Service must be reconnected");
+        assert!(Arc::ptr_eq(&recovered_store, &active_svc.metadata_store()));
+
+        // Runtime service must now be reconnected to recovered store
+        let rs_store = state.runtime_service.metadata_store();
+        assert!(Arc::ptr_eq(&recovered_store, &rs_store));
+
+        // Temporary in-memory store remains completely empty and unpolluted
+        assert_eq!(mem_store.list_projects().unwrap().len(), 0);
+    }
 }
