@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>LocalForge — Project Inspector (Brand Aligned)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --lf-night: #191337;
+    --lf-plum: #2B2450;
+    --lf-dusk: #3B376A;
+    --lf-violet: #695FA4;
+    --lf-lilac: #B7ADDF;
+    --lf-mist: #D4CCF1;
+    --lf-white: #FFFBFF;
+
+    --health-healthy: #10B981;
+    --health-warning: #F59E0B;
+    --health-error: #EF4444;
+    --health-unknown: #6B7280;
+
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: var(--lf-night);
+    font-family: var(--font-body);
+    color: var(--lf-white);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.6) 40%, var(--lf-night) 90%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: rgba(25, 19, 55, 0.94);
+    border: 1px solid rgba(183, 173, 223, 0.14);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .macos-titlebar {
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid rgba(183, 173, 223, 0.10);
+    background: rgba(43, 36, 80, 0.35);
+    backdrop-filter: blur(20px);
+    z-index: 50;
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 180px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  .brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-emblem-img {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  .brand-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    color: var(--lf-white);
+  }
+  .brand-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lf-lilac);
+    background: rgba(183, 173, 223, 0.12);
+    border: 1px solid rgba(183, 173, 223, 0.22);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  /* Dimmed Stage Backdrop */
+  .dimmed-stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 100px 100px 100px;
+    opacity: 0.35;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  /* Slide-Over Project Inspector Drawer */
+  .inspector-drawer {
+    position: absolute;
+    top: 54px;
+    right: 0;
+    bottom: 0;
+    width: 540px;
+    background: rgba(43, 36, 80, 0.92);
+    backdrop-filter: blur(40px) saturate(170%);
+    border-left: 1px solid rgba(183, 173, 223, 0.24);
+    box-shadow: -20px 0 60px rgba(10, 6, 30, 0.85);
+    display: flex;
+    flex-direction: column;
+    z-index: 60;
+    overflow-y: auto;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 28px;
+    border-bottom: 1px solid rgba(183, 173, 223, 0.12);
+    background: rgba(25, 19, 55, 0.4);
+  }
+  .drawer-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .drawer-emblem {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(183, 173, 223, 0.3);
+  }
+  .drawer-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .d-name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    color: var(--lf-white);
+  }
+  .d-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--lf-lilac);
+  }
+  .btn-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(25, 19, 55, 0.6);
+    border: 1px solid rgba(183, 173, 223, 0.2);
+    color: var(--lf-mist);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .drawer-body {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .section-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sec-heading {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lf-lilac);
+  }
+
+  .prop-list {
+    background: rgba(25, 19, 55, 0.55);
+    border: 1px solid rgba(183, 173, 223, 0.14);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .prop-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(183, 173, 223, 0.08);
+  }
+  .prop-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .p-key { font-family: var(--font-mono); color: var(--lf-mist); font-size: 11px; }
+  .p-val { font-family: var(--font-mono); color: var(--lf-white); font-size: 11px; font-weight: 500; }
+
+  /* Safety Guard Cards */
+  .guard-box {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .guard-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--health-error);
+  }
+  .guard-desc {
+    font-size: 12px;
+    color: var(--lf-mist);
+    line-height: 1.4;
+  }
+  .btn-disabled {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px dashed rgba(239, 68, 68, 0.4);
+    color: rgba(255, 255, 255, 0.5);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: not-allowed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .sftp-box {
+    background: rgba(105, 95, 164, 0.12);
+    border: 1px solid rgba(183, 173, 223, 0.24);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sftp-badge {
+    align-self: flex-start;
+    background: rgba(183, 173, 223, 0.15);
+    border: 1px solid var(--lf-lilac);
+    color: var(--lf-white);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="studio-backdrop"></div>
+
+<div class="macos-window">
+  <header class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+
+    <div class="brand-lockup">
+      <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
+      <span class="brand-title">LocalForge</span>
+      <span class="brand-badge">Project Inspector</span>
+    </div>
+
+    <div class="titlebar-right">
+      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--lf-mist);">ESC: Kapat</span>
+    </div>
+  </header>
+
+  <!-- Dimmed Stage in Background -->
+  <main class="dimmed-stage">
+    <h1 style="font-family: var(--font-display); font-size: 28px;">ecommerce-portal · Aktif Proje Sahnesi</h1>
+  </main>
+
+  <!-- Slide-Over Inspector Drawer -->
+  <aside class="inspector-drawer">
+    <header class="drawer-header">
+      <div class="drawer-identity">
+        <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Emblem Badge" class="drawer-emblem">
+        <div class="drawer-titles">
+          <h2 class="d-name">ecommerce-portal</h2>
+          <span class="d-sub">http://ecommerce.localforge.test:8080</span>
+        </div>
+      </div>
+      <button class="btn-close">✕</button>
+    </header>
+
+    <div class="drawer-body">
+      <!-- Section 1: Canonical Metadata -->
+      <section class="section-block">
+        <span class="sec-heading">01 · Genel ve Depolama Bilgileri</span>
+        <div class="prop-list">
+          <div class="prop-item">
+            <span class="p-key">Kök Dizin Yolu</span>
+            <span class="p-val">/Volumes/Mac Harici Disk/.../ecommerce</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Depolama Birimi (APFS UUID)</span>
+            <span class="p-val" style="color:var(--lf-lilac);">E4B30F82-9C1D-4E7B-8F09-2D88C523B0A1</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Bağlantı Türü</span>
+            <span class="p-val">Tier-1 Harici APFS SSD</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Oluşturulma Tarihi</span>
+            <span class="p-val">2026-10-14 11:20:00 UTC</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Runtime & Gateway -->
+      <section class="section-block">
+        <span class="sec-heading">02 · Çalışma Zamanı ve Ağ Geçidi</span>
+        <div class="prop-list">
+          <div class="prop-item">
+            <span class="p-key">PHP Çalıştırıcı</span>
+            <span class="p-val">PHP 8.2-FPM (FastCGI Socket)</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Nginx Sanal Konak</span>
+            <span class="p-val">~/.localforge/nginx/vhosts/ecommerce.conf</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Belge Kökü (Document Root)</span>
+            <span class="p-val">/public (index.php)</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">SSL / Yerel Sertifika</span>
+            <span class="p-val">mkcert Yerel Güvenilir CA (Aktif)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Database & Safe Guard -->
+      <section class="section-block">
+        <span class="sec-heading">03 · Veritabanı ve Güvenlik Kilidi</span>
+        <div class="prop-list">
+          <div class="prop-item">
+            <span class="p-key">Motor / Sürüm</span>
+            <span class="p-val">MariaDB 11.2 (InnoDB Engine)</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Veritabanı Adı</span>
+            <span class="p-val">ecommerce_db</span>
+          </div>
+          <div class="prop-item">
+            <span class="p-key">Kullanıcı & Port</span>
+            <span class="p-val">localforge @ 127.0.0.1:3306</span>
+          </div>
+        </div>
+
+        <!-- Strict Data Loss Guard -->
+        <div class="guard-box">
+          <div class="guard-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Veri Güvenlik Koruması (Kilitli)</span>
+          </div>
+          <p class="guard-desc">Veritabanını doğrudan silme veya sıfırlama işlemi R1.3A/B aşamasında kilitlenmiştir. Yanlışlıkla veri kaybını önlemek için yalnızca salt-okunur denetim desteklenir.</p>
+          <button class="btn-disabled" disabled>
+            <span>🔒 Veritabanını Sil / Sıfırla (Korumalı)</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Section 4: SFTP Deployment Target (Dry-Run Enforcement) -->
+      <section class="section-block">
+        <span class="sec-heading">04 · Dağıtım (SFTP) & Simülasyon Koruması</span>
+        <div class="sftp-box">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--lf-white);">production-server-01</span>
+            <span class="sftp-badge">Dry-Run Only</span>
+          </div>
+          <div class="prop-item" style="border:none; padding:0;">
+            <span class="p-key">Uzak Sunucu</span>
+            <span class="p-val">sftp.acme.com:22 (/var/www/ecommerce)</span>
+          </div>
+          <p style="font-size:12px; color:var(--lf-mist); line-height:1.4;">Canlı sunucuya dosya yazma işlemi R1.3A/B sınırları dahilinde devre dışıdır. Dağıtım tetiklendiğinde yalnızca dosya farkları ve izinler simüle edilir.</p>
+          <div style="display:flex; gap:10px; margin-top:4px;">
+            <button style="flex:1; background:var(--lf-violet); border:1px solid var(--lf-lilac); color:var(--lf-white); font-family:var(--font-display); font-size:11px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;">
+              Dry-Run Simülasyonu Çalıştır
+            </button>
+            <button class="btn-disabled" disabled style="padding:8px 12px;">
+              <span>🔒 Canlıya Yaz (Devre Dışı)</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+
+</body>
+</html>

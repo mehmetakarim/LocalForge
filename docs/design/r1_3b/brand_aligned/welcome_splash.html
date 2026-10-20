@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, height=1000">
+<title>LocalForge — Welcome Splash (Brand Aligned)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --lf-night: #191337;
+    --lf-plum: #2B2450;
+    --lf-dusk: #3B376A;
+    --lf-violet: #695FA4;
+    --lf-lilac: #B7ADDF;
+    --lf-mist: #D4CCF1;
+    --lf-white: #FFFBFF;
+
+    --health-healthy: #10B981;
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
+  }
+
+  body {
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    background-color: var(--lf-night);
+    font-family: var(--font-body);
+    color: var(--lf-white);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* Atmospheric Backdrop */
+  .studio-backdrop {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 25%, rgba(59, 55, 106, 0.55) 0%, rgba(43, 36, 80, 0.7) 45%, var(--lf-night) 90%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .halo-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 900px;
+    height: 600px;
+    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.3) 0%, rgba(43, 36, 80, 0.15) 50%, transparent 75%);
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .macos-window {
+    width: 1600px;
+    height: 1000px;
+    position: relative;
+    background: rgba(25, 19, 55, 0.94);
+    border: 1px solid rgba(183, 173, 223, 0.14);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .macos-titlebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    z-index: 50;
+  }
+  .traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .traffic-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .dot-close { background: #FF5F56; }
+  .dot-min { background: #FFBD2E; }
+  .dot-max { background: #27C93F; }
+
+  /* Splash Modal Center Card */
+  .splash-modal {
+    width: 840px;
+    background: rgba(43, 36, 80, 0.78);
+    backdrop-filter: blur(36px) saturate(160%);
+    border: 1px solid rgba(183, 173, 223, 0.18);
+    border-top: 1px solid rgba(183, 173, 223, 0.42);
+    border-radius: 28px;
+    padding: 44px 52px;
+    box-shadow: 0 40px 100px -20px rgba(10, 6, 30, 0.9), inset 0 1px 0 rgba(183, 173, 223, 0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    z-index: 20;
+  }
+
+  /* macOS Squircle App Icon */
+  .app-icon-wrapper {
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .app-icon-squircle {
+    width: 110px;
+    height: 110px;
+    border-radius: 22.37%;
+    object-fit: cover;
+    display: block;
+    box-shadow: 0 20px 48px -10px rgba(10, 6, 30, 0.8), 0 0 0 1px rgba(183, 173, 223, 0.25);
+  }
+
+  .splash-titles {
+    margin-bottom: 34px;
+  }
+  .splash-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--lf-lilac);
+    margin-bottom: 8px;
+  }
+  .splash-heading {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 32px;
+    letter-spacing: -0.03em;
+    color: var(--lf-white);
+    margin-bottom: 8px;
+  }
+  .splash-subtitle {
+    font-size: 15px;
+    color: var(--lf-mist);
+    max-width: 540px;
+    line-height: 1.5;
+    margin-inline: auto;
+  }
+
+  /* Action Cards Grid */
+  .actions-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .action-card {
+    background: rgba(25, 19, 55, 0.65);
+    border: 1px solid rgba(183, 173, 223, 0.14);
+    border-top: 1px solid rgba(183, 173, 223, 0.28);
+    border-radius: 16px;
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .action-card:hover {
+    background: rgba(59, 55, 106, 0.5);
+    border-color: var(--lf-lilac);
+    transform: translateY(-2px);
+  }
+  .action-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(105, 95, 164, 0.25);
+    border: 1px solid rgba(183, 173, 223, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--lf-lilac);
+    margin-bottom: 14px;
+  }
+  .action-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--lf-white);
+    margin-bottom: 6px;
+  }
+  .action-desc {
+    font-size: 12px;
+    color: var(--lf-mist);
+    line-height: 1.4;
+    margin-bottom: 14px;
+    flex: 1;
+  }
+  .action-kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--lf-lilac);
+    background: rgba(43, 36, 80, 0.6);
+    border: 1px solid rgba(183, 173, 223, 0.2);
+    padding: 3px 6px;
+    border-radius: 5px;
+  }
+
+  /* Bottom Metadata */
+  .splash-footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--lf-mist);
+    opacity: 0.85;
+  }
+  .footer-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(183, 173, 223, 0.4);
+  }
+</style>
+</head>
+<body>
+
+<div class="studio-backdrop"></div>
+<div class="halo-center"></div>
+
+<div class="macos-window">
+  <div class="macos-titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-dot dot-close"></div>
+      <div class="traffic-dot dot-min"></div>
+      <div class="traffic-dot dot-max"></div>
+    </div>
+  </div>
+
+  <div class="splash-modal">
+    <!-- Apple Squircle App Icon -->
+    <div class="app-icon-wrapper">
+      <img src="../../../assets/brand/raster/localforge-app-icon-1024.png" alt="LocalForge Official App Icon" class="app-icon-squircle">
+    </div>
+
+    <div class="splash-titles">
+      <div class="splash-eyebrow">LocalForge · Sürüm 0.1.0-alpha</div>
+      <h1 class="splash-heading">LocalForge'a Hoş Geldiniz</h1>
+      <p class="splash-subtitle">macOS Apple Silicon mimarisi için tasarlanmış bağımsız yerel geliştirme ve dağıtım stüdyosu.</p>
+    </div>
+
+    <!-- Quickstart Action Cards -->
+    <div class="actions-grid">
+      <!-- Action 1 -->
+      <div class="action-card">
+        <div class="action-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <div class="action-title">Mevcut Projeyi Aç</div>
+        <div class="action-desc">Var olan bir yerel PHP veya web klasörünü LocalForge çalışma alanına bağlayın.</div>
+        <div class="action-kbd">⌘O Klasör Seç</div>
+      </div>
+
+      <!-- Action 2 (Primary) -->
+      <div class="action-card" style="border-color: var(--lf-lilac); background: linear-gradient(180deg, rgba(59, 55, 106, 0.7) 0%, rgba(25, 19, 55, 0.8) 100%);">
+        <div class="action-icon" style="background: var(--lf-violet); color: var(--lf-white);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+        <div class="action-title">Yeni Proje Başlat</div>
+        <div class="action-desc">Nginx sanal konak, PHP-FPM ve MariaDB ile anında izole geliştirme ortamı kurun.</div>
+        <div class="action-kbd" style="background: var(--lf-violet); color: var(--lf-white); border-color: var(--lf-lilac);">⌘N Proje Sihirbazı</div>
+      </div>
+
+      <!-- Action 3 -->
+      <div class="action-card">
+        <div class="action-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"></line><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line></svg>
+        </div>
+        <div class="action-title">Harici Disk Tanımla</div>
+        <div class="action-desc">Projelerinizi ve veritabanlarınızı harici APFS SSD üzerinde güvenle çalıştırın.</div>
+        <div class="action-kbd">⌘D Disk Bağla</div>
+      </div>
+    </div>
+
+    <!-- Footer System Metadata -->
+    <div class="splash-footer">
+      <span>v0.1.0-alpha</span>
+      <div class="footer-dot"></div>
+      <span>Apple Silicon (arm64)</span>
+      <div class="footer-dot"></div>
+      <span>macOS Tier-1 Platform</span>
+      <div class="footer-dot"></div>
+      <span>Açık Kaynak Kodlu</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

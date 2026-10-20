@@ -1,0 +1,40 @@
+/**
+ * LocalForge Canonical Brand & Spatial Tokens
+ * Version: 1.0.0 (October 2026)
+ * Source: LocalForge-Logo-Kiti.html
+ */
+
+:root {
+  /* Canonical Brand Palette */
+  --lf-night: #191337;   /* Gece: Base canvas, deepest shadows */
+  --lf-plum: #2B2450;    /* Erik: Glass cards, surface containers */
+  --lf-dusk: #3B376A;    /* Alacakaranlık: Stage backdrop, panel borders */
+  --lf-violet: #695FA4;  /* Menekşe: Primary brand accent, button gradients */
+  --lf-lilac: #B7ADDF;   /* Lila: Elephant body, hero identifier, focus rings */
+  --lf-mist: #D4CCF1;    /* Sis: High-contrast secondary text, specular highlights */
+  --lf-white: #FFFBFF;   /* Kar Beyazı: High-contrast primary text */
+
+  /* Semantic System Health Tokens (Strictly separated from brand purple/violet) */
+  --lf-health-healthy: #10B981;  /* Emerald: Verified healthy process / running */
+  --lf-health-warning: #F59E0B;  /* Amber: Degraded, missing probe, attention */
+  --lf-health-error: #EF4444;    /* Ruby: Error, port conflict, crash, guard */
+  --lf-health-unknown: #6B7280;  /* Slate: Stopped, unprobed, not running */
+
+  /* Typography */
+  --lf-font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  --lf-font-body: 'Figtree', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  --lf-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Spatial Glass Surfaces */
+  --lf-glass-deep: rgba(43, 36, 80, 0.72);
+  --lf-glass-surface: rgba(59, 55, 106, 0.42);
+  --lf-glass-hover: rgba(105, 95, 164, 0.25);
+  --lf-glass-border: rgba(183, 173, 223, 0.16);
+  --lf-glass-border-bright: rgba(183, 173, 223, 0.38);
+
+  /* Shadows & Atmospheric Lighting */
+  --lf-shadow-window: 0 40px 100px -20px rgba(10, 6, 30, 0.85);
+  --lf-shadow-card: 0 20px 40px -10px rgba(10, 6, 30, 0.6);
+  --lf-shadow-focus: 0 0 0 3px rgba(183, 173, 223, 0.35);
+  --lf-glow-violet: 0 0 50px rgba(105, 95, 164, 0.25);
+}
