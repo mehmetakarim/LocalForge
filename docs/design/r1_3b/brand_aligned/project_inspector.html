@@ -24,8 +24,8 @@
     --health-error: #EF4444;
     --health-unknown: #6B7280;
 
-    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
   }
 
@@ -46,7 +46,7 @@
   .studio-backdrop {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.6) 40%, var(--lf-night) 90%);
+    background: radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.48) 0%, rgba(43, 36, 80, 0.65) 45%, var(--lf-night) 90%);
     pointer-events: none;
     z-index: 0;
   }
@@ -63,8 +63,9 @@
     z-index: 10;
   }
 
+  /* macOS Titlebar */
   .macos-titlebar {
-    height: 54px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -95,10 +96,12 @@
     gap: 12px;
   }
   .brand-emblem-img {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     object-fit: cover;
+    display: block;
+    box-shadow: 0 2px 8px rgba(10, 6, 30, 0.5);
   }
   .brand-title {
     font-family: var(--font-display);
@@ -120,30 +123,60 @@
     border-radius: 6px;
   }
 
-  /* Dimmed Stage Backdrop */
-  .dimmed-stage {
-    flex: 1;
+  /* Meaningful Context: Direction A+ Stage Behind Drawer */
+  .background-stage {
+    position: absolute;
+    inset: 52px 0 0 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px 100px 100px 100px;
-    opacity: 0.35;
-    filter: blur(2px);
+    padding-right: 560px; /* Offset to center the remaining view */
+    opacity: 0.55;
+    filter: blur(1.5px);
     pointer-events: none;
+    z-index: 10;
+  }
+
+  .stage-hero-bg {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .stage-hero-bg h2 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--lf-white);
+  }
+
+  .monoliths-bg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+  }
+  .bg-monolith {
+    width: 210px;
+    height: 280px;
+    background: linear-gradient(180deg, rgba(43, 36, 80, 0.7) 0%, rgba(25, 19, 55, 0.8) 100%);
+    border: 1px solid rgba(183, 173, 223, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 
   /* Slide-Over Project Inspector Drawer */
   .inspector-drawer {
     position: absolute;
-    top: 54px;
+    top: 52px;
     right: 0;
     bottom: 0;
-    width: 540px;
-    background: rgba(43, 36, 80, 0.92);
-    backdrop-filter: blur(40px) saturate(170%);
+    width: 550px;
+    background: rgba(43, 36, 80, 0.94);
+    backdrop-filter: blur(44px) saturate(170%);
     border-left: 1px solid rgba(183, 173, 223, 0.24);
-    box-shadow: -20px 0 60px rgba(10, 6, 30, 0.85);
+    box-shadow: -24px 0 64px rgba(10, 6, 30, 0.9);
     display: flex;
     flex-direction: column;
     z-index: 60;
@@ -154,9 +187,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 24px 28px;
-    border-bottom: 1px solid rgba(183, 173, 223, 0.12);
-    background: rgba(25, 19, 55, 0.4);
+    padding: 22px 28px;
+    border-bottom: 1px solid rgba(183, 173, 223, 0.14);
+    background: rgba(25, 19, 55, 0.45);
   }
   .drawer-identity {
     display: flex;
@@ -164,11 +197,12 @@
     gap: 14px;
   }
   .drawer-emblem {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 8px;
     object-fit: cover;
-    border: 1px solid rgba(183, 173, 223, 0.3);
+    border: 1px solid rgba(183, 173, 223, 0.35);
+    box-shadow: 0 4px 12px rgba(10, 6, 30, 0.6);
   }
   .drawer-titles {
     display: flex;
@@ -178,13 +212,13 @@
   .d-name {
     font-family: var(--font-display);
     font-weight: 800;
-    font-size: 20px;
+    font-size: 21px;
     letter-spacing: -0.02em;
     color: var(--lf-white);
   }
   .d-sub {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--lf-lilac);
   }
   .btn-close {
@@ -201,10 +235,10 @@
   }
 
   .drawer-body {
-    padding: 24px 28px;
+    padding: 26px 28px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 22px;
   }
 
   .section-block {
@@ -234,7 +268,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 13px;
     padding-bottom: 6px;
     border-bottom: 1px solid rgba(183, 173, 223, 0.08);
   }
@@ -243,12 +277,12 @@
     padding-bottom: 0;
   }
   .p-key { font-family: var(--font-mono); color: var(--lf-mist); font-size: 11px; }
-  .p-val { font-family: var(--font-mono); color: var(--lf-white); font-size: 11px; font-weight: 500; }
+  .p-val { font-family: var(--font-mono); color: var(--lf-white); font-size: 12px; font-weight: 600; }
 
-  /* Safety Guard Cards */
+  /* Strict Safety Guard Cards */
   .guard-box {
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.28);
+    background: rgba(239, 68, 68, 0.09);
+    border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: 12px;
     padding: 14px 16px;
     display: flex;
@@ -260,21 +294,21 @@
     align-items: center;
     gap: 8px;
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--health-error);
   }
   .guard-desc {
     font-size: 12px;
     color: var(--lf-mist);
-    line-height: 1.4;
+    line-height: 1.45;
   }
   .btn-disabled {
-    background: rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.14);
     border: 1px dashed rgba(239, 68, 68, 0.4);
     color: rgba(255, 255, 255, 0.5);
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     padding: 8px 14px;
     border-radius: 8px;
@@ -319,8 +353,9 @@
       <div class="traffic-dot dot-max"></div>
     </div>
 
+    <!-- Official Brand Lockup with Rendered Elephant Emblem -->
     <div class="brand-lockup">
-      <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
+      <img src="assets/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
       <span class="brand-title">LocalForge</span>
       <span class="brand-badge">Project Inspector</span>
     </div>
@@ -330,16 +365,33 @@
     </div>
   </header>
 
-  <!-- Dimmed Stage in Background -->
-  <main class="dimmed-stage">
-    <h1 style="font-family: var(--font-display); font-size: 28px;">ecommerce-portal · Aktif Proje Sahnesi</h1>
+  <!-- Visible Direction A+ Stage in Background -->
+  <main class="background-stage">
+    <div class="stage-hero-bg">
+      <h2>Tüm servisler etkin.</h2>
+      <p style="font-size:13px; color:var(--lf-mist); margin-top:4px;">İki yerel çalışma alanı sahnede aktif.</p>
+    </div>
+    <div class="monoliths-bg-row">
+      <div class="bg-monolith">
+        <span style="font-weight:700; color:var(--lf-white);">ecommerce-portal</span>
+        <span style="font-size:11px; color:var(--health-healthy);">● Çevrimiçi</span>
+      </div>
+      <div class="bg-monolith" style="border-style:dashed;">
+        <span style="color:var(--lf-mist);">+ Proje Ekle</span>
+      </div>
+      <div class="bg-monolith">
+        <span style="font-weight:700; color:var(--lf-white);">marketing-site</span>
+        <span style="font-size:11px; color:var(--health-unknown);">○ Beklemede</span>
+      </div>
+    </div>
   </main>
 
   <!-- Slide-Over Inspector Drawer -->
   <aside class="inspector-drawer">
     <header class="drawer-header">
       <div class="drawer-identity">
-        <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Emblem Badge" class="drawer-emblem">
+        <!-- Rendered Official Elephant Emblem Badge -->
+        <img src="assets/localforge-emblem.png" alt="LocalForge Emblem Badge" class="drawer-emblem">
         <div class="drawer-titles">
           <h2 class="d-name">ecommerce-portal</h2>
           <span class="d-sub">http://ecommerce.localforge.test:8080</span>
@@ -366,8 +418,8 @@
             <span class="p-val">Tier-1 Harici APFS SSD</span>
           </div>
           <div class="prop-item">
-            <span class="p-key">Oluşturulma Tarihi</span>
-            <span class="p-val">2026-10-14 11:20:00 UTC</span>
+            <span class="p-key">Ortam</span>
+            <span class="p-val">İllüstratif Statik Prototip</span>
           </div>
         </div>
       </section>
@@ -389,13 +441,13 @@
             <span class="p-val">/public (index.php)</span>
           </div>
           <div class="prop-item">
-            <span class="p-key">SSL / Yerel Sertifika</span>
-            <span class="p-val">mkcert Yerel Güvenilir CA (Aktif)</span>
+            <span class="p-key">Yerel SSL Sertifikası</span>
+            <span class="p-val">mkcert Yerel CA (Doğrulandı)</span>
           </div>
         </div>
       </section>
 
-      <!-- Section 3: Database & Safe Guard -->
+      <!-- Section 3: Database & Strict Guard -->
       <section class="section-block">
         <span class="sec-heading">03 · Veritabanı ve Güvenlik Kilidi</span>
         <div class="prop-list">
@@ -431,16 +483,16 @@
         <span class="sec-heading">04 · Dağıtım (SFTP) & Simülasyon Koruması</span>
         <div class="sftp-box">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--lf-white);">production-server-01</span>
+            <span style="font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--lf-white);">production-server-01</span>
             <span class="sftp-badge">Dry-Run Only</span>
           </div>
           <div class="prop-item" style="border:none; padding:0;">
             <span class="p-key">Uzak Sunucu</span>
             <span class="p-val">sftp.acme.com:22 (/var/www/ecommerce)</span>
           </div>
-          <p style="font-size:12px; color:var(--lf-mist); line-height:1.4;">Canlı sunucuya dosya yazma işlemi R1.3A/B sınırları dahilinde devre dışıdır. Dağıtım tetiklendiğinde yalnızca dosya farkları ve izinler simüle edilir.</p>
+          <p style="font-size:12px; color:var(--lf-mist); line-height:1.45;">Canlı sunucuya dosya yazma işlemi R1.3A/B sınırları dahilinde kesinlikle devre dışıdır. Dağıtım tetiklendiğinde yalnızca dosya farkları simüle edilir.</p>
           <div style="display:flex; gap:10px; margin-top:4px;">
-            <button style="flex:1; background:var(--lf-violet); border:1px solid var(--lf-lilac); color:var(--lf-white); font-family:var(--font-display); font-size:11px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;">
+            <button style="flex:1; background:var(--lf-violet); border:1px solid var(--lf-lilac); color:var(--lf-white); font-family:var(--font-display); font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;">
               Dry-Run Simülasyonu Çalıştır
             </button>
             <button class="btn-disabled" disabled style="padding:8px 12px;">

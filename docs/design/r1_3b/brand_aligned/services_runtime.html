@@ -24,8 +24,8 @@
     --health-error: #EF4444;
     --health-unknown: #6B7280;
 
-    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
   }
 
@@ -46,7 +46,7 @@
   .studio-backdrop {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 15%, rgba(59, 55, 106, 0.42) 0%, rgba(43, 36, 80, 0.6) 40%, var(--lf-night) 90%);
+    background: radial-gradient(circle at 50% 15%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.6) 40%, var(--lf-night) 90%);
     pointer-events: none;
     z-index: 0;
   }
@@ -58,7 +58,7 @@
     transform: translateX(-50%);
     width: 950px;
     height: 400px;
-    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.25) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.28) 0%, transparent 70%);
     filter: blur(80px);
     pointer-events: none;
     z-index: 1;
@@ -77,7 +77,7 @@
   }
 
   .macos-titlebar {
-    height: 54px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -108,10 +108,12 @@
     gap: 12px;
   }
   .brand-emblem-img {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     object-fit: cover;
+    display: block;
+    box-shadow: 0 2px 8px rgba(10, 6, 30, 0.5);
   }
   .brand-title {
     font-family: var(--font-display);
@@ -161,29 +163,30 @@
   .left-dock {
     position: absolute;
     left: 28px;
-    top: 130px;
+    top: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 12px 8px;
-    border-radius: 22px;
+    border-radius: 24px;
     background: rgba(43, 36, 80, 0.65);
-    backdrop-filter: blur(36px) saturate(160%);
+    backdrop-filter: blur(36px) saturate(180%);
     border: 1px solid rgba(183, 173, 223, 0.16);
     border-top: 1px solid rgba(183, 173, 223, 0.32);
     box-shadow: 0 20px 44px -10px rgba(10, 6, 30, 0.7);
     z-index: 40;
   }
   .dock-btn {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--lf-mist);
     cursor: pointer;
+    transition: all 0.2s;
   }
   .dock-btn.active {
     background: var(--lf-violet);
@@ -191,14 +194,14 @@
     border: 1px solid var(--lf-lilac);
     box-shadow: 0 4px 16px rgba(105, 95, 164, 0.45);
   }
-  .dock-btn svg { width: 20px; height: 20px; }
+  .dock-btn svg { width: 18px; height: 18px; }
 
-  /* Content Layout */
+  /* Content Layout with High Legibility */
   .runtime-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 32px 64px 32px 108px;
+    padding: 30px 64px 30px 108px;
     overflow-y: auto;
   }
 
@@ -206,7 +209,7 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: 24px;
+    margin-bottom: 22px;
   }
   .runtime-titles h1 {
     font-family: var(--font-display);
@@ -224,7 +227,7 @@
   .runtime-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    gap: 22px;
     margin-bottom: 24px;
   }
 
@@ -234,11 +237,11 @@
     border: 1px solid rgba(183, 173, 223, 0.14);
     border-top: 1px solid rgba(183, 173, 223, 0.32);
     border-radius: 18px;
-    padding: 22px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 330px;
+    min-height: 350px;
     box-shadow: 0 16px 36px -8px rgba(10, 6, 30, 0.6);
   }
 
@@ -246,7 +249,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
   }
   .service-title-block {
     display: flex;
@@ -256,12 +259,12 @@
   .s-name {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 18px;
+    font-size: 19px;
     color: var(--lf-white);
   }
   .s-sub {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--lf-mist);
   }
 
@@ -270,9 +273,9 @@
     align-items: center;
     gap: 6px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 999px;
     background: rgba(16, 185, 129, 0.14);
     color: var(--health-healthy);
@@ -282,27 +285,28 @@
   .telemetry-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 18px;
   }
   .tel-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding-bottom: 6px;
+    gap: 3px;
+    padding-bottom: 8px;
     border-bottom: 1px solid rgba(183, 173, 223, 0.08);
   }
   .tel-label {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
     color: var(--lf-mist);
     letter-spacing: 0.06em;
   }
   .tel-val {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 13px;
     color: var(--lf-white);
+    font-weight: 600;
     word-break: break-all;
   }
 
@@ -310,7 +314,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 12px;
+    padding-top: 14px;
     border-top: 1px solid rgba(183, 173, 223, 0.10);
   }
   .btn-sm-ghost {
@@ -319,26 +323,26 @@
     color: var(--lf-mist);
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 11px;
-    padding: 6px 12px;
-    border-radius: 6px;
+    font-size: 12px;
+    padding: 7px 14px;
+    border-radius: 8px;
     cursor: pointer;
   }
 
-  /* Adversarial Ownership Verification Panel */
+  /* Grounded Ownership Verification Card */
   .security-panel {
     background: linear-gradient(135deg, rgba(43, 36, 80, 0.75) 0%, rgba(25, 19, 55, 0.85) 100%);
     border: 1px solid rgba(183, 173, 223, 0.18);
     border-left: 4px solid var(--lf-lilac);
     border-radius: 14px;
-    padding: 20px 24px;
+    padding: 22px 26px;
     display: flex;
     align-items: flex-start;
-    gap: 16px;
+    gap: 18px;
   }
   .sec-icon {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     color: var(--lf-lilac);
     flex-shrink: 0;
     margin-top: 2px;
@@ -346,9 +350,9 @@
   .sec-text h3 {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 15px;
+    font-size: 16px;
     color: var(--lf-white);
-    margin-bottom: 4px;
+    margin-bottom: 5px;
   }
   .sec-text p {
     font-size: 13px;
@@ -359,15 +363,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 12px;
   }
   .sec-chip {
     font-family: var(--font-mono);
     font-size: 11px;
-    background: rgba(25, 19, 55, 0.7);
+    background: rgba(25, 19, 55, 0.75);
     border: 1px solid rgba(183, 173, 223, 0.22);
     color: var(--lf-white);
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 6px;
   }
 </style>
@@ -385,8 +389,9 @@
       <div class="traffic-dot dot-max"></div>
     </div>
 
+    <!-- Official Brand Lockup with Rendered Elephant Emblem -->
     <div class="brand-lockup">
-      <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
+      <img src="assets/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
       <span class="brand-title">LocalForge</span>
       <span class="brand-badge">Servisler & Runtime</span>
     </div>
@@ -557,11 +562,12 @@
       <svg class="sec-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
       <div class="sec-text">
         <h3>Süreç Sahipliği ve Port Çakışması Doğrulaması (R1.3B Katı Güvenlik)</h3>
-        <p>LocalForge, rastgele bir Homebrew Nginx sürecini asla kendi ağ geçidi olarak kabul etmez. Port 8080'i dinleyen sürecin PID'si (48921), komut satırı argümanları (`-c ~/.localforge/nginx/nginx.conf`) ve binary yolu kanonik olarak karşılaştırılarak onaylanmıştır. Port başka bir uygulama tarafından işgal edilirse durum derhal <code>PORT_CONFLICT</code> olarak etiketlenir.</p>
+        <p>LocalForge, rastgele bir Homebrew Nginx sürecini asla kendi ağ geçidi olarak kabul etmez. Port 8080'i dinleyen sürecin PID'si (48921), komut satırı argümanları (<code>-c ~/.localforge/nginx/nginx.conf</code>) ve binary yolu kanonik olarak karşılaştırılarak onaylanmıştır. Port başka bir uygulama tarafından işgal edilirse durum derhal <code>PORT_CONFLICT</code> olarak etiketlenir.</p>
         <div class="sec-chips">
           <span class="sec-chip">Denetim: Path Traversal Koruması [AKTİF]</span>
           <span class="sec-chip">Port 8080: Sahiplik Doğrulandı (PID: 48921)</span>
           <span class="sec-chip">Root Olmayan Çalışma Modu [TAM KORUMA]</span>
+          <span class="sec-chip" style="color:var(--lf-lilac); border-color:var(--lf-lilac);">İllüstratif Statik Prototip</span>
         </div>
       </div>
     </div>

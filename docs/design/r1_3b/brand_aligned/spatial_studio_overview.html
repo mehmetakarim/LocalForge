@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1600, height=1000">
-<title>LocalForge — Spatial Studio Overview (Brand Aligned)</title>
+<title>LocalForge — Direction A+ Spatial Studio Overview (Brand Aligned)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -11,7 +11,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    /* Brand Palette */
+    /* Canonical Brand Tokens */
     --lf-night: #191337;
     --lf-plum: #2B2450;
     --lf-dusk: #3B376A;
@@ -20,15 +20,15 @@
     --lf-mist: #D4CCF1;
     --lf-white: #FFFBFF;
 
-    /* Semantic Health Signals (Strictly separated from purple/violet) */
+    /* Semantic Health Indicators (Strictly separated from purple/violet) */
     --health-healthy: #10B981;
     --health-warning: #F59E0B;
     --health-error: #EF4444;
     --health-unknown: #6B7280;
 
     /* Typography */
-    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --font-body: 'Figtree', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     --font-mono: 'JetBrains Mono', Menlo, Consolas, monospace;
   }
 
@@ -47,24 +47,24 @@
     justify-content: center;
   }
 
-  /* Atmospheric Studio Backdrop */
+  /* Deep Atmospheric Studio Backdrop */
   .studio-backdrop {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.6) 40%, var(--lf-night) 90%);
+    background: radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.48) 0%, rgba(43, 36, 80, 0.65) 45%, var(--lf-night) 90%);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Brand Glow Halos */
+  /* Violet Ambient Top Halo */
   .halo-top {
     position: absolute;
-    top: -100px;
+    top: -120px;
     left: 50%;
     transform: translateX(-50%);
     width: 1000px;
     height: 480px;
-    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.28) 0%, rgba(43, 36, 80, 0.15) 50%, transparent 80%);
+    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.32) 0%, rgba(43, 36, 80, 0.15) 50%, transparent 80%);
     filter: blur(80px);
     pointer-events: none;
     z-index: 1;
@@ -83,9 +83,9 @@
     z-index: 10;
   }
 
-  /* macOS Titlebar with Brand Lockup */
+  /* Unified macOS Titlebar */
   .macos-titlebar {
-    height: 54px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -117,10 +117,12 @@
     gap: 12px;
   }
   .brand-emblem-img {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     object-fit: cover;
+    display: block;
+    box-shadow: 0 2px 8px rgba(10, 6, 30, 0.5);
   }
   .brand-title {
     font-family: var(--font-display);
@@ -145,7 +147,7 @@
   .titlebar-right {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 14px;
   }
   .status-pill {
     display: flex;
@@ -159,47 +161,46 @@
     border-radius: 8px;
     border: 1px solid rgba(183, 173, 223, 0.12);
   }
-  .status-dot {
+  .dot-emerald {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-  }
-  .dot-emerald {
     background: var(--health-healthy);
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
   }
-  .dot-slate {
-    background: var(--health-unknown);
-  }
 
-  /* Left Floating Navigation Dock */
+  /* Slender Floating Left Navigation Dock */
   .left-dock {
     position: absolute;
     left: 28px;
-    top: 130px;
+    top: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 12px 8px;
-    border-radius: 22px;
+    border-radius: 24px;
     background: rgba(43, 36, 80, 0.65);
-    backdrop-filter: blur(36px) saturate(160%);
+    backdrop-filter: blur(36px) saturate(180%);
     border: 1px solid rgba(183, 173, 223, 0.16);
     border-top: 1px solid rgba(183, 173, 223, 0.32);
     box-shadow: 0 20px 44px -10px rgba(10, 6, 30, 0.7);
     z-index: 40;
   }
   .dock-btn {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--lf-mist);
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     cursor: pointer;
+  }
+  .dock-btn:hover {
+    color: var(--lf-white);
+    background: rgba(183, 173, 223, 0.12);
   }
   .dock-btn.active {
     background: var(--lf-violet);
@@ -207,241 +208,394 @@
     border: 1px solid var(--lf-lilac);
     box-shadow: 0 4px 16px rgba(105, 95, 164, 0.45);
   }
-  .dock-btn svg {
-    width: 20px;
-    height: 20px;
+  .dock-btn svg { width: 18px; height: 18px; }
+  .dock-divider { width: 20px; height: 1px; background: rgba(183, 173, 223, 0.14); margin: 2px 0; }
+
+  /* Floating Right Zoom / Project View Control */
+  .zoom-control {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    border-radius: 20px;
+    background: rgba(43, 36, 80, 0.55);
+    backdrop-filter: blur(28px);
+    border: 1px solid rgba(183, 173, 223, 0.16);
+    z-index: 40;
+  }
+  .zoom-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--lf-mist);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .zoom-btn.active {
+    background: var(--lf-violet);
+    color: var(--lf-white);
+    font-weight: 700;
   }
 
-  /* Center Stage Container */
-  .stage-viewport {
+  /* Direction A+ Center Stage Viewport */
+  .stage-container {
     flex: 1;
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px 100px 100px 100px;
     perspective: 1200px;
+    padding-bottom: 70px;
+    overflow: hidden;
   }
 
-  /* Hero Headline */
+  /* Atmospheric Perspective Floor & Reflections */
+  .perspective-floor {
+    position: absolute;
+    bottom: -60px;
+    width: 1400px;
+    height: 520px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.3) 40%, transparent 75%);
+    transform: rotateX(65deg);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .stage-reflection {
+    position: absolute;
+    bottom: 120px;
+    width: 900px;
+    height: 140px;
+    background: radial-gradient(ellipse at center, rgba(105, 95, 164, 0.22) 0%, rgba(183, 173, 223, 0.08) 50%, transparent 80%);
+    filter: blur(40px);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Hero Headline with Strong Negative Space */
   .stage-hero {
     text-align: center;
-    margin-bottom: 34px;
+    margin-bottom: 46px;
     z-index: 20;
+    max-width: 680px;
   }
   .hero-eyebrow {
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--lf-lilac);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
-  .hero-heading {
+  .hero-headline {
     font-family: var(--font-display);
+    font-size: 38px;
     font-weight: 800;
-    font-size: 32px;
     letter-spacing: -0.03em;
+    line-height: 1.15;
     color: var(--lf-white);
   }
-  .hero-desc {
-    font-size: 14px;
+  .hero-headline strong {
+    color: var(--lf-lilac);
+    font-weight: 800;
+  }
+  .hero-sub {
+    font-size: 15px;
     color: var(--lf-mist);
-    margin-top: 6px;
-    max-width: 580px;
-    margin-inline: auto;
+    margin-top: 10px;
+    line-height: 1.5;
   }
 
-  /* 3D Longitudinal Spatial Stage Deck */
-  .spatial-deck {
-    width: 100%;
-    max-width: 1160px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 36px;
-    transform: rotateX(7deg);
-    transform-style: preserve-3d;
+  /* Direction A+ Monoliths Row */
+  .monoliths-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 32px;
     z-index: 20;
+    transform-style: preserve-3d;
   }
 
-  /* Spatial Object Card */
-  .spatial-card {
-    background: linear-gradient(180deg, rgba(43, 36, 80, 0.78) 0%, rgba(25, 19, 55, 0.88) 100%);
-    backdrop-filter: blur(28px) saturate(160%);
-    border: 1px solid rgba(183, 173, 223, 0.16);
-    border-top: 1px solid rgba(183, 173, 223, 0.40);
+  /* Tall Vertical Translucent Spatial Monolith */
+  .spatial-monolith {
+    width: 260px;
+    min-height: 330px;
+    background: linear-gradient(180deg, rgba(43, 36, 80, 0.72) 0%, rgba(25, 19, 55, 0.85) 100%);
+    backdrop-filter: blur(32px) saturate(160%);
+    border: 1px solid rgba(183, 173, 223, 0.18);
+    border-top: 1px solid rgba(183, 173, 223, 0.45);
     border-radius: 20px;
-    padding: 26px 28px;
-    box-shadow: 0 32px 64px -16px rgba(10, 6, 30, 0.75), inset 0 1px 0 rgba(183, 173, 223, 0.3);
+    padding: 24px 22px;
+    box-shadow: 0 30px 60px -15px rgba(10, 6, 30, 0.8), inset 0 1px 0 rgba(183, 173, 223, 0.35);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 380px;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
     position: relative;
-    overflow: hidden;
   }
-  .spatial-card::before {
+  .spatial-monolith:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--lf-lilac);
+    box-shadow: 0 40px 80px -20px rgba(10, 6, 30, 0.9), 0 0 30px rgba(105, 95, 164, 0.25);
+  }
+  .spatial-monolith::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 20%;
-    width: 60%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--lf-lilac), transparent);
-    opacity: 0.7;
+    bottom: -22px;
+    left: 10%;
+    width: 80%;
+    height: 12px;
+    background: radial-gradient(ellipse at center, rgba(10, 6, 30, 0.75) 0%, transparent 70%);
+    filter: blur(6px);
+    pointer-events: none;
   }
 
-  .card-header {
+  .monolith-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    margin-bottom: 20px;
   }
-  .card-title-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .project-name {
+  .monolith-title {
     font-family: var(--font-display);
+    font-size: 20px;
     font-weight: 700;
-    font-size: 22px;
     letter-spacing: -0.02em;
     color: var(--lf-white);
   }
-  .project-domain {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--lf-mist);
-  }
-
-  .card-health-badge {
+  .monolith-status {
     display: flex;
     align-items: center;
     gap: 6px;
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
-    padding: 4px 10px;
+    color: var(--health-healthy);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 3px 8px;
     border-radius: 999px;
   }
-  .health-active {
-    background: rgba(16, 185, 129, 0.14);
-    color: var(--health-healthy);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-  .health-stopped {
-    background: rgba(107, 114, 128, 0.16);
+  .monolith-status.off {
     color: var(--lf-mist);
-    border: 1px solid rgba(107, 114, 128, 0.3);
+    background: rgba(107, 114, 128, 0.14);
+    border-color: rgba(107, 114, 128, 0.3);
+  }
+  .monolith-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--health-healthy);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  }
+  .monolith-pip.off {
+    background: var(--health-unknown);
+    box-shadow: none;
   }
 
-  .card-body {
-    margin-block: 22px;
+  /* Nested Service Pills */
+  .monolith-pills {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    flex: 1;
   }
-  .spec-row {
+  .nested-pill {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(183, 173, 223, 0.08);
-  }
-  .spec-label {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(25, 19, 55, 0.55);
+    border: 1px solid rgba(183, 173, 223, 0.12);
     font-size: 12px;
     color: var(--lf-mist);
-    font-family: var(--font-mono);
+    transition: all 0.2s;
   }
-  .spec-val {
-    font-size: 12px;
-    font-weight: 500;
-    font-family: var(--font-mono);
+  .nested-pill:hover {
+    background: rgba(43, 36, 80, 0.6);
+    border-color: rgba(183, 173, 223, 0.25);
+  }
+  .nested-pill-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pill-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--lf-violet);
     color: var(--lf-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
   }
-  .spec-tag {
-    background: rgba(183, 173, 223, 0.12);
-    border: 1px solid rgba(183, 173, 223, 0.2);
-    padding: 2px 7px;
-    border-radius: 5px;
-    font-size: 11px;
+  .pill-avatar.green {
+    background: #059669;
+  }
+  .pill-avatar.purple {
+    background: var(--lf-plum);
+    border: 1px solid var(--lf-lilac);
+  }
+  .pill-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--lf-lilac);
   }
 
-  .card-footer {
+  .monolith-footer {
+    padding-top: 16px;
+    border-top: 1px solid rgba(183, 173, 223, 0.10);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 14px;
-    border-top: 1px solid rgba(183, 173, 223, 0.10);
   }
-  .btn-primary {
+  .btn-inspect {
+    width: 100%;
     background: linear-gradient(135deg, var(--lf-violet) 0%, var(--lf-plum) 100%);
     border: 1px solid var(--lf-lilac);
     color: var(--lf-white);
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 13px;
-    padding: 8px 18px;
+    font-size: 12px;
+    padding: 8px 14px;
     border-radius: 10px;
-    box-shadow: 0 4px 14px rgba(105, 95, 164, 0.35);
+    box-shadow: 0 4px 14px rgba(105, 95, 164, 0.3);
     cursor: pointer;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
   }
-  .btn-ghost {
-    background: rgba(43, 36, 80, 0.45);
-    border: 1px solid rgba(183, 173, 223, 0.18);
-    color: var(--lf-mist);
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 13px;
-    padding: 8px 16px;
-    border-radius: 10px;
+
+  /* Add Slot Monolith in Center */
+  .add-slot-monolith {
+    width: 210px;
+    min-height: 280px;
+    border: 1.5px dashed rgba(183, 173, 223, 0.28);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px 20px;
+    background: rgba(43, 36, 80, 0.2);
+    backdrop-filter: blur(16px);
+    transition: all 0.25s;
     cursor: pointer;
   }
+  .add-slot-monolith:hover {
+    border-color: var(--lf-lilac);
+    background: rgba(105, 95, 164, 0.15);
+    transform: translateY(-4px);
+  }
+  .add-slot-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: rgba(105, 95, 164, 0.25);
+    border: 1px solid rgba(183, 173, 223, 0.3);
+    color: var(--lf-lilac);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+  .add-slot-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--lf-white);
+    margin-bottom: 4px;
+  }
+  .add-slot-desc {
+    font-size: 11px;
+    color: var(--lf-mist);
+    line-height: 1.4;
+  }
 
-  /* Bottom Command & Workspace Capsule */
-  .bottom-capsule-bar {
+  /* Direction A+ Bottom AI Command Capsule */
+  .bottom-capsule {
     position: absolute;
-    bottom: 24px;
+    bottom: 22px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 20px;
-    background: rgba(43, 36, 80, 0.75);
-    backdrop-filter: blur(28px) saturate(180%);
+    gap: 16px;
+    background: rgba(43, 36, 80, 0.78);
+    backdrop-filter: blur(32px) saturate(180%);
     border: 1px solid rgba(183, 173, 223, 0.22);
-    border-top: 1px solid rgba(183, 173, 223, 0.38);
+    border-top: 1px solid rgba(183, 173, 223, 0.40);
     border-radius: 999px;
-    padding: 8px 24px;
-    box-shadow: 0 16px 36px -8px rgba(10, 6, 30, 0.7);
+    padding: 8px 22px;
+    box-shadow: 0 20px 48px -10px rgba(10, 6, 30, 0.85);
     z-index: 50;
   }
-  .capsule-item {
+  .ai-status-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lf-lilac);
+    box-shadow: 0 0 10px var(--lf-lilac);
+  }
+  .capsule-cmd {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: var(--lf-mist);
+    color: var(--lf-white);
   }
   .capsule-kbd {
-    background: rgba(25, 19, 55, 0.8);
+    background: rgba(25, 19, 55, 0.85);
     border: 1px solid rgba(183, 173, 223, 0.25);
     color: var(--lf-lilac);
     font-family: var(--font-mono);
     font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 6px;
   }
   .capsule-divider {
     width: 1px;
     height: 16px;
-    background: rgba(183, 173, 223, 0.16);
+    background: rgba(183, 173, 223, 0.18);
+  }
+  .capsule-workspace {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--lf-mist);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .prototype-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: rgba(183, 173, 223, 0.12);
+    border: 1px solid rgba(183, 173, 223, 0.22);
+    color: var(--lf-lilac);
+    padding: 2px 6px;
+    border-radius: 4px;
   }
 </style>
 </head>
@@ -451,7 +605,7 @@
 <div class="halo-top"></div>
 
 <div class="macos-window">
-  <!-- Titlebar -->
+  <!-- Unified macOS Titlebar with Official Brand Lockup -->
   <header class="macos-titlebar">
     <div class="traffic-lights">
       <div class="traffic-dot dot-close"></div>
@@ -459,20 +613,21 @@
       <div class="traffic-dot dot-max"></div>
     </div>
 
+    <!-- Official Brand Lockup with Rendered Elephant Emblem -->
     <div class="brand-lockup">
-      <img src="../../../assets/brand/raster/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
+      <img src="assets/localforge-emblem.png" alt="LocalForge Elephant Emblem" class="brand-emblem-img">
       <span class="brand-title">LocalForge</span>
       <span class="brand-badge">Spatial Studio</span>
     </div>
 
     <div class="titlebar-right">
       <div class="status-pill">
-        <div class="status-dot dot-emerald"></div>
-        <span>Nginx 8080 : Doğrulandı</span>
+        <div class="dot-emerald"></div>
+        <span>Ağ Geçidi: Doğrulandı (8080)</span>
       </div>
       <div class="status-pill">
-        <div class="status-dot dot-emerald"></div>
-        <span>MariaDB 3306 : Aktif</span>
+        <div class="dot-emerald"></div>
+        <span>MariaDB: Aktif (3306)</span>
       </div>
       <div class="status-pill" style="border-color: rgba(183, 173, 223, 0.28); color: var(--lf-white);">
         <span>/Volumes/Mac Harici Disk</span>
@@ -480,145 +635,157 @@
     </div>
   </header>
 
-  <!-- Left Floating Dock -->
+  <!-- Slender Floating Left Navigation Dock -->
   <aside class="left-dock">
-    <div class="dock-btn active" title="Spatial Studio Overview">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-        <polyline points="2 17 12 22 22 17"></polyline>
-        <polyline points="2 12 12 17 22 12"></polyline>
-      </svg>
+    <div class="dock-btn active" title="Spatial Studio (Direction A+)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
     </div>
     <div class="dock-btn" title="Projeler">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"></rect>
-        <rect x="14" y="3" width="7" height="7"></rect>
-        <rect x="14" y="14" width="7" height="7"></rect>
-        <rect x="3" y="14" width="7" height="7"></rect>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
     </div>
     <div class="dock-btn" title="Servisler ve Çalışma Zamanı">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </div>
     <div class="dock-btn" title="Depolama ve Birimler">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="12" x2="2" y2="12"></line>
-        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
-        <line x1="6" y1="16" x2="6.01" y2="16"></line>
-        <line x1="10" y1="16" x2="10.01" y2="16"></line>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"></line><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line></svg>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-btn" title="Ayarlar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
     </div>
   </aside>
 
-  <!-- Stage Viewport -->
-  <main class="stage-viewport">
+  <!-- Right Floating Count / Scale Switcher -->
+  <aside class="zoom-control">
+    <div class="zoom-btn" title="0 Proje (Boş Sahne)">0</div>
+    <div class="zoom-btn active" title="2 Proje (Onaylı Ana Hat)">2</div>
+    <div class="zoom-btn" title="6 Proje (Yoğun Sahne)">6</div>
+  </aside>
+
+  <!-- Centered Direction A+ Stage Viewport -->
+  <main class="stage-container">
+    <div class="perspective-floor"></div>
+    <div class="stage-reflection"></div>
+
+    <!-- Hero Headline with Direction A+ Negative Space -->
     <div class="stage-hero">
-      <div class="hero-eyebrow">Aktif Çalışma Alanı · 2 Proje Kayıtlı</div>
-      <h1 class="hero-heading">Yerel Geliştirme Sahnesi</h1>
-      <p class="hero-desc">İzole macOS Apple Silicon mimarisinde çalışan servisler ve projeleriniz.</p>
+      <div class="hero-eyebrow">LocalForge · Direction A+ Sahnesi</div>
+      <h1 class="hero-headline">Tüm servisler <strong>etkin.</strong></h1>
+      <p class="hero-sub">İki yerel çalışma alanı ve doğrulanmış Nginx ağ geçidi aktif olarak çalışıyor.</p>
     </div>
 
-    <!-- 3D Longitudinal Cards -->
-    <div class="spatial-deck">
-      <!-- Card 1: Active -->
-      <article class="spatial-card">
-        <div class="card-header">
-          <div class="card-title-group">
-            <h2 class="project-name">ecommerce-portal</h2>
-            <span class="project-domain">http://ecommerce.localforge.test:8080</span>
+    <!-- Tall Translucent Monoliths Row -->
+    <div class="monoliths-row">
+      <!-- Monolith 1: Online Project -->
+      <article class="spatial-monolith">
+        <div>
+          <div class="monolith-header">
+            <h2 class="monolith-title">ecommerce-portal</h2>
+            <div class="monolith-status">
+              <span class="monolith-pip"></span>
+              <span>çevrimiçi</span>
+            </div>
           </div>
-          <div class="card-health-badge health-active">
-            <div class="status-dot dot-emerald"></div>
-            <span>ÇALIŞIYOR</span>
+
+          <div class="monolith-pills">
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar">E</span>
+                <span>ecommerce.localforge.test</span>
+              </div>
+              <span class="pill-tag">:8080</span>
+            </div>
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar green">P</span>
+                <span>PHP 8.2-FPM Socket</span>
+              </div>
+              <span class="pill-tag">aktif</span>
+            </div>
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar purple">M</span>
+                <span>MariaDB (ecommerce_db)</span>
+              </div>
+              <span class="pill-tag">:3306</span>
+            </div>
           </div>
         </div>
 
-        <div class="card-body">
-          <div class="spec-row">
-            <span class="spec-label">Çalışma Zamanı</span>
-            <span class="spec-val spec-tag">PHP 8.2-FPM</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Web Ağ Geçidi</span>
-            <span class="spec-val">Nginx vhost / port 8080</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Veritabanı</span>
-            <span class="spec-val">ecommerce_db (MariaDB 11.2)</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Depolama Birimi</span>
-            <span class="spec-val" style="color: var(--lf-lilac);">Mac Harici Disk (APFS)</span>
-          </div>
-        </div>
-
-        <div class="card-footer">
-          <button class="btn-ghost">■ Durdur</button>
-          <button class="btn-primary">
-            <span>Müfettiş (Inspector)</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <div class="monolith-footer">
+          <button class="btn-inspect">
+            <span>Project Inspector Aç</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </div>
       </article>
 
-      <!-- Card 2: Stopped -->
-      <article class="spatial-card" style="opacity: 0.9;">
-        <div class="card-header">
-          <div class="card-title-group">
-            <h2 class="project-name">marketing-site</h2>
-            <span class="project-domain">http://marketing.localforge.test:8081</span>
+      <!-- Center Add Slot Monolith -->
+      <div class="add-slot-monolith">
+        <div class="add-slot-icon">+</div>
+        <div class="add-slot-title">Proje Ekle</div>
+        <div class="add-slot-desc">Harici SSD veya dahili diskten yeni bir PHP/WP alanı bağla</div>
+      </div>
+
+      <!-- Monolith 2: Idle Project -->
+      <article class="spatial-monolith" style="opacity: 0.92;">
+        <div>
+          <div class="monolith-header">
+            <h2 class="monolith-title">marketing-site</h2>
+            <div class="monolith-status off">
+              <span class="monolith-pip off"></span>
+              <span>beklemede</span>
+            </div>
           </div>
-          <div class="card-health-badge health-stopped">
-            <div class="status-dot dot-slate"></div>
-            <span>DURDURULDU</span>
+
+          <div class="monolith-pills">
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar" style="background:var(--lf-dusk);">M</span>
+                <span>marketing.localforge.test</span>
+              </div>
+              <span class="pill-tag">:8081</span>
+            </div>
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar" style="background:var(--lf-dusk);">P</span>
+                <span>PHP 8.1-FPM</span>
+              </div>
+              <span class="pill-tag">pasif</span>
+            </div>
+            <div class="nested-pill">
+              <div class="nested-pill-left">
+                <span class="pill-avatar purple">M</span>
+                <span>MariaDB (marketing_wp)</span>
+              </div>
+              <span class="pill-tag">:3306</span>
+            </div>
           </div>
         </div>
 
-        <div class="card-body">
-          <div class="spec-row">
-            <span class="spec-label">Çalışma Zamanı</span>
-            <span class="spec-val spec-tag">PHP 8.1-FPM</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Web Ağ Geçidi</span>
-            <span class="spec-val">Nginx vhost (pasif)</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Veritabanı</span>
-            <span class="spec-val">marketing_wp (MariaDB 11.2)</span>
-          </div>
-          <div class="spec-row">
-            <span class="spec-label">Depolama Birimi</span>
-            <span class="spec-val">Dahili APFS Container</span>
-          </div>
-        </div>
-
-        <div class="card-footer">
-          <button class="btn-primary" style="background: var(--lf-dusk); border-color: rgba(183, 173, 223, 0.3);">▶ Başlat</button>
-          <button class="btn-ghost">Müfettiş (Inspector)</button>
+        <div class="monolith-footer">
+          <button class="btn-inspect" style="background: var(--lf-dusk); border-color: rgba(183, 173, 223, 0.28);">
+            <span>▶ Servisleri Başlat</span>
+          </button>
         </div>
       </article>
     </div>
   </main>
 
-  <!-- Bottom Capsule Bar -->
-  <footer class="bottom-capsule-bar">
-    <div class="capsule-item">
+  <!-- Direction A+ Bottom AI Command Capsule -->
+  <footer class="bottom-capsule">
+    <div class="ai-status-pulse"></div>
+    <div class="capsule-cmd">
       <span class="capsule-kbd">⌘K</span>
-      <span>Hızlı Komut Paleti</span>
+      <span>Komut Merkezi · Proje veya servis ara...</span>
     </div>
     <div class="capsule-divider"></div>
-    <div class="capsule-item">
-      <span style="color: var(--lf-lilac);">Bağlı Disk:</span>
-      <span style="font-family: var(--font-mono); color: var(--lf-white);">/Volumes/Mac Harici Disk</span>
+    <div class="capsule-workspace">
+      <span style="color:var(--lf-lilac);">Bağlı Alan:</span>
+      <span style="color:var(--lf-white); font-weight:600;">/Volumes/Mac Harici Disk > LocalForge</span>
     </div>
     <div class="capsule-divider"></div>
-    <div class="capsule-item">
-      <span>LocalForge v0.1.0-alpha · macOS Apple Silicon</span>
-    </div>
+    <span class="prototype-badge">İllüstratif Statik Prototip</span>
   </footer>
 </div>
 
