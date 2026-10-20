@@ -1,20 +1,21 @@
 import React, { useEffect } from "react";
-import { ViewMode, ProjectRecord } from "../types";
+import { ViewMode, ProjectRecord, VolumeInfo, RuntimeOverview } from "../types";
 import { FloatingDock } from "./FloatingDock";
 import { AICommandCapsule } from "./AICommandCapsule";
 
 export interface AppShellProps {
   activeMode: ViewMode;
   onSelectMode: (mode: ViewMode) => void;
-  theme: "dark" | "light";
-  onToggleTheme: () => void;
+  projects: ProjectRecord[];
+  volumes: VolumeInfo[];
+  runtime: RuntimeOverview | null;
   isCapsuleOpen: boolean;
   onOpenCapsule: () => void;
   onCloseCapsule: () => void;
-  projects: ProjectRecord[];
   onSelectProject?: (project: ProjectRecord) => void;
   onCreateProject?: () => void;
   onRefreshData?: () => void;
+  onOpenWelcome?: () => void;
   zoomLevel?: number;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
@@ -25,15 +26,16 @@ export interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({
   activeMode,
   onSelectMode,
-  theme,
-  onToggleTheme,
+  projects,
+  volumes,
+  runtime,
   isCapsuleOpen,
   onOpenCapsule,
   onCloseCapsule,
-  projects,
   onSelectProject,
   onCreateProject,
   onRefreshData,
+  onOpenWelcome,
   zoomLevel = 100,
   onZoomIn,
   onZoomOut,
@@ -81,50 +83,94 @@ export const AppShell: React.FC<AppShellProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onSelectMode]);
 
+  const externalVol = volumes.find((v) => !v.is_internal || v.is_removable);
+  const primaryVolumeName = externalVol?.mount_point || volumes[0]?.mount_point || "/Volumes/Mac Harici Disk";
+
   return (
-    <div
-      className={`min-h-screen relative flex flex-col font-sans text-zinc-100 select-none overflow-hidden ${
-        theme === "dark" ? "bg-[#07090F]" : "bg-slate-900"
-      }`}
-    >
-      {/* Studio Radial Ambient Backdrop */}
+    <div className="min-h-screen relative flex flex-col font-['Figtree',sans-serif] text-[#FFFBFF] select-none overflow-hidden bg-[#191337]">
+      {/* Studio Deep Atmospheric Backdrop */}
       <div
         className="fixed inset-0 pointer-events-none z-0"
         style={{
           background:
-            "radial-gradient(circle at 50% 20%, rgba(30, 42, 74, 0.45) 0%, rgba(10, 13, 20, 0.95) 60%, #07090F 100%)",
+            "radial-gradient(circle at 50% 18%, rgba(59, 55, 106, 0.48) 0%, rgba(43, 36, 80, 0.65) 45%, #191337 90%)",
         }}
         aria-hidden="true"
       />
 
-      {/* Atmospheric Lighting Halos (Hardware-Capped strictly to 2 layers) */}
+      {/* Atmospheric Top Violet Ambient Halo */}
       <div
-        className="fixed top-[-120px] left-1/2 -translate-x-1/2 w-[900px] h-[480px] rounded-full pointer-events-none opacity-30 blur-[80px] bg-gradient-to-br from-indigo-500/20 via-purple-600/10 to-transparent z-0"
-        aria-hidden="true"
-      />
-      <div
-        className="fixed bottom-[-100px] right-[15%] w-[600px] h-[400px] rounded-full pointer-events-none opacity-20 blur-[90px] bg-gradient-to-tl from-indigo-600/20 to-transparent z-0"
+        className="fixed top-[-120px] left-1/2 -translate-x-1/2 w-[1000px] h-[480px] pointer-events-none blur-[80px] z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(105, 95, 164, 0.32) 0%, rgba(43, 36, 80, 0.15) 50%, transparent 80%)",
+        }}
         aria-hidden="true"
       />
 
-      {/* macOS Native Titlebar Header */}
+      {/* Unified macOS Titlebar with Official Brand Lockup */}
       <header
         data-tauri-drag-region
-        className="fixed top-0 left-0 right-0 h-12 z-40 flex items-center justify-between px-24 border-b border-white/[0.04] bg-[#0A0D14]/80 backdrop-blur-md"
+        className="fixed top-0 left-0 right-0 h-[52px] z-50 flex items-center justify-between px-7 border-b border-[rgba(183,173,223,0.10)] bg-[#2B2450]/35 backdrop-blur-xl"
       >
-        <div className="flex items-center gap-2 text-xs font-medium text-zinc-400 pointer-events-none">
-          <span className="font-semibold text-zinc-200">LocalForge</span>
-          <span className="text-zinc-600">/</span>
-          <span className="capitalize text-zinc-400 font-mono text-[11px]">{activeMode}</span>
+        {/* macOS Window Controls (Traffic Lights) */}
+        <div className="flex items-center gap-2 w-44">
+          <span className="w-3 h-3 rounded-full bg-[#FF5F56] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
+          <span className="w-3 h-3 rounded-full bg-[#FFBD2E] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
+          <span className="w-3 h-3 rounded-full bg-[#27C93F] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
         </div>
 
-        <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-400">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]" />
-            <span className="text-zinc-400">senkronize · yerel loopback :8080</span>
+        {/* Official Brand Lockup with Rendered Elephant Emblem */}
+        <div className="flex items-center gap-3">
+          <img
+            src="/brand/localforge-emblem.png"
+            alt="LocalForge Elephant Emblem"
+            className="w-6 h-6 rounded-md object-cover shadow-[0_2px_8px_rgba(10,6,30,0.5)] border border-[rgba(183,173,223,0.2)]"
+          />
+          <span className="font-['Plus_Jakarta_Sans',sans-serif] font-extrabold text-[15px] tracking-[-0.02em] text-[#FFFBFF]">
+            LocalForge
+          </span>
+          <span className="font-mono text-[10px] font-semibold tracking-[0.08em] uppercase text-[#B7ADDF] bg-[rgba(183,173,223,0.12)] border border-[rgba(183,173,223,0.22)] px-2 py-0.5 rounded-md">
+            Spatial Studio
+          </span>
+        </div>
+
+        {/* System Health Indicators & Volume Badge */}
+        <div className="flex items-center gap-3 font-mono text-[11px]">
+          {/* Nginx Gateway Pill */}
+          <div className="flex items-center gap-2 text-[#D4CCF1] bg-[#2B2450]/55 px-2.5 py-1 rounded-lg border border-[rgba(183,173,223,0.12)]">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                runtime?.nginx_running
+                  ? "bg-[#10B981] shadow-[0_0_8px_#10B981]"
+                  : runtime?.nginx_port_conflict
+                  ? "bg-[#EF4444] shadow-[0_0_8px_#EF4444]"
+                  : "bg-[#6B7280]"
+              }`}
+            />
+            <span>
+              Ağ Geçidi: {runtime?.nginx_running ? "Doğrulandı" : runtime?.nginx_port_conflict ? "Port Çakışması" : "Durduruldu"} ({runtime?.nginx_port || 8080})
+            </span>
           </div>
-          <span className="text-zinc-600">•</span>
-          <span className="text-zinc-500">v0.1.0 (Phase R1.3A-V)</span>
+
+          {/* MariaDB Pill */}
+          <div className="flex items-center gap-2 text-[#D4CCF1] bg-[#2B2450]/55 px-2.5 py-1 rounded-lg border border-[rgba(183,173,223,0.12)]">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                runtime?.mariadb_alive
+                  ? "bg-[#10B981] shadow-[0_0_8px_#10B981]"
+                  : "bg-[#6B7280]"
+              }`}
+            />
+            <span>
+              MariaDB: {runtime?.mariadb_alive ? "Aktif" : "Durduruldu"} ({runtime?.mariadb_port || 3306})
+            </span>
+          </div>
+
+          {/* Volume Badge */}
+          <div className="text-[#FFFBFF] bg-[#2B2450]/55 px-2.5 py-1 rounded-lg border border-[rgba(183,173,223,0.28)] truncate max-w-[200px]">
+            <span>{primaryVolumeName}</span>
+          </div>
         </div>
       </header>
 
@@ -132,20 +178,19 @@ export const AppShell: React.FC<AppShellProps> = ({
       <FloatingDock
         activeMode={activeMode}
         onSelectMode={onSelectMode}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
+        onOpenWelcome={onOpenWelcome}
       />
 
       {/* Floating Functional Zoom Controls on Right */}
       {onZoomIn && onZoomOut && onZoomReset && (
         <aside
-          aria-label="Scene Zoom Controls"
-          className="fixed right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-2 p-2 rounded-2xl bg-[#101522]/55 border border-white/10 backdrop-blur-2xl shadow-xl font-mono text-xs text-zinc-400"
+          aria-label="Sahne Yakınlaştırma Denetimleri"
+          className="fixed right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-[#2B2450]/55 border border-[rgba(183,173,223,0.16)] backdrop-blur-2xl shadow-xl font-mono text-xs text-[#D4CCF1]"
         >
           <button
             type="button"
             onClick={onZoomIn}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white flex items-center justify-center transition-colors"
+            className="w-7 h-7 rounded-lg bg-[rgba(183,173,223,0.10)] hover:bg-[rgba(183,173,223,0.20)] border border-[rgba(183,173,223,0.15)] text-[#FFFBFF] flex items-center justify-center transition-colors cursor-pointer"
             title="Yakınlaştır (+5%)"
           >
             +
@@ -153,7 +198,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           <button
             type="button"
             onClick={onZoomReset}
-            className="text-[11px] font-semibold text-zinc-300 hover:text-white px-1 py-0.5 rounded transition-colors"
+            className="text-[11px] font-semibold text-[#D4CCF1] hover:text-[#FFFBFF] px-1 py-0.5 rounded transition-colors cursor-pointer"
             title="Sıfırla (100%)"
           >
             %{zoomLevel}
@@ -161,7 +206,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           <button
             type="button"
             onClick={onZoomOut}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white flex items-center justify-center transition-colors"
+            className="w-7 h-7 rounded-lg bg-[rgba(183,173,223,0.10)] hover:bg-[rgba(183,173,223,0.20)] border border-[rgba(183,173,223,0.15)] text-[#FFFBFF] flex items-center justify-center transition-colors cursor-pointer"
             title="Uzaklaştır (-5%)"
           >
             -
@@ -169,8 +214,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         </aside>
       )}
 
-      {/* Main Studio Viewport (Centered) */}
-      <main className="relative z-10 flex-1 ml-20 mr-16 mt-12 flex flex-col items-center justify-center overflow-y-auto">
+      {/* Main Studio Viewport */}
+      <main className="relative z-10 flex-1 ml-24 mr-16 mt-14 flex flex-col items-center justify-center overflow-y-auto">
         {children}
       </main>
 

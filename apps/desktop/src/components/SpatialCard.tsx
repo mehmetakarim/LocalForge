@@ -19,60 +19,65 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
   const [tilt, setTilt] = useState({ x: 8, y: 0, lift: -8 });
 
   const isRunning = project.status === "running";
-  const isFailed = project.status === "failed";
-  const isDegraded = project.status === "degraded";
-  const isDisconnected = project.status === "disconnected";
   const isExternal = volume ? volume.is_removable || !volume.is_internal : false;
 
   const getStatusBadge = () => {
     switch (project.status) {
       case "running":
         return {
-          dot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]",
-          text: "text-emerald-400",
+          dot: "bg-[#10B981] shadow-[0_0_8px_#10B981]",
+          text: "text-[#10B981]",
+          bg: "bg-[#10B981]/12 border-[#10B981]/30",
           label: "çevrimiçi",
         };
       case "failed":
         return {
-          dot: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]",
-          text: "text-rose-400",
+          dot: "bg-[#EF4444] shadow-[0_0_8px_#EF4444]",
+          text: "text-[#EF4444]",
+          bg: "bg-[#EF4444]/12 border-[#EF4444]/30",
           label: "arızalı",
         };
       case "degraded":
         return {
-          dot: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]",
-          text: "text-amber-400",
+          dot: "bg-[#F59E0B] shadow-[0_0_8px_#F59E0B]",
+          text: "text-[#F59E0B]",
+          bg: "bg-[#F59E0B]/12 border-[#F59E0B]/30",
           label: "bozulmuş",
         };
       case "disconnected":
         return {
-          dot: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]",
-          text: "text-amber-400",
+          dot: "bg-[#F59E0B] shadow-[0_0_8px_#F59E0B]",
+          text: "text-[#F59E0B]",
+          bg: "bg-[#F59E0B]/12 border-[#F59E0B]/30",
           label: "bağlantı kesik",
         };
       case "starting":
         return {
-          dot: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
-          text: "text-blue-400",
+          dot: "bg-[#60A5FA] shadow-[0_0_8px_#60A5FA]",
+          text: "text-[#60A5FA]",
+          bg: "bg-[#60A5FA]/12 border-[#60A5FA]/30",
           label: "başlatılıyor",
         };
       case "stopping":
         return {
-          dot: "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]",
-          text: "text-blue-400",
+          dot: "bg-[#9CA3AF]",
+          text: "text-[#9CA3AF]",
+          bg: "bg-[#9CA3AF]/12 border-[#9CA3AF]/30",
           label: "durduruluyor",
         };
       case "unknown":
         return {
-          dot: "bg-zinc-400",
-          text: "text-zinc-400",
+          dot: "bg-[#6B7280]",
+          text: "text-[#D4CCF1]",
+          bg: "bg-[#6B7280]/14 border-[#6B7280]/30",
           label: "bilinmiyor",
         };
       case "stopped":
       default:
         return {
-          dot: "bg-zinc-500",
-          text: "text-zinc-400",
+          dot: "bg-[#6B7280]",
+          text: "text-[#D4CCF1]",
+          bg: "bg-[#6B7280]/14 border-[#6B7280]/30",
           label: "beklemede",
         };
     }
@@ -99,19 +104,7 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
   };
 
   const isCompact = scaleMode === "compact";
-
-  const getCardToneClasses = () => {
-    if (isFailed || isDegraded) {
-      return "bg-gradient-to-b from-[#24141E]/75 via-[#120A10]/85 to-[#F43F5E]/20 border-t-[1.5px] border-t-rose-400/40 border-x border-b border-rose-500/20 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(244,63,94,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
-    }
-    if (isDisconnected) {
-      return "bg-gradient-to-b from-[#241C14]/75 via-[#140F0A]/85 to-[#F59E0B]/20 border-t-[1.5px] border-t-amber-400/40 border-x border-b border-amber-500/20 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(245,158,11,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
-    }
-    if (isRunning) {
-      return "bg-gradient-to-b from-[#182034]/75 via-[#0C101C]/85 to-[#10B981]/20 border-t-[1.5px] border-t-white/30 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),0_0_32px_-4px_rgba(16,185,129,0.2),inset_0_1px_0_rgba(255,255,255,0.2)]";
-    }
-    return "bg-gradient-to-b from-[#161C2C]/70 via-[#0C101A]/85 to-[#64748B]/15 border-t-[1.5px] border-t-white/20 border-x border-b border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15)]";
-  };
+  const cleanName = project.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
 
   return (
     <div
@@ -130,82 +123,105 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
       style={{
         transform: `perspective(1400px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(${tilt.lift}px)`,
         WebkitBoxReflect:
-          "below 8px linear-gradient(to bottom, transparent 65%, rgba(255, 255, 255, 0.08) 100%)",
+          "below 10px linear-gradient(to bottom, transparent 65%, rgba(183, 173, 223, 0.08) 100%)",
+        background:
+          "linear-gradient(180deg, rgba(43, 36, 80, 0.72) 0%, rgba(25, 19, 55, 0.85) 100%)",
       }}
-      className={`relative select-none transition-all duration-300 ease-out cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-        isCompact ? "w-40 min-h-[230px] p-4 rounded-2xl" : "w-64 min-h-[290px] p-6 rounded-3xl"
-      } ${getCardToneClasses()} ${
-        isSelected ? "ring-2 ring-indigo-400/80 shadow-[0_0_36px_rgba(79,110,247,0.35)]" : ""
+      className={`relative select-none transition-all duration-300 ease-out cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#B7ADDF] backdrop-blur-2xl border border-[rgba(183,173,223,0.18)] border-t-[1.5px] border-t-[rgba(183,173,223,0.45)] shadow-[0_30px_60px_-15px_rgba(10,6,30,0.8),inset_0_1px_0_rgba(183,173,223,0.35)] hover:border-[#B7ADDF] hover:shadow-[0_40px_80px_-20px_rgba(10,6,30,0.9),0_0_30px_rgba(105,95,164,0.25)] ${
+        isCompact ? "w-44 min-h-[260px] p-4 rounded-2xl" : "w-64 min-h-[320px] p-6 rounded-3xl"
+      } ${
+        isSelected ? "ring-2 ring-[#B7ADDF] shadow-[0_0_36px_rgba(105,95,164,0.45)]" : ""
       }`}
     >
       {/* Monolith Header */}
-      <div className="flex flex-col gap-1 mb-5">
-        <h3
-          className={`font-bold text-white tracking-tight truncate ${
-            isCompact ? "text-sm" : "text-lg"
-          }`}
-          title={project.name}
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="truncate">
+          <h3
+            className={`font-['Plus_Jakarta_Sans',sans-serif] font-bold text-[#FFFBFF] tracking-[-0.02em] truncate ${
+              isCompact ? "text-base" : "text-xl"
+            }`}
+            title={project.name}
+          >
+            {project.name}
+          </h3>
+          <span className="font-mono text-[10px] text-[#B7ADDF] truncate block">
+            {project.local_domain}
+          </span>
+        </div>
+        <div
+          className={`flex items-center gap-1.5 font-mono text-[11px] font-semibold px-2 py-0.5 rounded-full border ${statusBadge.bg} ${statusBadge.text}`}
         >
-          {project.name}
-        </h3>
-        <div className="flex items-center gap-1.5 font-mono text-[11px]">
           <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
-          <span className={statusBadge.text}>{statusBadge.label}</span>
+          <span>{statusBadge.label}</span>
         </div>
       </div>
 
       {/* Nested Sub-Component Pills */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between p-2 rounded-xl bg-black/35 border border-white/5 text-xs text-zinc-200">
+      <div className="flex flex-col gap-2 mb-4">
+        {/* Nginx / Web Root Pill */}
+        <div className="flex items-center justify-between p-2 rounded-xl bg-[#191337]/55 border border-[rgba(183,173,223,0.12)] text-xs text-[#D4CCF1]">
           <div className="flex items-center gap-2 truncate">
-            <span
-              className={`w-4 h-4 rounded-md font-bold text-[10px] flex items-center justify-center ${
-                isExternal ? "bg-amber-400 text-black" : "bg-indigo-500 text-white"
-              }`}
-            >
+            <span className="w-5 h-5 rounded-md font-['Plus_Jakarta_Sans',sans-serif] text-[10px] font-bold bg-[#695FA4] text-[#FFFBFF] flex items-center justify-center">
               {project.name.charAt(0).toUpperCase()}
             </span>
             <span className="truncate">{project.document_root || "public"}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isRunning ? "bg-emerald-400" : "bg-zinc-600"
-              }`}
-            />
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isRunning ? "bg-emerald-400" : "bg-zinc-600"
-              }`}
-            />
+          <div className="flex items-center gap-1 font-mono text-[10px] text-[#B7ADDF]">
+            <span>:8080</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-2 rounded-xl bg-black/35 border border-white/5 text-xs text-zinc-300">
+        {/* PHP Version Pill */}
+        <div className="flex items-center justify-between p-2 rounded-xl bg-[#191337]/55 border border-[rgba(183,173,223,0.12)] text-xs text-[#D4CCF1]">
           <div className="flex items-center gap-2 truncate">
-            <span className="w-4 h-4 rounded-md font-mono text-[9px] font-bold bg-emerald-500 text-black flex items-center justify-center">
-              P
+            <span className="w-5 h-5 rounded-md font-mono text-[9px] font-bold bg-[#2B2450] border border-[#B7ADDF] text-[#B7ADDF] flex items-center justify-center">
+              PHP
             </span>
-            <span className="font-mono text-[11px] text-zinc-300">
-              PHP {project.php_version}
+            <span className="font-mono text-[11px] text-[#FFFBFF]">
+              {project.php_version}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isRunning ? "bg-emerald-400" : "bg-zinc-600"
-              }`}
-            />
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isRunning ? "bg-[#10B981] shadow-[0_0_6px_#10B981]" : "bg-[#6B7280]"
+            }`}
+          />
+        </div>
+
+        {/* MariaDB Isolated DB Pill */}
+        <div className="flex items-center justify-between p-2 rounded-xl bg-[#191337]/55 border border-[rgba(183,173,223,0.12)] text-xs text-[#D4CCF1]">
+          <div className="flex items-center gap-2 truncate">
+            <span className="w-5 h-5 rounded-md font-mono text-[9px] font-bold bg-[#059669] text-white flex items-center justify-center">
+              DB
+            </span>
+            <span className="font-mono text-[10px] text-[#D4CCF1] truncate">
+              {cleanName}
+            </span>
           </div>
+          <span className="font-mono text-[10px] text-[#B7ADDF]">:3306</span>
         </div>
       </div>
 
-      {/* Drive Badge Hint at Bottom */}
-      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-2 border-t border-white/5">
-        <span className={isExternal ? "text-amber-400/90 font-medium truncate" : "truncate"}>
+      {/* Monolith Footer with Inspect Button */}
+      <div className="pt-3 border-t border-[rgba(183,173,223,0.10)] flex items-center justify-between">
+        <span
+          className={`font-mono text-[10px] truncate max-w-[120px] ${
+            isExternal ? "text-[#F59E0B] font-medium" : "text-[#D4CCF1]"
+          }`}
+          title={volume?.name || "APFS"}
+        >
           {volume?.name || "APFS"}
         </span>
-        <span className="text-zinc-600 text-[9px]">Detay ↗</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(project);
+          }}
+          className="bg-gradient-to-r from-[#695FA4] to-[#2B2450] border border-[#B7ADDF] text-[#FFFBFF] font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[11px] px-3 py-1.5 rounded-lg shadow-[0_2px_8px_rgba(105,95,164,0.3)] hover:brightness-110 transition-all cursor-pointer"
+        >
+          Müfettiş ↗
+        </button>
       </div>
     </div>
   );

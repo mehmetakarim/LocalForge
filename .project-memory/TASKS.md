@@ -91,12 +91,17 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-GATE-01** | Direction A+ 4 High-Fidelity Visual Prototypes & PNGs | Critical | COMPLETED | Lead UI Designer | Direction A+ PO Ref | 4 1600x1000 HTML prototypes & rendered PNGs (Projects, Services, Storage, Inspector) in `docs/design/r1_3b/` |
 | **TASK-R1.3B-GATE-02** | Data Capability Mapping & Log Safeguards Matrix | Critical | COMPLETED | Systems Architect | TASK-R1.3B-GATE-01 | Metric-to-command mapping, backend availability audit, safe fallbacks, ring-buffer log specification |
 
-### Subphase R1.3B: Native Workspace Implementation (PLANNED / LOCKED AWAITING APPROVAL)
+### Subphase R1.3B: Brand Integration & Native Workspace Implementation (COMPLETED / AWAITING ACCEPTANCE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
-| **TASK-R1.3B-01** | Native Workspace Multi-View Spatial Navigation | High | PLANNED | Frontend Lead | R1.3B Gate Approval | Projects Workspace, Services & Runtime, Storage & Volumes views |
-| **TASK-R1.3B-02** | Detailed Project Inspector & Diagnostic Drawer | High | PLANNED | Frontend Lead | TASK-R1.3B-01 | Per-project telemetry, FastCGI socket inspection, bounded live logs, cURL helper |
-| **TASK-R1.3B-03** | Database Deletion UI Exclusion (Safety Guard) | Critical | SCOPE LOCKED | Security Engineer | ADR-0011 | Database deletion strictly OUT OF SCOPE; `DatabaseDeletionUnavailable` enforced |
+| **TASK-R1.3B-STAGE-A** | Canonical Brand Integration & Prototype Assets | Critical | APPROVED | Lead UI Designer | Brand Kit ZIP | 6 high-res HTML prototypes & PNGs; CI Run 39499020338 Green |
+| **TASK-R1.3B-B1** | Spatial Studio Brand Alignment & Direction A+ Monoliths | Critical | COMPLETED | Frontend Lead | Stage A Gate | Translucent vertical monoliths, specular rim, perspective floor reflection, 0/2/6 project behavior |
+| **TASK-R1.3B-B2** | Projects Workspace Native View | High | COMPLETED | Frontend Lead | TASK-R1.3B-B1 | Real persistent metadata listing, search input, filter pills, safe lifecycle controls |
+| **TASK-R1.3B-B3** | Services & Runtime Native View | Critical | COMPLETED | Systems Engineer | TASK-R1.3B-B1 | Nginx port 8080 process ownership verification, PHP-FPM socket pool, MariaDB engine, zero fabricated telemetry |
+| **TASK-R1.3B-B4** | Storage & Volumes Native View | High | COMPLETED | Systems Engineer | TASK-R1.3B-B1 | APFS Tier-1 external volume, internal container, persistent UUIDs, disk usage gauges, VolumeBarrier guard |
+| **TASK-R1.3B-B5** | Detailed Project Inspector Drawer | Critical | COMPLETED | Security Engineer | TASK-R1.3B-B1 | Slide-over drawer, brand identity, database deletion lock strictly enforced, SFTP dry-run only guard |
+| **TASK-R1.3B-B6** | Welcome / First-Run Splash Experience | Medium | COMPLETED | Lead UI Designer | Stage A Gate | Official Apple squircle app icon, quickstart onboarding cards, non-intrusive dismiss logic |
+| **TASK-R1.3B-B7** | Full Workspace Automated Test & Visual Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-B1..B6 | 57 Rust + 16 frontend tests (73/73 PASS); clean TypeScript build; 9 verified high-res PNG screenshots packaged in ZIP |
 
 ---
 

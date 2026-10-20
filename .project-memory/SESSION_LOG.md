@@ -480,3 +480,52 @@ This document records the chronological engineering log for all development sess
    - `cargo fmt --check`: 0 diffs.
    - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
    - `npm --prefix apps/desktop run build`: Clean TypeScript compilation & Vite bundle (0 errors).
+
+---
+
+## Session 014 — Phase R1.3B Stage B Brand Identity & Native Workspace Implementation
+
+- **Date**: 2026-10-21
+- **Participants**: Lead Architect, Frontend Lead, Systems Engineer, Security Engineer, QA Lead
+- **Authorized Phase**: **Phase R1.3B Stage B — Brand Integration & Native Workspace Implementation**
+- **Git Branch**: `phase-r1/r1-3b-brand-implementation`
+
+### Summary of Activities
+1. **Brand Integration**:
+   - Integrated official brand tokens into `apps/desktop/src/index.css` (Gece `#191337`, Erik `#2B2450`, Alacakaranlık `#3B376A`, Menekşe `#695FA4`, Lila `#B7ADDF`, Sis `#D4CCF1`, Kar Beyazı `#FFFBFF`).
+   - Preserved independent semantic health colors (Emerald `#10B981` healthy, Amber `#F59E0B` warning, Ruby `#EF4444` error, Slate `#6B7280` stopped). Strictly ensured system health is never colored purple or violet.
+   - Generated official macOS, Windows, iOS, and Android application icon assets into `apps/desktop/src-tauri/icons/` (`icon.icns`, `icon.ico`, etc.) using `@tauri-apps/cli`.
+   - Placed canonical raster assets in `apps/desktop/public/brand/` for direct bundling.
+   - Integrated official elephant emblem into macOS titlebar and project inspector drawer.
+2. **Stage B1 — Spatial Studio Brand Alignment**:
+   - Restored Direction A+ 3D vertical monoliths with 8° micro-tilt, specular rim (`border-t-[1.5px] border-t-[rgba(183,173,223,0.45)]`), and perspective floor reflections.
+   - Implemented honest 0/2/6 project count behavior (0 = dashed empty wireframe, 2 = dual monoliths with quick add, 6 = multi-item row with pagination for >6).
+   - Bound real backend runtime overview data without synthetic telemetry.
+   - Enhanced bottom AI Command Capsule (`AICommandCapsule.tsx`) with brand pulse, `⌘K` shortcut, and workspace path.
+3. **Stage B2 — Projects Workspace (`ProjectsWorkspace.tsx`)**:
+   - Implemented full projects listing view bound to persistent metadata.
+   - Added live search, status filter pills ("Tümü", "Çalışanlar", "Durdurulanlar", "Harici APFS"), and safe lifecycle controls ("Başlat", "Durdur", "Müfettiş").
+4. **Stage B3 — Services & Runtime (`ServicesRuntime.tsx`)**:
+   - Implemented 3 main service diagnostic cards: Nginx Gateway (8080), PHP-FPM Socket Pool, MariaDB Engine (3306).
+   - Bound verified process ownership, port conflict status, and live latency without fabricated metrics.
+   - Added Grounded Process Identity & Ownership verification panel.
+5. **Stage B4 — Storage & Volumes (`StorageVolumes.tsx`)**:
+   - Implemented APFS volume cards for Tier-1 `/Volumes/Mac Harici Disk` and internal container.
+   - Displayed persistent UUIDs, APFS filesystem, used/free disk space gauge, and VolumeBarrier safety policy.
+6. **Stage B5 — Detailed Project Inspector (`ProjectInspector.tsx`)**:
+   - Implemented slide-over drawer with brand elephant emblem, project metadata, document root, and cURL helper.
+   - Enforced strict safety guard: Veritabanı Silme Kilidi (Database deletion permanently disabled and locked).
+   - Enforced strict safety guard: SFTP Dağıtım Kapısı (Dry-run only, live deployments disabled).
+7. **Stage B6 — Welcome / First-Run Experience (`WelcomeSplash.tsx`)**:
+   - Implemented modal displaying the master squircle app icon and 3 quickstart onboarding actions ("Mevcut Projeyi Aç", "Yeni Proje Başlat", "Harici Disk Tanımla").
+   - Provided seamless dismiss transition to main studio.
+8. **Automated Testing & Visual Verification**:
+   - Cargo workspace tests: 57 passed, 0 failed (%100 PASS).
+   - Frontend unit tests: 16 passed, 0 failed (%100 PASS).
+   - TypeScript compilation & Vite build: 0 errors.
+   - Captured 9 verified full-resolution PNG screenshots from running app using headless Chrome automation.
+   - Packaged screenshots into `docs/design/r1_3b/localforge_r1_3b_stage_b_verified_screenshots.zip`.
+
+### Decisions Made
+- Maintained strict dedicated implementation branch `phase-r1/r1-3b-brand-implementation`; do not merge into `main`.
+- Retained all security invariants: non-dry-run SFTP remains disabled, database deletion remains locked, Nginx ownership verification remains fail-closed.

@@ -6,30 +6,34 @@
 
 ## 1. Current Status
 
-- **Current State**: **R1.3B Visual Design Gate & Narrow Reliability Review — Completed & Awaiting Approval**
-- **Active Git Branch**: `phase-r1/r1-3b-preparation`
-- **Target Remote**: `origin/phase-r1/r1-3b-preparation`
+- **Current State**: **R1.3B Stage B Brand Identity & Native Workspace Implementation — Completed & Awaiting Acceptance**
+- **Active Git Branch**: `phase-r1/r1-3b-brand-implementation`
+- **Target Remote**: `origin/phase-r1/r1-3b-brand-implementation`
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
   - **Phase R1.3A-V Stage B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V1 Final Acceptance Patch**: ACCEPTED by Product Owner.
-  - **R1.3B Preparation**: CONDITIONALLY ACCEPTED by Product Owner.
-  - **R1.3B Visual Design Gate**: COMPLETED (Exact path matching in `is_localforge_nginx_cmdline`, substring spoofing rejection, fail-closed multi-listener conflict handling, 4 high-fidelity visual prototypes & rendered PNGs in `docs/design/r1_3b/`, full data capability mapping, 57 Rust + 16 frontend tests pass).
-- **Completed Tasks in R1.3B Gate**:
-  - `TASK-R1.3B-PREP-01`: Exact canonical path matching for Nginx config and prefix, elimination of substring matching, fail-closed multi-listener conflict handling.
-  - `TASK-R1.3B-PREP-04`: Verified with 57 Rust tests and 16 frontend automated tests (73/73 PASS).
-  - `TASK-R1.3B-GATE-01`: 4 1600x1000 Direction A+ HTML prototypes and rendered PNG screenshots in `docs/design/r1_3b/`.
-  - `TASK-R1.3B-GATE-02`: Comprehensive Data Capability Mapping and bounded log specification.
-- **Next Permitted Action**: Submit Visual Design Gate report with PNG screenshots and data capability mapping to Product Owner. Await explicit review and selection before proceeding with R1.3B code implementation.
+  - **Phase R1.3B Brand Integration Stage A**: APPROVED by Product Owner (Baseline: `9c9d720b46c9676f5023f40f1660c92dc90dad5d`, CI: `39499020338`).
+  - **Phase R1.3B Stage B Implementation**: COMPLETED on dedicated branch `phase-r1/r1-3b-brand-implementation`.
+- **Completed Deliverables in R1.3B Stage B**:
+  - `B1`: Spatial Studio Brand Alignment (Direction A+ 3D monoliths with 8° tilt, specular rim, perspective floor reflection, 0/2/6 project count behavior, bottom AI command capsule).
+  - `B2`: Projects Workspace (Real persistent metadata listing, search input, status filter pills, safe lifecycle controls).
+  - `B3`: Services & Runtime (Nginx port 8080 process ownership verification, PHP-FPM socket pool, MariaDB engine, grounded process identity panel).
+  - `B4`: Storage & Volumes (APFS Tier-1 `/Volumes/Mac Harici Disk`, internal container, persistent UUIDs, disk usage gauges, VolumeBarrier guard).
+  - `B5`: Detailed Project Inspector (Slide-over drawer, project metadata, database deletion strictly disabled with lock guard, SFTP dry-run only guard).
+  - `B6`: Welcome / First-Run Experience (Official Apple squircle app icon, quickstart onboarding cards, dismissible onboarding).
+  - `Icons`: Official macOS app icons generated into `apps/desktop/src-tauri/icons/` (`icon.icns`, `icon.ico`, etc.).
+  - `Verification`: 57 Rust tests + 16 frontend automated tests (73/73 PASS); clean TypeScript build; 9 verified high-resolution PNG screenshots captured and packaged into `docs/design/r1_3b/localforge_r1_3b_stage_b_verified_screenshots.zip`.
+- **Next Permitted Action**: Submit R1.3B Stage B implementation report with verified PNG screenshots and test results to Product Owner. Await visual & functional acceptance. Do NOT merge into `main`.
 
 ---
 
 ## 2. Invariants & Guardrails
 
-1. **Strict Phase Gate Discipline**: Do NOT begin Phase R1.3 (Spatial Studio UI) without explicit Product Owner approval.
+1. **Dedicated Branch**: Work strictly isolated on `phase-r1/r1-3b-brand-implementation`; never merge into `main` without PO approval.
 2. **Fail-Closed Deployment Intact**: Non-dry-run deployment execution remains rejected with `DeploymentNotImplemented`.
-3. **No Root / Sudo Execution**: All runtime processes (PHP-FPM, Nginx, MariaDB) run strictly unprivileged under user ownership.
-4. **Verified Process Identity**: All process terminations enforce Darwin kernel start timestamp and binary path matching before signaling.
-5. **No False Claims**: Browser `.test` resolution remains explicitly marked as pending dedicated network resolver configuration; loopback access verified via Host header at `127.0.0.1:8080`.
-6. **Internal DB Decoupling**: Database files stay on internal APFS storage (`Library/Application Support/LocalForge/mariadb/`); user project files stay on external storage.
+3. **Database Deletion Lock**: Database deletion remains strictly disabled in the UI with `DatabaseDeletionUnavailable` guard.
+4. **No Root / Sudo Execution**: All runtime processes (PHP-FPM, Nginx, MariaDB) run strictly unprivileged under user ownership.
+5. **Verified Process Identity**: Nginx and PHP-FPM supervisors enforce exact canonical config path matching and Darwin kernel process ownership.
+6. **No Fabricated Telemetry**: In production builds, synthetic metrics and fixtures are strictly rejected; zero fake charts.

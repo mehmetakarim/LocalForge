@@ -2,90 +2,77 @@
 
 @layer base {
   :root {
-    /* Foundation Canvas Tokens - Dark Theme Default */
-    --lf-bg-void: #06080D;
-    --lf-bg-canvas: #0A0D15;
-    --lf-bg-surface-subtle: rgba(18, 24, 38, 0.50);
-    --lf-bg-surface: rgba(22, 29, 46, 0.65);
-    --lf-bg-surface-elevated: rgba(30, 40, 64, 0.78);
-    --lf-bg-surface-floating: rgba(38, 50, 80, 0.88);
+    /* Canonical Brand Tokens (Source: LocalForge Brand Kit) */
+    --lf-night: #191337;   /* Gece: Base canvas, deepest shadows */
+    --lf-plum: #2B2450;    /* Erik: Glass cards, surface containers */
+    --lf-dusk: #3B376A;    /* Alacakaranlık: Stage backdrop, panel borders */
+    --lf-violet: #695FA4;  /* Menekşe: Primary brand accent, button gradients */
+    --lf-lilac: #B7ADDF;   /* Lila: Elephant body, hero identifier, focus rings */
+    --lf-mist: #D4CCF1;    /* Sis: High-contrast secondary text, specular highlights */
+    --lf-white: #FFFBFF;   /* Kar Beyazı: High-contrast primary text */
 
-    /* Atmospheric Lighting & Accent Tokens */
-    --lf-glow-indigo: rgba(79, 110, 247, 0.15);
-    --lf-glow-ultramarine: rgba(45, 65, 125, 0.22);
-    --lf-accent-primary: #4F6EF7;
-    --lf-accent-hover: #637EF9;
-    --lf-accent-active: #3D59D6;
-    --lf-accent-subtle: rgba(79, 110, 247, 0.12);
+    /* Semantic Health Indicators (Strictly separated from purple/violet) */
+    --health-healthy: #10B981;  /* Emerald: Verified healthy process / running */
+    --health-warning: #F59E0B;  /* Amber: Degraded, missing probe, attention */
+    --health-error: #EF4444;    /* Ruby: Error, port conflict, crash, guard */
+    --health-unknown: #6B7280;  /* Slate: Stopped, unprobed, not running */
 
-    /* Border & Specular Highlight Tokens */
-    --lf-border-glass: rgba(255, 255, 255, 0.08);
-    --lf-border-subtle: rgba(255, 255, 255, 0.12);
-    --lf-border-highlight: rgba(255, 255, 255, 0.22);
-    --lf-border-active: rgba(79, 110, 247, 0.45);
-    --lf-border-glow: 0 0 0 1px rgba(79, 110, 247, 0.5), 0 0 16px rgba(79, 110, 247, 0.25);
-
-    /* Typography & Text Semantics */
-    --lf-text-primary: rgba(255, 255, 255, 0.95);
-    --lf-text-secondary: rgba(255, 255, 255, 0.68);
-    --lf-text-tertiary: rgba(255, 255, 255, 0.45);
-    --lf-text-disabled: rgba(255, 255, 255, 0.25);
-    --lf-text-accent: #708BFF;
-
-    /* Semantic Status Colors (Triple-Channel Accessible) */
+    /* Status Token Aliases */
     --lf-status-running: #10B981;
-    --lf-status-running-glow: rgba(16, 185, 129, 0.25);
+    --lf-status-running-glow: rgba(16, 185, 129, 0.35);
     --lf-status-stopped: #6B7280;
-    --lf-status-starting: #3B82F6;
-    --lf-status-starting-glow: rgba(59, 130, 246, 0.30);
+    --lf-status-starting: #60A5FA;
+    --lf-status-starting-glow: rgba(96, 165, 250, 0.35);
     --lf-status-stopping: #9CA3AF;
     --lf-status-degraded: #F59E0B;
-    --lf-status-degraded-glow: rgba(245, 158, 11, 0.25);
+    --lf-status-degraded-glow: rgba(245, 158, 11, 0.30);
     --lf-status-failed: #EF4444;
-    --lf-status-failed-glow: rgba(239, 68, 68, 0.30);
-    --lf-status-disconnected: #EC4899;
-    --lf-status-disconnected-glow: rgba(236, 72, 153, 0.25);
-    --lf-status-unknown: #8B5CF6;
+    --lf-status-failed-glow: rgba(239, 68, 68, 0.35);
+    --lf-status-disconnected: #F59E0B;
+    --lf-status-disconnected-glow: rgba(245, 158, 11, 0.30);
+    --lf-status-unknown: #6B7280;
     --lf-status-unavailable: #4B5563;
 
+    /* Foundation Canvas Tokens - Mapped to Brand Palette */
+    --lf-bg-void: #120D28;
+    --lf-bg-canvas: #191337;
+    --lf-bg-surface-subtle: rgba(43, 36, 80, 0.55);
+    --lf-bg-surface: rgba(43, 36, 80, 0.72);
+    --lf-bg-surface-elevated: rgba(59, 55, 106, 0.65);
+    --lf-bg-surface-floating: rgba(43, 36, 80, 0.88);
+
+    /* Atmospheric Lighting & Brand Accent Tokens */
+    --lf-glow-brand: rgba(105, 95, 164, 0.28);
+    --lf-accent-primary: #695FA4;
+    --lf-accent-hover: #7E74B8;
+    --lf-accent-active: #584F8D;
+    --lf-accent-subtle: rgba(183, 173, 223, 0.16);
+
+    /* Border & Specular Highlight Tokens */
+    --lf-border-glass: rgba(183, 173, 223, 0.14);
+    --lf-border-subtle: rgba(183, 173, 223, 0.22);
+    --lf-border-highlight: rgba(183, 173, 223, 0.38);
+    --lf-border-active: rgba(183, 173, 223, 0.60);
+    --lf-border-glow: 0 0 0 1px rgba(183, 173, 223, 0.5), 0 0 18px rgba(105, 95, 164, 0.35);
+
+    /* Typography & Text Semantics */
+    --lf-text-primary: #FFFBFF;
+    --lf-text-secondary: #D4CCF1;
+    --lf-text-tertiary: rgba(212, 204, 241, 0.60);
+    --lf-text-disabled: rgba(212, 204, 241, 0.30);
+    --lf-text-accent: #B7ADDF;
+
     /* Typography Scale */
-    --lf-font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --lf-font-text: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --lf-font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
-  }
-
-  [data-theme="light"] {
-    --lf-bg-void: #F2F4F7;
-    --lf-bg-canvas: #F8F9FA;
-    --lf-bg-surface-subtle: rgba(255, 255, 255, 0.65);
-    --lf-bg-surface: rgba(255, 255, 255, 0.85);
-    --lf-bg-surface-elevated: rgba(255, 255, 255, 0.95);
-    --lf-bg-surface-floating: #FFFFFF;
-
-    --lf-glow-indigo: rgba(79, 110, 247, 0.08);
-    --lf-glow-ultramarine: rgba(45, 65, 125, 0.06);
-    --lf-accent-primary: #3B5CD6;
-    --lf-accent-hover: #2D4ED8;
-    --lf-accent-active: #223EB8;
-    --lf-accent-subtle: rgba(79, 110, 247, 0.10);
-
-    --lf-border-glass: rgba(0, 0, 0, 0.08);
-    --lf-border-subtle: rgba(0, 0, 0, 0.12);
-    --lf-border-highlight: rgba(255, 255, 255, 0.90);
-    --lf-border-active: rgba(59, 92, 214, 0.45);
-
-    --lf-text-primary: rgba(10, 15, 25, 0.95);
-    --lf-text-secondary: rgba(10, 15, 25, 0.68);
-    --lf-text-tertiary: rgba(10, 15, 25, 0.45);
-    --lf-text-disabled: rgba(10, 15, 25, 0.25);
-    --lf-text-accent: #2D4ED8;
+    --lf-font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --lf-font-text: 'Figtree', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    --lf-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
   }
 
   body {
     font-family: var(--lf-font-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: var(--lf-bg-canvas);
+    background-color: var(--lf-night);
     color: var(--lf-text-primary);
     user-select: none;
     overflow: hidden;
@@ -95,7 +82,7 @@
 
   ::selection {
     background-color: var(--lf-accent-subtle);
-    color: var(--lf-accent-primary);
+    color: var(--lf-white);
   }
 
   /* macOS Custom Smooth Scrollbar */
@@ -107,106 +94,92 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(183, 173, 223, 0.20);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.24);
-  }
-  [data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.14);
-  }
-  [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.24);
+    background: rgba(183, 173, 223, 0.35);
   }
 }
 
 /* Accessible Focus Ring */
 :focus-visible {
-  outline: 2px solid var(--lf-accent-primary) !important;
+  outline: 2px solid var(--lf-lilac) !important;
   outline-offset: 2px !important;
 }
 
 /* ==========================================================================
-   Spatial Studio Material Utilities
+   Spatial Studio Material Utilities (Brand Aligned)
    ========================================================================== */
 
-/* Floating Vertical Navigation Dock (Liquid Glass) */
+/* Slender Floating Left Navigation Dock */
 .lf-material-dock {
-  background: var(--lf-bg-surface);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid var(--lf-border-glass);
+  background: rgba(43, 36, 80, 0.65);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  border: 1px solid rgba(183, 173, 223, 0.16);
+  border-top: 1px solid rgba(183, 173, 223, 0.32);
   box-shadow: 
-    0 16px 40px -6px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 0 var(--lf-border-highlight),
-    inset 0 0 16px var(--lf-glow-indigo);
+    0 20px 44px -10px rgba(10, 6, 30, 0.70),
+    inset 0 1px 0 0 rgba(183, 173, 223, 0.30);
 }
 
-/* Spatial Card Material with 3D Specular Rim */
-.lf-material-card {
+/* Direction A+ Spatial Monolith with Specular Rim & Tilt */
+.lf-material-monolith {
   background: linear-gradient(
-    145deg,
-    rgba(22, 29, 46, 0.70) 0%,
-    rgba(14, 18, 28, 0.60) 100%
+    180deg,
+    rgba(43, 36, 80, 0.72) 0%,
+    rgba(25, 19, 55, 0.85) 100%
   );
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid var(--lf-border-glass);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid rgba(183, 173, 223, 0.18);
+  border-top: 1px solid rgba(183, 173, 223, 0.45);
+  border-radius: 20px;
   box-shadow: 
-    0 8px 24px -4px rgba(0, 0, 0, 0.40),
-    inset 0 1px 0 0 var(--lf-border-highlight);
-  border-radius: 16px;
-  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    0 30px 60px -15px rgba(10, 6, 30, 0.80),
+    inset 0 1px 0 rgba(183, 173, 223, 0.35);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.lf-material-card:hover {
-  border-color: var(--lf-border-subtle);
+.lf-material-monolith:hover {
+  border-color: var(--lf-lilac);
   box-shadow: 
-    0 14px 36px -6px rgba(0, 0, 0, 0.55),
-    0 0 20px -2px var(--lf-glow-indigo),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.28);
-}
-
-[data-theme="light"] .lf-material-card {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.90) 0%,
-    rgba(245, 247, 250, 0.85) 100%
-  );
-  box-shadow: 
-    0 6px 20px -2px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+    0 40px 80px -20px rgba(10, 6, 30, 0.90),
+    0 0 30px rgba(105, 95, 164, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 /* Floating AI Command Capsule */
 .lf-material-capsule {
-  background: var(--lf-bg-surface-floating);
+  background: rgba(43, 36, 80, 0.78);
   backdrop-filter: blur(32px) saturate(180%);
   -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border: 1px solid var(--lf-border-subtle);
+  border: 1px solid rgba(183, 173, 223, 0.22);
+  border-top: 1px solid rgba(183, 173, 223, 0.40);
   box-shadow: 
-    0 12px 36px -4px rgba(0, 0, 0, 0.50),
-    0 0 18px var(--lf-glow-indigo),
-    inset 0 1px 0 0 var(--lf-border-highlight);
+    0 20px 48px -10px rgba(10, 6, 30, 0.85),
+    0 0 24px rgba(105, 95, 164, 0.22),
+    inset 0 1px 0 0 rgba(183, 173, 223, 0.30);
 }
 
 /* Elevated Surface Panels */
 .lf-material-panel {
-  background: var(--lf-bg-surface-subtle);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--lf-border-glass);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  border-radius: 12px;
+  background: rgba(43, 36, 80, 0.65);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(183, 173, 223, 0.14);
+  border-top: 1px solid rgba(183, 173, 223, 0.32);
+  border-radius: 18px;
+  box-shadow: 0 16px 36px -8px rgba(10, 6, 30, 0.60);
 }
 
 /* Active Glow Border for Selected Elements */
 .lf-border-glow-active {
-  box-shadow: var(--lf-border-glow);
-  border-color: var(--lf-accent-primary);
+  box-shadow: 0 0 0 2px var(--lf-lilac), 0 0 28px rgba(105, 95, 164, 0.45);
+  border-color: var(--lf-lilac);
 }
 
 /* Reduced Motion Mode Guard */

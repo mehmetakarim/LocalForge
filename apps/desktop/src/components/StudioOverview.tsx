@@ -3,6 +3,7 @@ import { Plus, RefreshCw, ExternalLink } from "lucide-react";
 import { ProjectRecord, VolumeInfo, RuntimeOverview } from "../types";
 import { SpatialCard } from "./SpatialCard";
 import { ProjectInspector } from "./ProjectInspector";
+import { computeHeroHealthContent } from "../utils/healthClassification";
 
 export interface StudioOverviewProps {
   projects: ProjectRecord[];
@@ -15,8 +16,6 @@ export interface StudioOverviewProps {
   onCreateProject: () => void;
   onRefresh: () => void;
 }
-
-import { computeHeroHealthContent } from "../utils/healthClassification";
 
 export const StudioOverview: React.FC<StudioOverviewProps> = ({
   projects,
@@ -33,7 +32,7 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
   const [pageIndex, setPageIndex] = useState(0);
   const runningProjects = projects.filter((p) => p.status === "running");
 
-  // Inspector auto-selection: only active in DEV mode
+  // Inspector auto-selection in DEV mode
   React.useEffect(() => {
     if (import.meta.env.DEV && typeof window !== "undefined" && projects.length > 0) {
       const param = new URLSearchParams(window.location.search).get("inspector");
@@ -86,69 +85,41 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
   const scaleMode = displayedProjects.length > 4 ? "compact" : "default";
 
   return (
-    <div className="relative min-h-[calc(100vh-140px)] flex flex-col justify-between items-center select-none pb-24">
-      {/* Perspective Grid Plane */}
+    <div className="relative w-full flex-1 flex flex-col justify-between items-center select-none pb-20 overflow-hidden">
+      {/* Perspective Floor & Reflections */}
       <div
-        className="absolute inset-x-[-100px] top-[140px] bottom-[120px] pointer-events-none opacity-25 z-0"
+        className="absolute bottom-[-40px] w-[1400px] h-[500px] pointer-events-none z-0"
         style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px)",
-          backgroundSize: "36px 36px",
-          transform: "rotateX(60deg)",
-          transformOrigin: "center bottom",
-          maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, transparent 75%)",
+          background:
+            "radial-gradient(ellipse at 50% 40%, rgba(59, 55, 106, 0.45) 0%, rgba(43, 36, 80, 0.3) 40%, transparent 75%)",
+          transform: "rotateX(65deg)",
+        }}
+        aria-hidden="true"
+      />
+      <div
+        className="absolute bottom-[100px] w-[900px] h-[140px] pointer-events-none blur-[40px] z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(105, 95, 164, 0.22) 0%, rgba(183, 173, 223, 0.08) 50%, transparent 80%)",
         }}
         aria-hidden="true"
       />
 
-      {/* Centered Hero Heading */}
-      <div className="text-center z-10 pt-4">
-        <div className="font-mono text-[11px] tracking-widest text-zinc-400 uppercase mb-2">
+      {/* Stage Hero Headline */}
+      <div className="text-center z-10 pt-4 max-w-2xl px-4">
+        <div className="font-mono text-[11px] font-semibold tracking-[0.16em] uppercase text-[#B7ADDF] mb-2">
           Yerel Çalışma Alanı · Apple Silicon APFS
         </div>
-        <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-2">
-          {hero.prefix} <strong className="font-bold text-white">{hero.highlight}</strong>
+        <h1 className="font-['Plus_Jakarta_Sans',sans-serif] text-3xl md:text-4xl font-extrabold tracking-[-0.03em] text-[#FFFBFF] mb-2 leading-tight">
+          {hero.prefix} <strong className="text-[#B7ADDF]">{hero.highlight}</strong>
         </h1>
-        <p className="text-xs md:text-sm text-zinc-400 max-w-xl mx-auto font-normal">
+        <p className="text-xs md:text-sm text-[#D4CCF1] max-w-xl mx-auto font-normal leading-relaxed">
           {hero.desc}
         </p>
       </div>
 
-      {/* Spatial 3D Stage */}
-      <div className="relative w-full max-w-5xl my-auto py-8 flex flex-col items-center justify-center z-10">
-        {/* Connecting Conduits Lines */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none z-0"
-          viewBox="0 0 1000 400"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M 280 230 Q 280 320 500 350"
-            fill="none"
-            stroke="rgba(255,255,255,0.10)"
-            strokeDasharray="3,3"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M 720 230 Q 720 320 500 350"
-            fill="none"
-            stroke="rgba(255,255,255,0.10)"
-            strokeDasharray="3,3"
-            strokeWidth="1.2"
-          />
-          <line
-            x1="500"
-            y1="230"
-            x2="500"
-            y2="350"
-            stroke="rgba(255,255,255,0.10)"
-            strokeDasharray="3,3"
-            strokeWidth="1.2"
-          />
-        </svg>
-
-        {/* Spatial Monoliths Row */}
+      {/* Stage Monoliths Row */}
+      <div className="relative w-full max-w-6xl my-auto py-6 flex flex-col items-center justify-center z-10">
         {projects.length === 0 ? (
           /* 0 Projects: Honest Empty State Wireframe */
           <div
@@ -163,18 +134,20 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
             }}
             style={{
               WebkitBoxReflect:
-                "below 8px linear-gradient(to bottom, transparent 70%, rgba(255, 255, 255, 0.05) 100%)",
+                "below 10px linear-gradient(to bottom, transparent 65%, rgba(183, 173, 223, 0.08) 100%)",
             }}
-            className="w-72 min-h-[280px] rounded-3xl p-8 border-2 border-dashed border-white/20 hover:border-indigo-400/50 bg-white/[0.015] hover:bg-white/[0.04] transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            className="w-80 min-h-[300px] rounded-3xl p-8 border-2 border-dashed border-[rgba(183,173,223,0.28)] hover:border-[#B7ADDF] bg-[#2B2450]/20 hover:bg-[#695FA4]/15 backdrop-blur-md transition-all flex flex-col items-center justify-center text-center cursor-pointer shadow-[0_30px_60px_-15px_rgba(10,6,30,0.8)] outline-none focus-visible:ring-2 focus-visible:ring-[#B7ADDF]"
           >
-            <div className="w-12 h-12 rounded-full bg-indigo-500/15 border border-indigo-400/35 text-indigo-400 flex items-center justify-center text-xl mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#695FA4]/25 border border-[rgba(183,173,223,0.3)] text-[#B7ADDF] flex items-center justify-center text-xl mb-4">
               <Plus className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-white mb-1">İlk Projeni Oluştur</h3>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-              Harici APFS SSD (Mac Harici Disk) veya dahili diskten PHP projesi bağla.
+            <h3 className="font-['Plus_Jakarta_Sans',sans-serif] text-base font-bold text-[#FFFBFF] mb-1">
+              İlk Projeni Oluştur
+            </h3>
+            <p className="text-xs text-[#D4CCF1] leading-relaxed mb-4 max-w-xs">
+              Harici APFS SSD (/Volumes/Mac Harici Disk) veya dahili diskten PHP projesi bağlayın.
             </p>
-            <span className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-[0_0_16px_rgba(79,110,247,0.4)]">
+            <span className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#695FA4] to-[#2B2450] border border-[#B7ADDF] hover:brightness-110 text-[#FFFBFF] text-xs font-semibold shadow-[0_4px_16px_rgba(105,95,164,0.35)]">
               + Proje Oluştur
             </span>
           </div>
@@ -182,7 +155,7 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
           /* Projects Rendered (2, 6, or more with pagination) */
           <div
             className={`flex flex-wrap items-center justify-center z-10 ${
-              scaleMode === "compact" ? "gap-4 max-w-5xl" : "gap-8"
+              scaleMode === "compact" ? "gap-4 max-w-5xl" : "gap-7"
             }`}
           >
             {displayedProjects.map((project) => {
@@ -211,13 +184,15 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                     onCreateProject();
                   }
                 }}
-                className="w-44 min-h-[250px] rounded-3xl p-5 border-2 border-dashed border-white/15 hover:border-white/35 bg-white/[0.015] hover:bg-white/[0.04] transition-all flex flex-col items-center justify-center text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="w-48 min-h-[280px] rounded-3xl p-5 border-2 border-dashed border-[rgba(183,173,223,0.25)] hover:border-[#B7ADDF] bg-[#2B2450]/20 hover:bg-[#695FA4]/15 backdrop-blur-md transition-all flex flex-col items-center justify-center text-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#B7ADDF]"
               >
-                <div className="w-8 h-8 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center mb-3">
+                <div className="w-9 h-9 rounded-xl bg-[#695FA4]/20 border border-[rgba(183,173,223,0.25)] text-[#B7ADDF] flex items-center justify-center mb-3">
                   <Plus className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-semibold text-white mb-1">Proje Ekle</span>
-                <span className="text-[10px] text-zinc-500 leading-tight">
+                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-xs font-semibold text-[#FFFBFF] mb-1">
+                  Proje Ekle
+                </span>
+                <span className="text-[10px] text-[#D4CCF1] leading-tight">
                   Yeni çalışma alanı bağla
                 </span>
               </div>
@@ -227,13 +202,13 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
 
         {/* Truthful Total Project Counter & Pagination Navigation for >6 Projects */}
         {projects.length > 6 && (
-          <div className="flex items-center justify-between w-full max-w-xl mx-auto mt-6 px-4 py-2.5 rounded-2xl bg-[#0F1424]/80 backdrop-blur-md border border-white/10 text-xs text-zinc-300 shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-20">
+          <div className="flex items-center justify-between w-full max-w-xl mx-auto mt-6 px-4 py-2.5 rounded-2xl bg-[#2B2450]/80 backdrop-blur-md border border-[rgba(183,173,223,0.18)] text-xs text-[#D4CCF1] shadow-[0_8px_24px_rgba(10,6,30,0.6)] z-20">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[11px] text-indigo-400 font-semibold tracking-wider uppercase">
+              <span className="font-mono text-[11px] text-[#B7ADDF] font-semibold tracking-wider uppercase">
                 Toplam {projects.length} Proje
               </span>
-              <span className="text-zinc-600">·</span>
-              <span className="text-zinc-400">
+              <span className="text-[#695FA4]">·</span>
+              <span className="text-[#D4CCF1]">
                 Sayfa {safePageIndex + 1} / {totalPages}
               </span>
             </div>
@@ -244,7 +219,7 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                 onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                 disabled={safePageIndex === 0}
                 aria-label="Önceki Proje Sayfası"
-                className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="px-3 py-1 rounded-xl bg-[#191337]/60 hover:bg-[#695FA4]/30 disabled:opacity-30 border border-[rgba(183,173,223,0.15)] text-[#D4CCF1] hover:text-[#FFFBFF] transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#B7ADDF]"
               >
                 ← Önceki
               </button>
@@ -256,10 +231,10 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                     type="button"
                     onClick={() => setPageIndex(idx)}
                     aria-label={`Sayfa ${idx + 1}`}
-                    className={`w-2 h-2 rounded-full transition-all ${
+                    className={`h-2 rounded-full transition-all ${
                       idx === safePageIndex
-                        ? "bg-indigo-400 w-4 shadow-[0_0_8px_rgba(99,102,241,0.8)]"
-                        : "bg-white/20 hover:bg-white/40"
+                        ? "bg-[#B7ADDF] w-4 shadow-[0_0_8px_rgba(183,173,223,0.8)]"
+                        : "bg-[rgba(183,173,223,0.25)] hover:bg-[rgba(183,173,223,0.45)] w-2"
                     }`}
                   />
                 ))}
@@ -270,70 +245,45 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                 onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={safePageIndex >= totalPages - 1}
                 aria-label="Sonraki Proje Sayfası"
-                className="px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="px-3 py-1 rounded-xl bg-[#191337]/60 hover:bg-[#695FA4]/30 disabled:opacity-30 border border-[rgba(183,173,223,0.15)] text-[#D4CCF1] hover:text-[#FFFBFF] transition-all text-xs font-medium cursor-pointer disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-[#B7ADDF]"
               >
                 Sonraki →
               </button>
             </div>
           </div>
         )}
-
-        {/* Bu Mac Central Node */}
-        <div className="mt-8 flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-[#121826]/70 border border-white/10 backdrop-blur-xl shadow-xl z-10">
-          <svg
-            className="w-5 h-5 text-indigo-300"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-          </svg>
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-semibold text-white">Bu Mac (Apple Silicon)</span>
-            <span className="text-[10px] font-mono text-zinc-400">
-              Loopback 127.0.0.1 · {volumes.length} APFS Birimi Bağlı
-            </span>
-          </div>
-        </div>
       </div>
 
-      {/* Bottom Controls Deck */}
-      <div className="w-full max-w-3xl flex flex-col items-center gap-3.5 z-10">
-
-        {/* Quick Action Pills */}
-        <div className="flex items-center gap-2.5">
-          {runningProjects.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onOpenBrowser(runningProjects[0])}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{runningProjects[0].local_domain} · tarayıcıda aç</span>
-            </button>
-          )}
-
+      {/* Quick Action Bar at Bottom of Stage */}
+      <div className="w-full max-w-3xl flex items-center justify-center gap-3 z-10">
+        {runningProjects.length > 0 && (
           <button
             type="button"
-            onClick={onRefresh}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
+            onClick={() => onOpenBrowser(runningProjects[0])}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2B2450]/60 hover:bg-[#695FA4]/30 border border-[rgba(183,173,223,0.18)] text-xs font-medium text-[#D4CCF1] hover:text-[#FFFBFF] transition-colors cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Servisleri Yenile</span>
+            <ExternalLink className="w-3.5 h-3.5 text-[#B7ADDF]" />
+            <span>{runningProjects[0].local_domain} · tarayıcıda aç</span>
           </button>
+        )}
 
-          <button
-            type="button"
-            onClick={onCreateProject}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Proje Ekle</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2B2450]/60 hover:bg-[#695FA4]/30 border border-[rgba(183,173,223,0.18)] text-xs font-medium text-[#D4CCF1] hover:text-[#FFFBFF] transition-colors cursor-pointer"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-[#D4CCF1]" />
+          <span>Servisleri Yenile</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onCreateProject}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#695FA4] to-[#2B2450] border border-[#B7ADDF] text-xs font-semibold text-[#FFFBFF] hover:brightness-110 shadow-[0_2px_12px_rgba(105,95,164,0.3)] transition-all cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5 text-[#10B981]" />
+          <span>Proje Ekle</span>
+        </button>
       </div>
 
       {/* Slide-Over Project Inspector */}

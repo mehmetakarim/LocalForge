@@ -9,9 +9,11 @@ import {
 } from "lucide-react";
 import { AppShell } from "./components/AppShell";
 import { StudioOverview } from "./components/StudioOverview";
-import { RuntimeStatus } from "./components/RuntimeStatus";
-import { StorageOverview } from "./components/StorageOverview";
+import { ProjectsWorkspace } from "./components/ProjectsWorkspace";
+import { ServicesRuntime } from "./components/ServicesRuntime";
+import { StorageVolumes } from "./components/StorageVolumes";
 import { CreateProjectModal } from "./components/CreateProjectModal";
+import { WelcomeSplash } from "./components/WelcomeSplash";
 import { ErrorState } from "./components/ErrorState";
 import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
 import { getVisualFixture } from "./fixtures/visualFixtures";
@@ -21,9 +23,9 @@ export const App: React.FC = () => {
   const [volumes, setVolumes] = useState<VolumeInfo[]>([]);
   const [runtime, setRuntime] = useState<RuntimeOverview | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("studio");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [isCapsuleOpen, setIsCapsuleOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isFixtureMode, setIsFixtureMode] = useState(false);
   const [_loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -43,6 +45,22 @@ export const App: React.FC = () => {
       const fixtureParam = isDev
         ? new URLSearchParams(window.location.search).get("fixture")
         : null;
+
+      const welcomeParam = isDev
+        ? new URLSearchParams(window.location.search).get("welcome")
+        : null;
+
+      const modeParam = isDev
+        ? (new URLSearchParams(window.location.search).get("mode") as ViewMode)
+        : null;
+
+      if (modeParam && ["studio", "projects", "services", "storage", "deployments", "mcp", "settings"].includes(modeParam)) {
+        setViewMode(modeParam);
+      }
+
+      if (welcomeParam === "true") {
+        setIsWelcomeOpen(true);
+      }
 
       const activeFixture = isDev && fixtureParam ? getVisualFixture(fixtureParam) : null;
 
@@ -100,12 +118,10 @@ export const App: React.FC = () => {
         await invoke("start_project", { id: projectId });
         await loadData();
       } else if (isFixtureMode) {
-        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, status: "running" } : p))
         );
       } else {
-        // Non-Tauri environment without explicit fixture mode must NOT simulate success
         setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
       }
     } catch (err: any) {
@@ -124,12 +140,10 @@ export const App: React.FC = () => {
         await invoke("stop_project", { id: projectId });
         await loadData();
       } else if (isFixtureMode) {
-        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, status: "stopped" } : p))
         );
       } else {
-        // Non-Tauri environment without explicit fixture mode must NOT simulate success
         setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
       }
     } catch (err: any) {
@@ -160,7 +174,6 @@ export const App: React.FC = () => {
         });
         await loadData();
       } else if (isFixtureMode) {
-        // Pure in-memory visual simulation ONLY for isolated development fixture testing
         const newProj: ProjectRecord = {
           id: `proj_${Date.now()}`,
           name,
@@ -175,7 +188,6 @@ export const App: React.FC = () => {
         };
         setProjects((prev) => [newProj, ...prev]);
       } else {
-        // Non-Tauri environment without explicit fixture mode must NOT simulate success
         setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
         return;
       }
@@ -186,25 +198,20 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleToggleTheme = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    document.documentElement.setAttribute("data-theme", nextTheme);
-  };
-
   return (
     <AppShell
       activeMode={viewMode}
       onSelectMode={setViewMode}
-      theme={theme}
-      onToggleTheme={handleToggleTheme}
+      projects={projects}
+      volumes={volumes}
+      runtime={runtime}
       isCapsuleOpen={isCapsuleOpen}
       onOpenCapsule={() => setIsCapsuleOpen(true)}
       onCloseCapsule={() => setIsCapsuleOpen(false)}
-      projects={projects}
       onSelectProject={(_p) => {}}
       onCreateProject={() => setIsCreateModalOpen(true)}
       onRefreshData={loadData}
+      onOpenWelcome={() => setIsWelcomeOpen(true)}
       zoomLevel={zoomLevel}
       onZoomIn={() => setZoomLevel((z) => Math.min(125, z + 5))}
       onZoomOut={() => setZoomLevel((z) => Math.max(75, z - 5))}
@@ -236,64 +243,61 @@ export const App: React.FC = () => {
         )}
 
         {viewMode === "projects" && (
-          <div className="w-full max-w-5xl py-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Tüm Projeler</h2>
-            <StudioOverview
-              projects={projects}
-              volumes={volumes}
-              runtime={runtime}
-              mutatingProject={mutatingProject}
-              onStartProject={handleStartProject}
-              onStopProject={handleStopProject}
-              onOpenBrowser={handleOpenBrowser}
-              onCreateProject={() => setIsCreateModalOpen(true)}
-              onRefresh={loadData}
-            />
-          </div>
+          <ProjectsWorkspace
+            projects={projects}
+            volumes={volumes}
+            runtime={runtime}
+            mutatingProject={mutatingProject}
+            onStartProject={handleStartProject}
+            onStopProject={handleStopProject}
+            onOpenBrowser={handleOpenBrowser}
+            onCreateProject={() => setIsCreateModalOpen(true)}
+            onRefresh={loadData}
+          />
         )}
 
         {viewMode === "services" && (
-          <div className="w-full max-w-5xl py-8">
-            <RuntimeStatus runtime={runtime} onRefresh={loadData} />
-          </div>
+          <ServicesRuntime runtime={runtime} onRefresh={loadData} />
         )}
 
         {viewMode === "storage" && (
-          <div className="w-full max-w-5xl py-8">
-            <StorageOverview
-              volumes={volumes}
-              projects={projects}
-              onRefresh={loadData}
-            />
-          </div>
+          <StorageVolumes
+            volumes={volumes}
+            projects={projects}
+            onRefresh={loadData}
+          />
         )}
 
         {viewMode === "deployments" && (
           <div className="w-full max-w-3xl py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-400 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-[#695FA4]/20 border border-[#B7ADDF]/30 text-[#B7ADDF] flex items-center justify-center mx-auto">
               <CloudUpload className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white">Akıllı Güvenli Dağıtım</h2>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto">
-              Git diff değil; SHA-256 sağlama defteri tabanlı güvenli dağıtım. Üretim dağıtımları onay kapısıyla korunur.
+            <h2 className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold text-[#FFFBFF]">
+              Akıllı Güvenli Dağıtım
+            </h2>
+            <p className="text-xs text-[#D4CCF1] max-w-md mx-auto leading-relaxed">
+              Git diff değil; SHA-256 sağlama defteri tabanlı güvenli dağıtım. Üretim dağıtımları insan onay kapısıyla korunur.
             </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400">
-              <Lock className="w-3.5 h-3.5 text-amber-400" />
-              <span>SFTP Dağıtım Kapısı Devrede (Salt-Okunur Önizleme)</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F59E0B]/12 border border-[#F59E0B]/25 text-xs text-[#F59E0B]">
+              <Lock className="w-3.5 h-3.5" />
+              <span>SFTP Dağıtım Kapısı Devrede (Salt-Okunur Önizleme / Dry-Run Only)</span>
             </div>
           </div>
         )}
 
         {viewMode === "mcp" && (
           <div className="w-full max-w-3xl py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-400/30 text-purple-400 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-[#695FA4]/20 border border-[#B7ADDF]/30 text-[#B7ADDF] flex items-center justify-center mx-auto">
               <Bot className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white">AI / Model Context Protocol</h2>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto">
+            <h2 className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold text-[#FFFBFF]">
+              AI / Model Context Protocol (MCP)
+            </h2>
+            <p className="text-xs text-[#D4CCF1] max-w-md mx-auto leading-relaxed">
               Claude Code, Gemini ve Cursor için yerel MCP sunucusu. Salt okunur tanılama ve insan onaylı işlem güvenliği.
             </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 font-mono">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#10B981]/12 border border-[#10B981]/25 text-xs text-[#10B981] font-mono">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>localforge-mcp-server: Dinleniyor (stdio)</span>
             </div>
@@ -302,25 +306,31 @@ export const App: React.FC = () => {
 
         {viewMode === "settings" && (
           <div className="w-full max-w-3xl py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 text-zinc-300 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-[#2B2450]/60 border border-[rgba(183,173,223,0.2)] text-[#D4CCF1] flex items-center justify-center mx-auto">
               <SettingsIcon className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white">Sistem Tercihleri</h2>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto">
+            <h2 className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold text-[#FFFBFF]">
+              Sistem Tercihleri
+            </h2>
+            <p className="text-xs text-[#D4CCF1] max-w-md mx-auto leading-relaxed">
               Port yapılandırmaları, APFS bağlama güvenlik sınırları ve loopback proxy ayarları.
             </p>
-            <div className="p-4 rounded-2xl bg-black/40 border border-white/5 text-left font-mono text-xs max-w-md mx-auto space-y-2">
+            <div className="p-4 rounded-2xl bg-[#191337]/90 border border-[rgba(183,173,223,0.14)] text-left font-mono text-xs max-w-md mx-auto space-y-2 text-[#D4CCF1]">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Nginx Loopback:</span>
-                <span className="text-zinc-200">127.0.0.1:8080</span>
+                <span className="text-[#B7ADDF]">Nginx Loopback:</span>
+                <span className="text-[#FFFBFF]">127.0.0.1:8080</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">MariaDB Port:</span>
-                <span className="text-zinc-200">3306</span>
+                <span className="text-[#B7ADDF]">MariaDB Port:</span>
+                <span className="text-[#FFFBFF]">3306</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Desteklenen PHP:</span>
-                <span className="text-zinc-200">8.4, 8.3, 8.2</span>
+                <span className="text-[#B7ADDF]">Desteklenen PHP:</span>
+                <span className="text-[#FFFBFF]">8.4, 8.3, 8.2</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#B7ADDF]">Harici Çalışma Alanı:</span>
+                <span className="text-[#10B981]">/Volumes/Mac Harici Disk</span>
               </div>
             </div>
           </div>
@@ -333,6 +343,24 @@ export const App: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateProject}
         volumes={volumes}
+      />
+
+      {/* Welcome Splash Experience */}
+      <WelcomeSplash
+        isOpen={isWelcomeOpen}
+        onClose={() => setIsWelcomeOpen(false)}
+        onCreateProject={() => {
+          setIsWelcomeOpen(false);
+          setIsCreateModalOpen(true);
+        }}
+        onOpenFolder={() => {
+          setIsWelcomeOpen(false);
+          setIsCreateModalOpen(true);
+        }}
+        onDefineExternalDisk={() => {
+          setIsWelcomeOpen(false);
+          setViewMode("storage");
+        }}
       />
     </AppShell>
   );
