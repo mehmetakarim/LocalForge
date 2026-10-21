@@ -6,7 +6,7 @@
 
 ## 1. Current Status
 
-- **Current State**: **R1.3B Stage B Final Acceptance Remediation — Completed & Awaiting Acceptance**
+- **Current State**: **R1.3B Final Acceptance Closeout — Completed & Awaiting Sign-Off**
 - **Active Git Branch**: `phase-r1/r1-3b-brand-implementation`
 - **Target Remote**: `origin/phase-r1/r1-3b-brand-implementation`
 - **Previous Milestone Status**:
@@ -16,15 +16,14 @@
   - **Phase R1.3A-V1 Final Acceptance Patch**: ACCEPTED by Product Owner.
   - **Phase R1.3B Brand Integration Stage A**: APPROVED by Product Owner (Baseline: `9c9d720b46c9676f5023f40f1660c92dc90dad5d`, CI: `39499020338`).
   - **Phase R1.3B Stage B Implementation**: COMPLETED on dedicated branch `phase-r1/r1-3b-brand-implementation`.
-- **Completed Remediations in R1.3B Stage B**:
-  - `Finding 1 (P0)`: Re-captured all 9 verified PNG screenshots via Playwright Chrome, resolving empty state bug caused by unhandled `fixture=default` alias in `visualFixtures.ts` and hardened `inspector` URL parameter. Packaged in `docs/design/r1_3b/localforge_r1_3b_stage_b_verified_screenshots.zip`.
-  - `Finding 2 (P1)`: Added `default_server` loopback 404 in Nginx; implemented `check_domain_resolution` in Tauri; created `RoutingAlertModal.tsx` in desktop frontend with copyable cURL helper to prevent wrong-project routing.
-  - `Finding 3 (P1)`: Removed `: 45;` fabricated capacity fallback in `StorageVolumes.tsx`; implemented `hasValidCapacity` check; unreadable/zero/disconnected volumes render `BİLİNMİYOR` / `KAPASİTE OKUNAMADI`.
-  - `Finding 4 (P1)`: Refactored `ServicesRuntime.tsx` to explicitly preserve UNKNOWN for unprobed Nginx, PHP-FPM, and MariaDB rather than collapsing into false/stopped.
-  - `Finding 5 (P1)`: Grounded operational claims in Deployments (`DeploymentNotImplemented` dry-run only), MCP (stdio ready), and Settings (dynamic ports/paths).
-  - `Finding 6 (P2)`: Created `ImportProjectModal.tsx` and wired "Mevcut Projeyi Aç" in `WelcomeSplash.tsx` to invoke Tauri `import_project` command.
-  - `Verification`: 58 Rust tests + 19 frontend automated tests (77/77 PASS); clean TypeScript build; zero clippy warnings; zero formatting diffs.
-- **Next Permitted Action**: Submit R1.3B Stage B final acceptance remediation report with verified PNG screenshots and test results to Product Owner. Await visual & functional acceptance. Do NOT merge into `main`. Do NOT begin R1.3C.
+  - **Phase R1.3B Final Acceptance Remediation**: COMPLETED (Commit `47fb5461557a1c2ceae90cb3d3259ced0b57c14f`, CI `39561526282` Green).
+- **Completed in R1.3B Final Acceptance Closeout**:
+  - `Finding 01 — Import Error Propagation`: `ImportProjectModal.tsx` catches backend import errors, displays error message in modal, keeps entered project folder path intact for correction, and only resets/closes modal on confirmed success. Added automated regression test in `r1_3b_remediation.test.mjs`.
+  - `Finding 02 — Production-Code Test Coverage`: Extracted production utilities `storageCapacity.ts`, `servicesTelemetry.ts`, `browserRouting.ts`; updated production screens to consume them; eliminated duplicated logic in tests; 20/20 desktop tests directly verify production modules.
+  - `Finding 03 — Domain Routing Acceptance`: Verified live Nginx `default_server` 404 response on unknown host/IP; verified project isolation (Project A -> Project A only, Project B -> Project B only); verified via live Darwin test `test_r1_3b_live_domain_routing_acceptance_and_isolation` (PASS in 2.20s).
+  - `Finding 04 — Genuine Native macOS Tauri Application Evidence`: Built native binary (`target/debug/localforge-desktop`), launched with live SQLite database (`localforge.db`) containing persistent projects `r1_acceptance_project` and `Projetest` on `/Volumes/Mac Harici Disk`. Captured 7 verified 1600×1000 screenshots (Spatial Studio 2 projects, Project Inspector open, Projects Workspace, Services & Runtime, Storage & Volumes, Import Modal, Welcome Splash) in `docs/design/r1_3b/native_tauri_verified/` and packaged into `localforge_r1_3b_native_tauri_screenshots.zip`. OCR verified live persistent data.
+  - `Full Verification`: 58/58 Rust workspace tests PASS; 20/20 frontend tests PASS (78/78 total); zero clippy warnings; zero format diffs; clean Vite build.
+- **Next Permitted Action**: Submit R1.3B Final Acceptance Closeout report to Product Owner. Await final sign-off. Do NOT merge into `main`. Do NOT begin R1.3C.
 
 ---
 

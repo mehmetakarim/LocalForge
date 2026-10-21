@@ -34,9 +34,14 @@ export const ImportProjectModal: React.FC<ImportProjectModalProps> = ({
     try {
       await onImport(trimmed);
       setProjectPath("");
+      setError(null);
       onClose();
     } catch (err: any) {
-      setError(err?.message || String(err));
+      const errorMsg =
+        typeof err === "string"
+          ? err
+          : err?.message || String(err || "Proje içe aktarılamadı.");
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

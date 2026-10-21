@@ -48,6 +48,22 @@ This document records all test scenarios, executed checks, environments, and ver
 
 ---
 
+## Phase R1.3B Final Acceptance Closeout Matrix
+
+| Test ID | Test Category | Description / Command | Environment | Status | Verification Evidence / Notes |
+|---|---|---|---|---|---|
+| **TEST-R1.3B-CLOSE-01** | Import Error Workflow | Failed import preserves entered path, displays error, and never closes modal | Node.js Test Runner | **PASS** | `r1_3b_remediation.test.mjs` verifies state preservation and error propagation. |
+| **TEST-R1.3B-CLOSE-02** | Production Utility Tests | Direct imports of `storageCapacity.ts`, `servicesTelemetry.ts`, `browserRouting.ts` | Node.js / Jiti Test Runner | **PASS** | 20/20 desktop tests pass directly testing production logic. |
+| **TEST-R1.3B-CLOSE-03** | Domain Routing Isolation | Live multi-domain isolation & default_server 404 block (`test_r1_3b_live_domain_routing_acceptance_and_isolation`) | macOS Darwin / Nginx 1.31.7 | **PASS** | Unknown domain -> 404; Alpha -> Alpha only; Beta -> Beta only; zero cross-project leakage. |
+| **TEST-R1.3B-CLOSE-04** | Genuine Native Tauri Capture | 7 high-resolution screenshots captured from live Cocoa app (`target/debug/localforge-desktop`) backed by SQLite (`localforge.db`) | macOS Apple Silicon / Tauri 2 | **PASS** | 7 verified screenshots (1600×1000) stored in `docs/design/r1_3b/native_tauri_verified/` and packaged into `localforge_r1_3b_native_tauri_screenshots.zip`. OCR verified live data. |
+| **TEST-R1.3B-CLOSE-05** | Workspace Rust Test Suite | `cargo test --workspace` | Apple Silicon Mac M1 | **PASS** | 58/58 tests passed (%100 PASS) across all 7 workspace crates. |
+| **TEST-R1.3B-CLOSE-06** | Desktop Frontend Test Suite | `npm test --prefix apps/desktop` | Node.js Test Runner | **PASS** | 20/20 tests passed (%100 PASS) in 481ms. |
+| **TEST-R1.3B-CLOSE-07** | Linter & Clippy Audit | `cargo clippy --workspace --all-targets -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings/errors across entire workspace. |
+| **TEST-R1.3B-CLOSE-08** | Formatter Audit | `cargo fmt --all -- --check` | Rust Toolchain 1.94.0 | **PASS** | Zero diffs across entire codebase. |
+| **TEST-R1.3B-CLOSE-09** | Production Bundle & Typecheck | `npm --prefix apps/desktop run build` | TypeScript 5.7 & Vite 6.4.4 | **PASS** | Clean build in 6.67s; zero type errors. |
+
+---
+
 ## Verification Status Definitions
 - **PASS**: Executed with exit code 0 and actual output matched expectations.
 - **FAIL**: Executed and failed to meet expectations.

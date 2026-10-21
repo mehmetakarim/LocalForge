@@ -1,6 +1,7 @@
 import React from "react";
 import { RefreshCw, ShieldCheck, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { RuntimeOverview } from "../types";
+import { deriveServiceStates } from "../utils/servicesTelemetry";
 
 export interface ServicesRuntimeProps {
   runtime: RuntimeOverview | null;
@@ -8,28 +9,7 @@ export interface ServicesRuntimeProps {
 }
 
 export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRefresh }) => {
-  const nginxStatus: "running" | "conflict" | "stopped" | "unknown" =
-    runtime == null
-      ? "unknown"
-      : runtime.nginx_running
-      ? "running"
-      : runtime.nginx_port_conflict
-      ? "conflict"
-      : "stopped";
-
-  const phpFpmStatus: "running" | "stopped" | "unknown" =
-    runtime == null || runtime.php_fpm_running === undefined || runtime.php_fpm_running === null
-      ? "unknown"
-      : runtime.php_fpm_running
-      ? "running"
-      : "stopped";
-
-  const mariadbStatus: "running" | "stopped" | "unknown" =
-    runtime == null || runtime.mariadb_alive === undefined || runtime.mariadb_alive === null
-      ? "unknown"
-      : runtime.mariadb_alive
-      ? "running"
-      : "stopped";
+  const { nginxStatus, phpFpmStatus, mariadbStatus } = deriveServiceStates(runtime);
 
   return (
     <div className="w-full max-w-6xl py-8 px-6 flex flex-col gap-6">

@@ -103,7 +103,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-B6** | Welcome / First-Run Splash Experience | Medium | COMPLETED | Lead UI Designer | Stage A Gate | Official Apple squircle app icon, quickstart onboarding cards, non-intrusive dismiss logic |
 | **TASK-R1.3B-B7** | Full Workspace Automated Test & Visual Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-B1..B6 | 57 Rust + 16 frontend tests (73/73 PASS); clean TypeScript build; 9 verified high-res PNG screenshots packaged in ZIP |
 
-### Subphase R1.3B-REM: Final Acceptance Remediation (COMPLETED / AWAITING ACCEPTANCE)
+### Subphase R1.3B-REM: Final Acceptance Remediation (COMPLETED / CONDITIONALLY ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-REM-01** | Visual Evidence Repair & Fixture Mode Hardening | Critical | COMPLETED | Lead UI Designer | PO Review Findings | Re-captured all 9 verified PNG screenshots; fixed `fixture=default` alias in `visualFixtures.ts` & hardened inspector URL selection; packaged zip archive |
@@ -113,6 +113,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-REM-05** | Grounded Operational Claims in Deployments, MCP & Settings | Medium | COMPLETED | Security Engineer | PO Review Findings | Labeled live deployments as `DeploymentNotImplemented` (disabled); bound live ports/paths in Settings dynamically |
 | **TASK-R1.3B-REM-06** | Real Project Import Workflow Integration | High | COMPLETED | Desktop Engineer | PO Review Findings | Created `ImportProjectModal.tsx`; wired "Mevcut Projeyi Aç" in `WelcomeSplash.tsx` to `import_project` command |
 | **TASK-R1.3B-REM-07** | Full Workspace Regression Suite Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-REM-01..06 | 58 Rust tests + 19 frontend tests (77/77 PASS); zero clippy warnings; zero format diffs; clean Vite build |
+
+### Subphase R1.3B-CLOSE: Final Acceptance Closeout (COMPLETED / AWAITING SIGN-OFF)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-CLOSE-01** | Import Error Workflow & Form State Preservation | Critical | COMPLETED | Frontend Lead | PO Closeout Finding 01 | Failed imports do not close `ImportProjectModal`; errors displayed inline; input path preserved for correction; close/reset strictly on confirmed success |
+| **TASK-R1.3B-CLOSE-02** | Production Utility Extraction & Direct Test Coverage | High | COMPLETED | Desktop Architect | PO Closeout Finding 02 | Extracted `storageCapacity.ts`, `servicesTelemetry.ts`, `browserRouting.ts`; removed duplicated logic from `r1_3b_remediation.test.mjs`; 20/20 tests PASS |
+| **TASK-R1.3B-CLOSE-03** | Live Nginx Routing Isolation & Adversarial Acceptance Test | Critical | COMPLETED | Senior Rust Eng | PO Closeout Finding 03 | Verified Nginx default_server 404, multi-project strict isolation, zero cross-tenant leakage; `test_r1_3b_live_domain_routing_acceptance_and_isolation` PASS |
+| **TASK-R1.3B-CLOSE-04** | Genuine Native macOS Tauri Application Evidence | Critical | COMPLETED | QA Lead | PO Closeout Finding 04 | Running native binary (`target/debug/localforge-desktop`) backed by live SQLite (`localforge.db`) with 2 persistent projects; 7 verified 1600x1000 screenshots in `docs/design/r1_3b/native_tauri_verified/` and zip archive |
+| **TASK-R1.3B-CLOSE-05** | Full Verification Suite & Project Memory Closeout | Critical | COMPLETED | Principal Architect | TASK-R1.3B-CLOSE-01..04 | 58 Rust tests + 20 frontend tests (78/78 PASS); zero clippy warnings; zero format diffs; clean Vite production bundle |
 
 ---
 

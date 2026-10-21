@@ -19,6 +19,7 @@ import { WelcomeSplash } from "./components/WelcomeSplash";
 import { ErrorState } from "./components/ErrorState";
 import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
 import { getVisualFixture } from "./fixtures/visualFixtures";
+import { computeProjectRouting } from "./utils/browserRouting";
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -165,8 +166,7 @@ export const App: React.FC = () => {
 
   const handleOpenBrowser = async (project: ProjectRecord) => {
     const port = runtime?.nginx_port || 8080;
-    const projectUrl = `http://${project.local_domain}:${port}/`;
-    const curlCommand = `curl -H "Host: ${project.local_domain}" http://127.0.0.1:${port}/`;
+    const { projectUrl, curlCommand } = computeProjectRouting(project.local_domain, port);
 
     let isResolvable = false;
     try {
@@ -215,8 +215,7 @@ export const App: React.FC = () => {
         };
         setProjects((prev) => [newProj, ...prev]);
       } else {
-        setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
-        return;
+        throw new Error("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
       }
       setIsImportModalOpen(false);
     } catch (err: any) {

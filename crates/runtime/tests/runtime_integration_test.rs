@@ -760,3 +760,123 @@ fn test_r1_3b_stage_b_nginx_default_server_blocks_cross_contamination_and_requir
         );
     }
 }
+
+#[test]
+fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
+    let fpm_exists = PhpFpmSupervisor::find_php_fpm_binary("any").is_ok();
+    let nginx_exists = NginxSupervisor::find_nginx_binary().is_ok();
+
+    if !fpm_exists || !nginx_exists {
+        eprintln!("Skipping live domain routing test: php-fpm or nginx missing on host");
+        return;
+    }
+
+    let dir = tempdir().unwrap();
+    let site_a_dir = dir.path().join("site_a");
+    let site_b_dir = dir.path().join("site_b");
+    std::fs::create_dir_all(&site_a_dir).unwrap();
+    std::fs::create_dir_all(&site_b_dir).unwrap();
+
+    std::fs::write(
+        site_a_dir.join("index.php"),
+        "<?php echo 'LOCALFORGE_SITE_A_PAYLOAD_ONLY';",
+    )
+    .unwrap();
+    std::fs::write(
+        site_b_dir.join("index.php"),
+        "<?php echo 'LOCALFORGE_SITE_B_PAYLOAD_ONLY';",
+    )
+    .unwrap();
+
+    let store = Arc::new(MetadataStore::open_in_memory().unwrap());
+    let volume_manager = Arc::new(MacOSVolumeManager::new());
+    let volume_barrier = Arc::new(VolumeBarrier::new(volume_manager.clone()));
+    let process_manager = Arc::new(MacOSProcessManager::new());
+
+    let vol_info = volume_manager
+        .find_volume_for_path(&site_a_dir)
+        .unwrap()
+        .unwrap();
+
+    let proj_a = ProjectRecord {
+        id: ProjectId::from_string("proj_alpha_routing"),
+        name: "Routing Alpha".into(),
+        path: site_a_dir,
+        volume_uuid: vol_info.uuid.clone(),
+        document_root: "".into(),
+        php_version: "8.5".into(),
+        local_domain: "alpha-route.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-21T00:00:00Z".into(),
+        updated_at: "2026-10-21T00:00:00Z".into(),
+    };
+    let proj_b = ProjectRecord {
+        id: ProjectId::from_string("proj_beta_routing"),
+        name: "Routing Beta".into(),
+        path: site_b_dir,
+        volume_uuid: vol_info.uuid,
+        document_root: "".into(),
+        php_version: "8.5".into(),
+        local_domain: "beta-route.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-21T00:00:00Z".into(),
+        updated_at: "2026-10-21T00:00:00Z".into(),
+    };
+    store.insert_project(&proj_a).unwrap();
+    store.insert_project(&proj_b).unwrap();
+
+    let test_port = 18096;
+    let runtime_base = dir.path().join("localforge_runtime_routing");
+    let service = ProjectRuntimeService::create_default(
+        runtime_base,
+        store.clone(),
+        volume_manager.clone(),
+        volume_barrier.clone(),
+        process_manager.clone(),
+        test_port,
+    );
+
+    // 1. Start both projects
+    let _ = service.start_project(&proj_a.id).unwrap();
+    let _ = service.start_project(&proj_b.id).unwrap();
+
+    // Allow brief moment for nginx worker reload
+    std::thread::sleep(std::time::Duration::from_millis(250));
+
+    // 2. Unknown Host / raw IP request must return HTTP 404 from default_server
+    let (unknown_code, unknown_body) =
+        probe_http_health(test_port, "unknown-project.test", "/").unwrap();
+    assert_eq!(unknown_code, 404, "Unknown host must return HTTP 404");
+    assert!(
+        unknown_body.contains("Host header required or project domain not found"),
+        "Must return LocalForge Gateway 404 body without leaking site output: {unknown_body}"
+    );
+
+    // 3. Project A Host reaches Project A ONLY
+    let (code_a, body_a) = probe_http_health(test_port, "alpha-route.test", "/").unwrap();
+    assert_eq!(code_a, 200, "Project A must return HTTP 200");
+    assert!(
+        body_a.contains("LOCALFORGE_SITE_A_PAYLOAD_ONLY"),
+        "Must contain Project A payload"
+    );
+    assert!(
+        !body_a.contains("LOCALFORGE_SITE_B_PAYLOAD_ONLY"),
+        "Project A must NOT contain Project B payload"
+    );
+
+    // 4. Project B Host reaches Project B ONLY
+    let (code_b, body_b) = probe_http_health(test_port, "beta-route.test", "/").unwrap();
+    assert_eq!(code_b, 200, "Project B must return HTTP 200");
+    assert!(
+        body_b.contains("LOCALFORGE_SITE_B_PAYLOAD_ONLY"),
+        "Must contain Project B payload"
+    );
+    assert!(
+        !body_b.contains("LOCALFORGE_SITE_A_PAYLOAD_ONLY"),
+        "Project B must NOT contain Project A payload"
+    );
+
+    // 5. Cleanup
+    let _ = service.stop_project(&proj_a.id);
+    let _ = service.stop_project(&proj_b.id);
+}

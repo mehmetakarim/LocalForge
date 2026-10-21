@@ -1,6 +1,7 @@
 import React from "react";
 import { HardDrive, RefreshCw, ShieldCheck, CheckCircle2, Lock } from "lucide-react";
 import { VolumeInfo, ProjectRecord } from "../types";
+import { computeStorageCapacity } from "../utils/storageCapacity";
 
 export interface StorageVolumesProps {
   volumes: VolumeInfo[];
@@ -50,16 +51,7 @@ export const StorageVolumes: React.FC<StorageVolumesProps> = ({
         {volumes.map((vol) => {
           const isExternal = !vol.is_internal || vol.is_removable;
           const assignedProjects = projects.filter((p) => p.volume_uuid === vol.uuid);
-          const hasValidCapacity =
-            vol.total_bytes > 0 &&
-            vol.available_bytes <= vol.total_bytes &&
-            vol.available_bytes >= 0;
-          const usedBytes = hasValidCapacity
-            ? Math.max(0, vol.total_bytes - vol.available_bytes)
-            : 0;
-          const usagePercent = hasValidCapacity
-            ? Math.min(100, Math.round((usedBytes / vol.total_bytes) * 100))
-            : null;
+          const { hasValidCapacity, usedBytes, usagePercent, statusLabel } = computeStorageCapacity(vol);
 
           return (
             <div
@@ -104,13 +96,7 @@ export const StorageVolumes: React.FC<StorageVolumesProps> = ({
                         !hasValidCapacity ? "text-[#F59E0B]" : "text-[#10B981]"
                       }`}
                     />
-                    <span>
-                      {!hasValidCapacity
-                        ? "BAĞLANTI KESİK / BİLİNMİYOR"
-                        : isExternal
-                        ? "BAĞLI (APFS)"
-                        : "SİSTEM (APFS)"}
-                    </span>
+                    <span>{statusLabel}</span>
                   </div>
                 </div>
 

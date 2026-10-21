@@ -576,3 +576,55 @@ This document records the chronological engineering log for all development sess
 - Maintained strict branch isolation on `phase-r1/r1-3b-brand-implementation`.
 - Preserved Direction A+ visual design architecture and canonical brand tokens.
 - No database deletion allowed; non-dry-run SFTP remains disabled.
+
+---
+
+## Session 016 — Phase R1.3B Final Acceptance Closeout
+
+- **Date**: 2026-10-22
+- **Participants**: Lead Architect, Systems Engineer, Desktop Engineer, Frontend Lead, Security Engineer, QA Lead
+- **Authorized Phase**: **Phase R1.3B Final Acceptance Closeout**
+- **Git Branch**: `phase-r1/r1-3b-brand-implementation`
+
+### Summary of Activities
+1. **Finding 01 — Import Error Propagation & Form State Preservation**:
+   - Refactored `ImportProjectModal.tsx`: catch backend errors, display inline in an error alert box, retain entered project folder path without clearing, and invoke `onClose()` strictly on confirmed success.
+   - Refactored `App.tsx`: `handleImportProject()` propagates errors explicitly when running outside Tauri instead of swallowing failures.
+   - Added automated regression test in `apps/desktop/test/r1_3b_remediation.test.mjs` verifying that failed imports preserve the entered path, display the error, and never close the modal.
+2. **Finding 02 — Production-Code Test Coverage & Utility Extraction**:
+   - Extracted shared capacity classification logic into `apps/desktop/src/utils/storageCapacity.ts` (`computeStorageCapacity`).
+   - Extracted service state derivation into `apps/desktop/src/utils/servicesTelemetry.ts` (`deriveServiceStates`).
+   - Extracted browser routing computation into `apps/desktop/src/utils/browserRouting.ts` (`computeProjectRouting`).
+   - Updated `StorageVolumes.tsx`, `ServicesRuntime.tsx`, and `App.tsx` to consume these production utilities directly.
+   - Replaced duplicated logic in `r1_3b_remediation.test.mjs` with direct imports of production utilities via `jiti`. 20/20 frontend tests pass in 481ms.
+3. **Finding 03 — Domain Routing Acceptance & Adversarial Isolation Test**:
+   - Implemented live adversarial integration test `test_r1_3b_live_domain_routing_acceptance_and_isolation` in `crates/runtime/tests/runtime_integration_test.rs`.
+   - Verified that unknown host requests and raw IP access return HTTP 404 with LocalForge Gateway signature via Nginx `default_server`.
+   - Verified that Project A (`alpha-route.test`) reaches Project A only (HTTP 200 with Project A payload).
+   - Verified that Project B (`beta-route.test`) reaches Project B only (HTTP 200 with Project B payload).
+   - Verified that cross-project leakage is strictly impossible.
+   - All 14 runtime integration tests pass in 11.70s.
+4. **Finding 04 — Genuine Native macOS Tauri Application Evidence**:
+   - Built native Tauri binary `target/debug/localforge-desktop` (30MB, embedding latest `dist/` bundle).
+   - Connected to live persistent SQLite database (`/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db`) containing 2 real projects (`r1_acceptance_project` and `Projetest`) on `/Volumes/Mac Harici Disk`.
+   - Captured 7 verified full-resolution (1600×1000) screenshots directly from the running Cocoa application on macOS Apple Silicon:
+     - `tauri_spatial_studio_2proj.png` (Spatial Studio showing the 2 real persistent projects)
+     - `tauri_project_inspector.png` (Slide-over Project Inspector open on Projetest)
+     - `tauri_projects_workspace.png` (Projects Workspace view)
+     - `tauri_services_runtime.png` (Services & Runtime diagnostic view)
+     - `tauri_storage_volumes.png` (Storage & Volumes APFS topology view)
+     - `tauri_welcome_import_modal.png` (Mevcut Projeyi İçe Aktar modal dialog open)
+     - `tauri_welcome_splash.png` (Welcome / First-Run splash modal open)
+   - Verified screenshot contents via OCR (`tesseract`) confirming live data binding.
+   - Packaged all screenshots into `docs/design/r1_3b/localforge_r1_3b_native_tauri_screenshots.zip`.
+5. **Full Verification Suite**:
+   - Rust workspace tests: 58/58 passed (%100 PASS).
+   - Frontend desktop tests: 20/20 passed (%100 PASS).
+   - TypeScript compilation & Vite build: 0 errors (clean `dist/`).
+   - `cargo fmt --all -- --check`: 0 diffs.
+   - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+
+### Decisions Made
+- Maintained strict branch isolation on `phase-r1/r1-3b-brand-implementation`.
+- Preserved Direction A+ visual architecture and canonical brand tokens.
+- All 4 findings from Product Owner Closeout directive resolved with zero synthetic fallbacks and 100% genuine evidence.
