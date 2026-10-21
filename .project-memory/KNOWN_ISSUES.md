@@ -41,3 +41,12 @@ This document tracks known issues, technical defects, environmental constraints,
 - **Impact**: External drives were marked as `[Internal SSD]` or failed external-specific badges.
 - **Resolution Plan / Mitigation**: Enhanced parser in `MacOSVolumeManager::inspect_volume` to inspect `Device Location` and properly classify `Device Location: External` as `is_internal = false`.
 - **Status**: RESOLVED (Tested and verified with `/Volumes/Mac Harici Disk`).
+
+### ISSUE-005: Raw Loopback IP Cross-Project Virtual Host Leakage (Resolved)
+- **Classification**: Security & Isolation Defect
+- **Discovered In**: R1.3B Stage B Review
+- **Component**: `crates/runtime/src/nginx.rs` & `apps/desktop/src/App.tsx`
+- **Description**: Navigating to `http://127.0.0.1:8080/` without a project `Host` header caused Nginx to route to the first lexicographically loaded `.conf` file in `conf.d/`, potentially serving a different project's site.
+- **Impact**: Cross-project website contamination and incorrect browser routing.
+- **Resolution Plan / Mitigation**: Added `default_server` block on loopback returning HTTP 404 (`"LocalForge Gateway: Host header required or project domain not found"`). Added `check_domain_resolution` in Tauri and `RoutingAlertModal` in frontend so browser navigation is only allowed when `.test` resolves to loopback.
+- **Status**: RESOLVED (Regression tested in `test_r1_3b_stage_b_nginx_default_server_blocks_cross_contamination_and_requires_host_header` and `r1_3b_remediation.test.mjs`).

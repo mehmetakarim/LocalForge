@@ -724,3 +724,39 @@ fn test_r1_3b_prep_04_adversarial_cmdline_spoofing_and_substring_matching_fails_
         "Adversarial substring attack must be strictly rejected"
     );
 }
+
+#[test]
+fn test_r1_3b_stage_b_nginx_default_server_blocks_cross_contamination_and_requires_host_header() {
+    let dir = tempdir().unwrap();
+    let pm = Arc::new(MacOSProcessManager::new());
+    let conf_dir = dir.path().join("conf");
+    let run_dir = dir.path().join("run");
+    let listen_port = 18092;
+
+    let sup = NginxSupervisor::new(conf_dir.clone(), run_dir, listen_port, pm);
+    let conf_path = conf_dir.join("nginx.conf");
+    assert!(conf_path.is_file(), "nginx.conf must be created");
+
+    let conf_content = std::fs::read_to_string(&conf_path).unwrap();
+
+    // Verify default_server block prevents wrong-project routing on raw IP
+    assert!(
+        conf_content.contains(&format!("listen 127.0.0.1:{} default_server;", listen_port)),
+        "Must contain explicit default_server directive on loopback"
+    );
+    assert!(
+        conf_content.contains("server_name _;"),
+        "Must capture unmatched host requests with server_name _;"
+    );
+    assert!(
+        conf_content.contains("return 404 \"LocalForge Gateway: Host header required or project domain not found\\n\";"),
+        "Unmatched raw IP or unknown domain requests must return explicit 404 without leaking projects"
+    );
+
+    if NginxSupervisor::find_nginx_binary().is_ok() {
+        assert!(
+            sup.validate_configuration().is_ok(),
+            "Configuration with default_server must pass nginx -t validation"
+        );
+    }
+}

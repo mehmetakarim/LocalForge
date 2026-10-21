@@ -6,13 +6,13 @@ This document tracks the canonical technical and operational state of the LocalF
 
 ## 1. Executive Summary
 
-- **Active Phase**: **Phase R1.3B Brand Integration & Native Workspace Implementation (Stage B)**
-- **Phase Status**: IMPLEMENTATION COMPLETED / AWAITING PRODUCT OWNER VISUAL & FUNCTIONAL ACCEPTANCE
+- **Active Phase**: **Phase R1.3B Final Acceptance Remediation**
+- **Phase Status**: REMEDIATION COMPLETED / 9 VERIFIED SCREENSHOTS CAPTURED / AWAITING PRODUCT OWNER REVIEW
 - **Active Branch**: `phase-r1/r1-3b-brand-implementation`
 - **Previous Phase Status**: **Phase R1.3B Brand Integration Stage A (Approved - Commit 9c9d720)**
 - **Approved Design Baseline**: **Direction A+ Spatial Studio Stage (1600×1000 Baseline)**.
-- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes & Patch - Accepted), R1.3B Preparation (Nginx Ownership, Metadata Error Propagation, SQLite Persistence - Completed), R1.3B Visual Design Gate (Task A Nginx Path Matching, Task B 4 High-Fidelity Prototypes, Task C Data Mapping - Completed), R1.3B Brand Integration Stage A (Approved), R1.3B Stage B (Brand Identity & Native Workspace Implementation - Completed).
-- **Test Matrix Status**: 57/57 automated Rust tests pass across workspace; 16/16 automated frontend tests pass (73 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; canonical brand tokens integrated; official elephant emblem rendered in desktop titlebar and inspector; official Tauri macOS app icons generated; 6 native workspace surfaces implemented (B1 Spatial Studio 0/2/6, B2 Projects Workspace, B3 Services & Runtime, B4 Storage & Volumes, B5 Project Inspector with DB deletion lock & SFTP dry-run, B6 Welcome Splash); 9 verified high-resolution PNG screenshots captured and packaged into zip archive.
+- **R1 Subphase Split**: R1.0 (Architecture - Done), R1.1/R1.1A (PHP-FPM/Nginx - Done), R1.2/R1.2A/R1.2B (MariaDB/Resilience - Done), R1.3A-V Stage A (Visual Gate - Done), R1.3A-V Stage B (Spatial Visual Recovery - Done), R1.3A-V1 (Final Functional Acceptance Fixes & Patch - Accepted), R1.3B Preparation (Nginx Ownership, Metadata Error Propagation, SQLite Persistence - Completed), R1.3B Visual Design Gate (Task A Nginx Path Matching, Task B 4 High-Fidelity Prototypes, Task C Data Mapping - Completed), R1.3B Brand Integration Stage A (Approved), R1.3B Stage B (Brand Identity & Native Workspace Implementation - Completed), R1.3B Final Acceptance Remediation (Completed).
+- **Test Matrix Status**: 58/58 automated Rust tests pass across workspace; 19/19 automated frontend tests pass (77 total); clean TypeScript & Vite v6.4.4 build; zero clippy warnings; zero formatting diffs; canonical brand tokens integrated; official elephant emblem rendered in desktop titlebar and inspector; official Tauri macOS app icons generated; 6 native workspace surfaces implemented (B1 Spatial Studio 0/2/6, B2 Projects Workspace, B3 Services & Runtime, B4 Storage & Volumes, B5 Project Inspector with DB deletion lock & SFTP dry-run, B6 Welcome Splash); 9 verified high-resolution PNG screenshots captured and packaged into zip archive.
 
 ---
 

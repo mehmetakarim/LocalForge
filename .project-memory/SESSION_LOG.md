@@ -529,3 +529,50 @@ This document records the chronological engineering log for all development sess
 ### Decisions Made
 - Maintained strict dedicated implementation branch `phase-r1/r1-3b-brand-implementation`; do not merge into `main`.
 - Retained all security invariants: non-dry-run SFTP remains disabled, database deletion remains locked, Nginx ownership verification remains fail-closed.
+
+---
+
+## Session 015 — Phase R1.3B Stage B Final Acceptance Remediation
+
+- **Date**: 2026-10-21
+- **Participants**: Lead Architect, Systems Engineer, Desktop Engineer, Frontend Lead, Security Engineer, QA Lead
+- **Authorized Phase**: **Phase R1.3B Final Acceptance Remediation**
+- **Git Branch**: `phase-r1/r1-3b-brand-implementation`
+
+### Summary of Activities
+1. **Finding 1 (P0) — Visual Acceptance Evidence Repair**:
+   - Diagnosed root cause: `fixture=default` returned `null` in `visualFixtures.ts` switch, causing fallback to 0 projects empty state.
+   - Fixed `visualFixtures.ts` by adding `"default"` alias alongside `"2"` and `"baseline"`.
+   - Hardened `inspector` query parameter auto-selection in `StudioOverview.tsx` (`inspector=true`, `inspector=1`, or project name/id).
+   - Re-captured all 9 verified PNG screenshots using Playwright Chrome (`spatial_studio_overview_2proj.png` and `project_inspector.png` now legitimately show 2 monoliths and the open inspector drawer).
+   - Re-packaged all 9 verified screenshots into `docs/design/r1_3b/localforge_r1_3b_stage_b_verified_screenshots.zip`.
+2. **Finding 2 (P1) — Wrong-Project Browser Routing Fix & Nginx Isolation**:
+   - Added `default_server` block on loopback (`127.0.0.1:{listen_port}`) in `crates/runtime/src/nginx.rs` returning HTTP 404 to block cross-project leakage on raw IP requests without Host header.
+   - Added `check_domain_resolution` command in `apps/desktop/src-tauri/src/lib.rs` using `std::net::ToSocketAddrs` to ensure `.test` domain resolves strictly to local loopback (127.0.0.1 or ::1).
+   - Created `RoutingAlertModal.tsx` in `apps/desktop/src/components/` and updated `handleOpenBrowser()` in `App.tsx`: if local domain is not configured in `/etc/hosts`, user is presented with an informative warning dialog and copyable cURL command rather than opening raw loopback IP and serving the wrong project.
+3. **Finding 3 (P1) — Remove Fabricated Capacity Fallback**:
+   - Eliminated `: 45;` fallback in `apps/desktop/src/components/StorageVolumes.tsx`.
+   - Implemented `hasValidCapacity` check (`vol.total_bytes > 0 && vol.available_bytes <= vol.total_bytes && vol.available_bytes >= 0`).
+   - For invalid, unreadable, zero-byte, or disconnected volumes, renders `Kullanılan: BİLİNMİYOR`, `Toplam: KAPASİTE OKUNAMADI`, neutral gauge bar, and `BAĞLANTI KESİK / BİLİNMİYOR` status badge.
+4. **Finding 4 (P1) — Preserve UNKNOWN vs STOPPED in Services & Runtime**:
+   - Refactored `apps/desktop/src/components/ServicesRuntime.tsx` to stop collapsing `null`/`undefined` telemetry into `false`.
+   - Nginx, PHP-FPM, and MariaDB diagnostic cards explicitly distinguish `DOĞRULANDI / AKTİF` (running), `PORT ÇAKIŞMASI` (conflict), `DURDURULDU / BEKLEMEDE` (verified stopped), and `BİLİNMİYOR` (unprobed / missing telemetry).
+   - Replaced hardcoded PHP version fallbacks with honest "Tespit Edilmedi" / "Bilinmiyor".
+5. **Finding 5 (P1) — Remove Ungrounded Operational Claims**:
+   - In Deployments view: explicitly labeled live deployment engine as disabled (`DeploymentNotImplemented`, read-only preview / dry-run only per Phase R1 safety rules).
+   - In MCP view: labeled as `stdio` interface ready in read-only client mode.
+   - In Settings view: dynamically bound live ports (`runtime?.nginx_port`, `runtime?.mariadb_port`), detected PHP versions, and active external APFS volume mount paths.
+6. **Finding 6 (P2) — Real Project Import Workflow**:
+   - Created `apps/desktop/src/components/ImportProjectModal.tsx` with folder path validation, volume suggestion, and error reporting.
+   - Wired `WelcomeSplash.tsx` "Mevcut Projeyi Aç" action and `App.tsx` to open `ImportProjectModal` and invoke Tauri `import_project` command.
+7. **Automated Verification**:
+   - Rust workspace tests: 58/58 passed (%100 PASS).
+   - Frontend desktop tests: 19/19 passed (%100 PASS, added `r1_3b_remediation.test.mjs`).
+   - `cargo fmt --check`: 0 diffs.
+   - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+   - `npm --prefix apps/desktop run build`: Clean TypeScript & Vite build (0 errors).
+
+### Decisions Made
+- Maintained strict branch isolation on `phase-r1/r1-3b-brand-implementation`.
+- Preserved Direction A+ visual design architecture and canonical brand tokens.
+- No database deletion allowed; non-dry-run SFTP remains disabled.

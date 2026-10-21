@@ -91,12 +91,16 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.3B-GATE-01** | Direction A+ 4 High-Fidelity Visual Prototypes & PNGs | Critical | COMPLETED | Lead UI Designer | 4 1600x1000 HTML prototypes & rendered PNGs (Projects, Services, Storage, Inspector) in `docs/design/r1_3b/` |
 | **TASK-R1.3B-GATE-02** | Data Capability Mapping & Log Safeguards Matrix | Critical | COMPLETED | Systems Architect | Metric-to-command mapping, backend availability audit, safe fallbacks, ring-buffer log specification |
 
-### Subphase R1.3B: Native Workspace Implementation (PLANNED / LOCKED AWAITING APPROVAL)
+### Subphase R1.3B: Brand Integration & Native Workspace Implementation (COMPLETED / AWAITING ACCEPTANCE)
 | Task ID | Title | Priority | Status | Assigned Role | Deliverable |
 |---|---|---|---|---|---|
-| **TASK-R1.3B-01** | Native Workspace Multi-View Spatial Navigation | High | PLANNED | Frontend Lead | Projects Workspace, Services & Runtime, Storage & Volumes views |
-| **TASK-R1.3B-02** | Detailed Project Inspector & Diagnostic Drawer | High | PLANNED | Frontend Lead | Per-project telemetry, FastCGI socket inspection, bounded live logs, cURL helper |
-| **TASK-R1.3B-03** | Database Deletion UI Exclusion (Safety Guard) | Critical | SCOPE LOCKED | Security Engineer | Database deletion strictly OUT OF SCOPE; `DatabaseDeletionUnavailable` enforced |
+| **TASK-R1.3B-B1** | Spatial Studio Brand Alignment & Direction A+ Monoliths | Critical | COMPLETED | Frontend Lead | Translucent vertical monoliths, specular rim, perspective floor reflection, 0/2/6 project behavior |
+| **TASK-R1.3B-B2** | Projects Workspace Native View | High | COMPLETED | Frontend Lead | Real persistent metadata listing, search input, filter pills, safe lifecycle controls |
+| **TASK-R1.3B-B3** | Services & Runtime Native View | Critical | COMPLETED | Systems Engineer | Nginx port 8080 process ownership verification, PHP-FPM socket pool, MariaDB engine, zero fabricated telemetry |
+| **TASK-R1.3B-B4** | Storage & Volumes Native View | High | COMPLETED | Systems Engineer | APFS Tier-1 external volume, internal container, persistent UUIDs, disk usage gauges, VolumeBarrier guard |
+| **TASK-R1.3B-B5** | Detailed Project Inspector Drawer | Critical | COMPLETED | Security Engineer | Slide-over drawer, brand identity, database deletion lock strictly enforced, SFTP dry-run only guard |
+| **TASK-R1.3B-B6** | Welcome / First-Run Splash Experience | Medium | COMPLETED | Lead UI Designer | Official Apple squircle app icon, quickstart onboarding cards, non-intrusive dismiss logic |
+| **TASK-R1.3B-REM** | Final Acceptance Remediation (P0-P2 Findings) | Critical | COMPLETED | Systems & QA Lead | 9 re-captured verified screenshots; safe domain routing modal & cURL; capacity integrity guard; UNKNOWN preservation; ImportProjectModal; 77/77 tests PASS |
 
 ---
 

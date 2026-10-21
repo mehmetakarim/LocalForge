@@ -153,10 +153,16 @@ fastcgi_param  REDIRECT_STATUS    200;
                  access_log \"{run_dir}/nginx_access.log\";\n\
                  sendfile on;\n\
                  keepalive_timeout 65;\n\n\
+                 server {{\n\
+                     listen 127.0.0.1:{listen_port} default_server;\n\
+                     server_name _;\n\
+                     return 404 \"LocalForge Gateway: Host header required or project domain not found\\n\";\n\
+                 }}\n\n\
                  include \"{conf_dir}/conf.d/*.conf\";\n\
              }}\n",
             run_dir = self.run_dir.display(),
-            conf_dir = self.conf_dir.display()
+            conf_dir = self.conf_dir.display(),
+            listen_port = self.listen_port
         );
         let _ = std::fs::write(main_conf_path, main_conf);
     }

@@ -31,6 +31,23 @@ This document records all test scenarios, executed checks, environments, and ver
 
 ---
 
+## Phase R1.3B Final Acceptance Remediation Matrix
+
+| Test ID | Test Category | Description / Command | Environment | Status | Verification Evidence / Notes |
+|---|---|---|---|---|---|
+| **TEST-R1.3B-REM-01** | Visual Verification | Playwright Chrome capture of 9 UI surfaces (0, 2, 6 projects, inspector, workspaces, responsive 1024x768) | Vite v6.4.4 & Chrome Headless | **PASS** | 9 verified PNG screenshots captured in `docs/design/r1_3b/implementation_verified/` and packaged in ZIP. 2-proj & inspector render valid projects and drawer. |
+| **TEST-R1.3B-REM-02** | Browser Routing Isolation | `check_domain_resolution` in Tauri & Nginx `default_server` | Rust Cargo & ToSocketAddrs | **PASS** | Raw loopback IP returns 404; unresolvable `.test` domain opens `RoutingAlertModal` with cURL fallback. Verified via `test_r1_3b_stage_b_nginx_default_server_blocks_cross_contamination_and_requires_host_header`. |
+| **TEST-R1.3B-REM-03** | Storage Capacity Integrity | `StorageVolumes` capacity calculation & zero-fallback removal | Node.js Test Runner | **PASS** | `r1_3b_remediation.test.mjs` verifies `usagePercent` is null (not 45%) for zero/negative/disconnected/overflow bytes. |
+| **TEST-R1.3B-REM-04** | Services Telemetry State | UNKNOWN preservation for unprobed Nginx, PHP-FPM, MariaDB | Node.js Test Runner | **PASS** | `r1_3b_remediation.test.mjs` verifies `runtime == null` or `undefined` properties render `BİLİNMİYOR` badges without collapsing into `false`. |
+| **TEST-R1.3B-REM-05** | Real Import Workflow | `ImportProjectModal` folder path import | React 19 & Tauri | **PASS** | "Mevcut Projeyi Aç" opens dedicated modal invoking `import_project` rather than project creation. |
+| **TEST-R1.3B-REM-06** | Workspace Rust Test Suite | `cargo test --workspace` | Apple Silicon Mac M1 | **PASS** | 58/58 tests passed (%100 PASS) across all 7 workspace crates. |
+| **TEST-R1.3B-REM-07** | Desktop Frontend Test Suite | `npm test --prefix apps/desktop` | Node.js Test Runner | **PASS** | 19/19 tests passed (%100 PASS) including fixture safety, health classification, and R1.3B remediation suites. |
+| **TEST-R1.3B-REM-08** | Linter & Clippy Audit | `cargo clippy --workspace --all-targets -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings/errors across entire workspace. |
+| **TEST-R1.3B-REM-09** | Formatter Audit | `cargo fmt --check` | Rust Toolchain 1.94.0 | **PASS** | Zero diffs across entire codebase. |
+| **TEST-R1.3B-REM-10** | Production Bundle & Typecheck | `npm --prefix apps/desktop run build` | TypeScript 5.7 & Vite | **PASS** | Clean compilation in 8.77s; zero type errors. |
+
+---
+
 ## Verification Status Definitions
 - **PASS**: Executed with exit code 0 and actual output matched expectations.
 - **FAIL**: Executed and failed to meet expectations.

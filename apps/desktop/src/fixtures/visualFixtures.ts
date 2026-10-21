@@ -198,7 +198,7 @@ export function getVisualFixture(
     };
   }
 
-  if (key === "2" || key === "baseline") {
+  if (key === "2" || key === "baseline" || key === "default") {
     return {
       volumes: mockVolumes,
       projects: [

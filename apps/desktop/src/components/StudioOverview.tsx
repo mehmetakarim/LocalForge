@@ -37,9 +37,13 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
     if (import.meta.env.DEV && typeof window !== "undefined" && projects.length > 0) {
       const param = new URLSearchParams(window.location.search).get("inspector");
       if (param) {
-        const found = projects.find((p) => p.id === param || p.name === param);
-        if (found) {
-          setSelectedProjectId(found.id);
+        if (param === "true" || param === "1") {
+          setSelectedProjectId(projects[0].id);
+        } else {
+          const found = projects.find((p) => p.id === param || p.name === param);
+          if (found) {
+            setSelectedProjectId(found.id);
+          }
         }
       }
     }

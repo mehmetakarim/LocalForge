@@ -13,6 +13,8 @@ import { ProjectsWorkspace } from "./components/ProjectsWorkspace";
 import { ServicesRuntime } from "./components/ServicesRuntime";
 import { StorageVolumes } from "./components/StorageVolumes";
 import { CreateProjectModal } from "./components/CreateProjectModal";
+import { ImportProjectModal } from "./components/ImportProjectModal";
+import { RoutingAlertModal } from "./components/RoutingAlertModal";
 import { WelcomeSplash } from "./components/WelcomeSplash";
 import { ErrorState } from "./components/ErrorState";
 import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
@@ -25,7 +27,14 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("studio");
   const [isCapsuleOpen, setIsCapsuleOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [routingAlert, setRoutingAlert] = useState<{
+    project: ProjectRecord;
+    port: number;
+    url: string;
+    curlCommand: string;
+  } | null>(null);
   const [isFixtureMode, setIsFixtureMode] = useState(false);
   const [_loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -154,8 +163,66 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleOpenBrowser = (_project: ProjectRecord) => {
-    window.open(`http://127.0.0.1:${runtime?.nginx_port || 8080}/`, "_blank");
+  const handleOpenBrowser = async (project: ProjectRecord) => {
+    const port = runtime?.nginx_port || 8080;
+    const projectUrl = `http://${project.local_domain}:${port}/`;
+    const curlCommand = `curl -H "Host: ${project.local_domain}" http://127.0.0.1:${port}/`;
+
+    let isResolvable = false;
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        isResolvable = await invoke<boolean>("check_domain_resolution", {
+          domain: project.local_domain,
+        });
+      } else {
+        isResolvable = false;
+      }
+    } catch (err) {
+      console.error("Domain resolution check failed:", err);
+      isResolvable = false;
+    }
+
+    if (isResolvable) {
+      window.open(projectUrl, "_blank");
+    } else {
+      setRoutingAlert({
+        project,
+        port,
+        url: projectUrl,
+        curlCommand,
+      });
+    }
+  };
+
+  const handleImportProject = async (path: string) => {
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        await invoke("import_project", { path });
+        await loadData();
+      } else if (isFixtureMode) {
+        const name = path.split("/").filter(Boolean).pop() || "imported-project";
+        const newProj: ProjectRecord = {
+          id: `proj_${Date.now()}`,
+          name,
+          path,
+          volume_uuid: volumes[0]?.uuid || "vol_01",
+          document_root: "public",
+          php_version: "8.4",
+          local_domain: `${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}.test`,
+          status: "stopped",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setProjects((prev) => [newProj, ...prev]);
+      } else {
+        setErrorMsg("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
+        return;
+      }
+      setIsImportModalOpen(false);
+    } catch (err: any) {
+      console.error("Import project failed:", err);
+      throw err;
+    }
   };
 
   const handleCreateProject = async (
@@ -277,11 +344,11 @@ export const App: React.FC = () => {
               Akıllı Güvenli Dağıtım
             </h2>
             <p className="text-xs text-[#D4CCF1] max-w-md mx-auto leading-relaxed">
-              Git diff değil; SHA-256 sağlama defteri tabanlı güvenli dağıtım. Üretim dağıtımları insan onay kapısıyla korunur.
+              Git diff değil; bağımsız SHA-256 sağlama defteri tabanlı güvenli dağıtım. Üretim dağıtımları insan onay kapısıyla korunur.
             </p>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F59E0B]/12 border border-[#F59E0B]/25 text-xs text-[#F59E0B]">
               <Lock className="w-3.5 h-3.5" />
-              <span>SFTP Dağıtım Kapısı Devrede (Salt-Okunur Önizleme / Dry-Run Only)</span>
+              <span>Canlı Dağıtım Motoru Devre Dışı (Phase R1 Güvenlik Kuralı: DeploymentNotImplemented)</span>
             </div>
           </div>
         )}
@@ -299,7 +366,7 @@ export const App: React.FC = () => {
             </p>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#10B981]/12 border border-[#10B981]/25 text-xs text-[#10B981] font-mono">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>localforge-mcp-server: Dinleniyor (stdio)</span>
+              <span>localforge-mcp-server: Stdio Arabirimi Hazır (Phase R1 Salt-Okunur İstemci Modu)</span>
             </div>
           </div>
         )}
@@ -313,24 +380,34 @@ export const App: React.FC = () => {
               Sistem Tercihleri
             </h2>
             <p className="text-xs text-[#D4CCF1] max-w-md mx-auto leading-relaxed">
-              Port yapılandırmaları, APFS bağlama güvenlik sınırları ve loopback proxy ayarları.
+              Doğrulanmış port yapılandırmaları, APFS bağlama güvenlik sınırları ve loopback proxy ayarları.
             </p>
             <div className="p-4 rounded-2xl bg-[#191337]/90 border border-[rgba(183,173,223,0.14)] text-left font-mono text-xs max-w-md mx-auto space-y-2 text-[#D4CCF1]">
               <div className="flex justify-between">
                 <span className="text-[#B7ADDF]">Nginx Loopback:</span>
-                <span className="text-[#FFFBFF]">127.0.0.1:8080</span>
+                <span className="text-[#FFFBFF]">
+                  {runtime?.nginx_port ? `127.0.0.1:${runtime.nginx_port}` : "Bilinmiyor (Yoklanmadı)"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#B7ADDF]">MariaDB Port:</span>
-                <span className="text-[#FFFBFF]">3306</span>
+                <span className="text-[#FFFBFF]">
+                  {runtime?.mariadb_port ? String(runtime.mariadb_port) : "Bilinmiyor"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#B7ADDF]">Desteklenen PHP:</span>
-                <span className="text-[#FFFBFF]">8.4, 8.3, 8.2</span>
+                <span className="text-[#FFFBFF]">
+                  {runtime?.php_versions && runtime.php_versions.length > 0
+                    ? runtime.php_versions.join(", ")
+                    : "Tespit Edilmedi"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#B7ADDF]">Harici Çalışma Alanı:</span>
-                <span className="text-[#10B981]">/Volumes/Mac Harici Disk</span>
+                <span className="text-[#10B981]">
+                  {volumes.find((v) => !v.is_internal || v.is_removable)?.mount_point || "Bağlı Harici Birim Yok"}
+                </span>
               </div>
             </div>
           </div>
@@ -345,6 +422,24 @@ export const App: React.FC = () => {
         volumes={volumes}
       />
 
+      {/* Project Import Modal */}
+      <ImportProjectModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportProject}
+        volumes={volumes}
+      />
+
+      {/* Safe Domain Routing Alert Modal */}
+      <RoutingAlertModal
+        isOpen={Boolean(routingAlert)}
+        onClose={() => setRoutingAlert(null)}
+        project={routingAlert?.project || null}
+        port={routingAlert?.port || 8080}
+        url={routingAlert?.url || ""}
+        curlCommand={routingAlert?.curlCommand || ""}
+      />
+
       {/* Welcome Splash Experience */}
       <WelcomeSplash
         isOpen={isWelcomeOpen}
@@ -355,7 +450,7 @@ export const App: React.FC = () => {
         }}
         onOpenFolder={() => {
           setIsWelcomeOpen(false);
-          setIsCreateModalOpen(true);
+          setIsImportModalOpen(true);
         }}
         onDefineExternalDisk={() => {
           setIsWelcomeOpen(false);

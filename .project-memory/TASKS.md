@@ -103,6 +103,17 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-B6** | Welcome / First-Run Splash Experience | Medium | COMPLETED | Lead UI Designer | Stage A Gate | Official Apple squircle app icon, quickstart onboarding cards, non-intrusive dismiss logic |
 | **TASK-R1.3B-B7** | Full Workspace Automated Test & Visual Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-B1..B6 | 57 Rust + 16 frontend tests (73/73 PASS); clean TypeScript build; 9 verified high-res PNG screenshots packaged in ZIP |
 
+### Subphase R1.3B-REM: Final Acceptance Remediation (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-REM-01** | Visual Evidence Repair & Fixture Mode Hardening | Critical | COMPLETED | Lead UI Designer | PO Review Findings | Re-captured all 9 verified PNG screenshots; fixed `fixture=default` alias in `visualFixtures.ts` & hardened inspector URL selection; packaged zip archive |
+| **TASK-R1.3B-REM-02** | Browser Routing Isolation & Loopback Safety | Critical | COMPLETED | Desktop Architect | PO Review Findings | Added `check_domain_resolution` Tauri command; blocked raw IP fallback; added `RoutingAlertModal` with copyable cURL helper; added Nginx default_server 404 block |
+| **TASK-R1.3B-REM-03** | Storage Capacity Integrity Guard | High | COMPLETED | Systems Engineer | PO Review Findings | Eliminated hardcoded `: 45;` fallback; added `hasValidCapacity` checking `total_bytes > 0` & `available_bytes <= total_bytes`; render `BİLİNMİYOR` / `KAPASİTE OKUNAMADI` |
+| **TASK-R1.3B-REM-04** | Telemetry State Fidelity & UNKNOWN Preservation | High | COMPLETED | Frontend Lead | PO Review Findings | Refactored `ServicesRuntime.tsx` to explicitly distinguish UNKNOWN from STOPPED for Nginx, PHP-FPM, and MariaDB when telemetry is unprobed |
+| **TASK-R1.3B-REM-05** | Grounded Operational Claims in Deployments, MCP & Settings | Medium | COMPLETED | Security Engineer | PO Review Findings | Labeled live deployments as `DeploymentNotImplemented` (disabled); bound live ports/paths in Settings dynamically |
+| **TASK-R1.3B-REM-06** | Real Project Import Workflow Integration | High | COMPLETED | Desktop Engineer | PO Review Findings | Created `ImportProjectModal.tsx`; wired "Mevcut Projeyi Aç" in `WelcomeSplash.tsx` to `import_project` command |
+| **TASK-R1.3B-REM-07** | Full Workspace Regression Suite Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-REM-01..06 | 58 Rust tests + 19 frontend tests (77/77 PASS); zero clippy warnings; zero format diffs; clean Vite build |
+
 ---
 
 ## Recovery Phase R0: Safety Stabilization & CI Repair (COMPLETED / CONDITIONALLY ACCEPTED)

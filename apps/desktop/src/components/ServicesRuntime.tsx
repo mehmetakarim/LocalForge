@@ -8,10 +8,28 @@ export interface ServicesRuntimeProps {
 }
 
 export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRefresh }) => {
-  const isNginxRunning = runtime?.nginx_running ?? false;
-  const isNginxConflict = runtime?.nginx_port_conflict ?? false;
-  const isMariaDbAlive = runtime?.mariadb_alive ?? false;
-  const isPhpFpmRunning = runtime?.php_fpm_running ?? false;
+  const nginxStatus: "running" | "conflict" | "stopped" | "unknown" =
+    runtime == null
+      ? "unknown"
+      : runtime.nginx_running
+      ? "running"
+      : runtime.nginx_port_conflict
+      ? "conflict"
+      : "stopped";
+
+  const phpFpmStatus: "running" | "stopped" | "unknown" =
+    runtime == null || runtime.php_fpm_running === undefined || runtime.php_fpm_running === null
+      ? "unknown"
+      : runtime.php_fpm_running
+      ? "running"
+      : "stopped";
+
+  const mariadbStatus: "running" | "stopped" | "unknown" =
+    runtime == null || runtime.mariadb_alive === undefined || runtime.mariadb_alive === null
+      ? "unknown"
+      : runtime.mariadb_alive
+      ? "running"
+      : "stopped";
 
   return (
     <div className="w-full max-w-6xl py-8 px-6 flex flex-col gap-6">
@@ -49,20 +67,24 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                 <span className="font-mono text-xs text-[#D4CCF1]">Ters Proxy & Yönlendirici</span>
               </div>
 
-              {isNginxRunning ? (
+              {nginxStatus === "running" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2.5 py-0.5 rounded-full">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
                   <span>DOĞRULANDI</span>
                 </div>
-              ) : isNginxConflict ? (
+              ) : nginxStatus === "conflict" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#EF4444] bg-[#EF4444]/15 border border-[#EF4444]/30 px-2.5 py-0.5 rounded-full">
                   <XCircle className="w-3.5 h-3.5 text-[#EF4444]" />
                   <span>PORT ÇAKIŞMASI</span>
                 </div>
-              ) : (
+              ) : nginxStatus === "stopped" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#D4CCF1] bg-[#6B7280]/15 border border-[#6B7280]/30 px-2.5 py-0.5 rounded-full">
-                  <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
                   <span>DURDURULDU</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2.5 py-0.5 rounded-full">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>BİLİNMİYOR</span>
                 </div>
               )}
             </div>
@@ -74,7 +96,7 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                   Dinleme Portu
                 </span>
                 <span className="font-mono text-xs text-[#FFFBFF] font-semibold">
-                  127.0.0.1:{runtime?.nginx_port || 8080}
+                  {runtime?.nginx_port ? `127.0.0.1:${runtime.nginx_port}` : "Bilinmiyor"}
                 </span>
               </div>
 
@@ -83,11 +105,13 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                   Süreç Sahipliği & Kimliği
                 </span>
                 <span className="font-mono text-xs text-[#D4CCF1]">
-                  {isNginxRunning
+                  {nginxStatus === "running"
                     ? "LocalForge Yönetiminde (Doğrulanmış)"
-                    : isNginxConflict
+                    : nginxStatus === "conflict"
                     ? "Yabancı Süreç Tarafından İşgal Edildi"
-                    : "Süreç Beklemede"}
+                    : nginxStatus === "stopped"
+                    ? "Süreç Beklemede"
+                    : "Telemetri Alınamadı (Bilinmiyor)"}
                 </span>
               </div>
 
@@ -119,14 +143,19 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                 <span className="font-mono text-xs text-[#D4CCF1]">Hızlı CGI Süreç Yöneticisi</span>
               </div>
 
-              {isPhpFpmRunning ? (
+              {phpFpmStatus === "running" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2.5 py-0.5 rounded-full">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
                   <span>AKTİF</span>
                 </div>
-              ) : (
+              ) : phpFpmStatus === "stopped" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#D4CCF1] bg-[#6B7280]/15 border border-[#6B7280]/30 px-2.5 py-0.5 rounded-full">
                   <span>BEKLEMEDE</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2.5 py-0.5 rounded-full">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>BİLİNMİYOR</span>
                 </div>
               )}
             </div>
@@ -140,7 +169,9 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                 <span className="font-mono text-xs text-[#FFFBFF] font-semibold">
                   {runtime?.php_versions && runtime.php_versions.length > 0
                     ? runtime.php_versions.join(", ")
-                    : "8.4, 8.3, 8.2"}
+                    : runtime
+                    ? "Tespit Edilmedi"
+                    : "Bilinmiyor"}
                 </span>
               </div>
 
@@ -181,14 +212,19 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                 <span className="font-mono text-xs text-[#D4CCF1]">İlişkisel Veritabanı Sunucusu</span>
               </div>
 
-              {isMariaDbAlive ? (
+              {mariadbStatus === "running" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2.5 py-0.5 rounded-full">
                   <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
                   <span>AKTİF</span>
                 </div>
-              ) : (
+              ) : mariadbStatus === "stopped" ? (
                 <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#D4CCF1] bg-[#6B7280]/15 border border-[#6B7280]/30 px-2.5 py-0.5 rounded-full">
                   <span>DURDURULDU</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2.5 py-0.5 rounded-full">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>BİLİNMİYOR</span>
                 </div>
               )}
             </div>
@@ -200,7 +236,7 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                   Dinleme Portu & Soket
                 </span>
                 <span className="font-mono text-xs text-[#FFFBFF] font-semibold">
-                  127.0.0.1:{runtime?.mariadb_port || 3306}
+                  {runtime?.mariadb_port ? `127.0.0.1:${runtime.mariadb_port}` : "Bilinmiyor"}
                 </span>
               </div>
 
@@ -209,7 +245,7 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                   Veritabanı Sürümü
                 </span>
                 <span className="font-mono text-xs text-[#D4CCF1]">
-                  {runtime?.mariadb_version || "MariaDB 11.x (Yerel Homebrew/İzole)"}
+                  {runtime?.mariadb_version || (runtime ? "Tespit Edilemedi" : "Bilinmiyor")}
                 </span>
               </div>
 
@@ -218,9 +254,11 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
                   Canlı Yoklama Gecikmesi
                 </span>
                 <span className="font-mono text-xs text-[#D4CCF1]">
-                  {runtime?.mariadb_latency_ms !== undefined
+                  {runtime?.mariadb_latency_ms !== undefined && runtime?.mariadb_latency_ms !== null
                     ? `${runtime.mariadb_latency_ms} ms (Doğrulandı)`
-                    : "Yoklama Tamamlanmadı"}
+                    : runtime
+                    ? "Yoklama Tamamlanmadı"
+                    : "Bilinmiyor"}
                 </span>
               </div>
             </div>

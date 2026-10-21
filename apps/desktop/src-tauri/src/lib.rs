@@ -273,6 +273,16 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
     })
 }
 
+#[tauri::command]
+fn check_domain_resolution(domain: String) -> Result<bool, String> {
+    use std::net::ToSocketAddrs;
+    let target = format!("{}:80", domain.trim());
+    match target.to_socket_addrs() {
+        Ok(mut addrs) => Ok(addrs.any(|a| a.ip().is_loopback())),
+        Err(_) => Ok(false),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base = localforge_runtime::resolve_application_support_dir()
@@ -344,7 +354,8 @@ pub fn run() {
             start_project,
             stop_project,
             update_project_status,
-            get_runtime_overview
+            get_runtime_overview,
+            check_domain_resolution
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalForge application");
@@ -445,5 +456,15 @@ mod tests {
 
         // Temporary in-memory store remains completely empty and unpolluted
         assert_eq!(mem_store.list_projects().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_check_domain_resolution_behavior() {
+        // localhost or 127.0.0.1 must resolve to loopback
+        assert!(check_domain_resolution("localhost".into()).unwrap());
+        assert!(check_domain_resolution("127.0.0.1".into()).unwrap());
+
+        // An unresolvable/unconfigured domain must fail closed (Ok(false))
+        assert!(!check_domain_resolution("definitely-unconfigured-test-domain-999.test".into()).unwrap());
     }
 }
