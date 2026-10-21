@@ -465,6 +465,9 @@ mod tests {
         assert!(check_domain_resolution("127.0.0.1".into()).unwrap());
 
         // An unresolvable/unconfigured domain must fail closed (Ok(false))
-        assert!(!check_domain_resolution("definitely-unconfigured-test-domain-999.test".into()).unwrap());
+        assert!(
+            !check_domain_resolution("definitely-unconfigured-test-domain-999.test".into())
+                .unwrap()
+        );
     }
 }
