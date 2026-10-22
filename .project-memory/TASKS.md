@@ -132,6 +132,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-UAT-04** | Gate 3: Native macOS Visual Polish & Dock Geometry | Critical | COMPLETED | Lead UI Designer | PO UAT Authorization | Apple squircle icon with transparent corners `(0,0)` compiled via `iconutil`; duplicate HTML traffic lights removed; zoom controls hidden with inspector open; storage scroll hierarchy fixed; available capacity gauge; non-layout-shifting HUD banner |
 | **TASK-R1.3B-UAT-05** | Gate 4: Verification Suite & Genuine Native Evidence Capture | Critical | COMPLETED | QA Lead | TASK-R1.3B-UAT-01..04 | 11 verified genuine Cocoa Tauri screenshots captured in `docs/design/r1_3b/native_tauri_verified/` and zipped; 26 frontend + 58 Rust workspace tests PASS; 0 clippy warnings; 0 fmt diffs |
 
+### Subphase R1.3B-U5: Runtime Readiness & Isolated Loopback Routing Architecture (DESIGN & PREFLIGHT COMPLETED / AWAITING PO APPROVAL)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5-01** | PHP-FPM Runtime Readiness & Keg-Only Isolation Plan | Critical | COMPLETED (DESIGN) | Systems Architect | PO Decision PO-U5-01 | Host environment audit, Homebrew `php@8.4` keg-only packaging analysis, zero-collision guarantee, FastCGI pool isolation contract (`docs/phases/R1_3B_U5_RUNTIME_READINESS_REPORT.md`) |
+| **TASK-R1.3B-U5-02** | MariaDB Approval-Gated Initialization Runbook | Critical | COMPLETED (DESIGN) | Database Architect | PO Decision PO-U5-02 | Host datadir audit (64B empty), 12-point runbook with atomicity, 0700/0600 permissions, rollback plan, and PO checkpoint (`docs/phases/R1_3B_U5_MARIADB_INITIALIZATION_RUNBOOK.md`) |
+| **TASK-R1.3B-U5-03** | Isolated Loopback Port Routing Architecture | Critical | COMPLETED (DESIGN) | Principal Architect | PO Decision PO-U5-03 | Dedicated port range 18081..18999, Shared Nginx Master (Option A) spec, schema diff, Rust/TS model diffs, browser compatibility matrix (`docs/phases/R1_3B_U5_LOOPBACK_ROUTING_ARCHITECTURE.md`) |
+| **TASK-R1.3B-U5-04** | Security Threat Model & STRIDE Analysis | Critical | COMPLETED (DESIGN) | Security Engineer | TASK-R1.3B-U5-01..03 | 11 STRIDE threat vectors analyzed (Host-header spoofing, loopback port hijacking, symlinks, cross-tenant leaks, cookie scope) (`docs/phases/R1_3B_U5_SECURITY_THREAT_MODEL.md`) |
+| **TASK-R1.3B-U5-05** | Gate U5 High-Fidelity UX Prototypes & Acceptance Matrix | Critical | COMPLETED (DESIGN) | Lead UI Designer / QA | TASK-R1.3B-U5-01..04 | 4 HTML prototypes (`01_php_runtime_compatibility.html`, `02_mariadb_initialization_approval.html`, `03_loopback_routing_endpoint.html`, `04_runtime_troubleshooting.html`) & 14-scenario matrix (`docs/phases/R1_3B_U5_ACCEPTANCE_MATRIX.md`) |
+
 ---
 
 ## Recovery Phase R0: Safety Stabilization & CI Repair (COMPLETED / CONDITIONALLY ACCEPTED)

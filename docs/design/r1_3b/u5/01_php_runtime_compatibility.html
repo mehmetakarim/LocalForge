@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalForge — Gate U5: PHP 8.4 Çalışma Zamanı Uyumluluğu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand_aligned/tokens/tokens.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--lf-night);
+      color: var(--lf-white);
+      font-family: var(--lf-font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(105, 95, 164, 0.25), transparent),
+        radial-gradient(circle 600px at 90% 80%, rgba(43, 36, 80, 0.4), transparent);
+    }
+    .window-header {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--lf-glass-border);
+      background: rgba(25, 19, 55, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--lf-font-display);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+    .brand-emblem {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+    .badge-stage {
+      font-family: var(--lf-font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: var(--lf-health-warning);
+    }
+    .main-layout {
+      display: flex;
+      flex: 1;
+      position: relative;
+    }
+    .studio-stage {
+      flex: 1;
+      padding: 36px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .monolith-grid {
+      display: flex;
+      gap: 28px;
+      margin-top: 24px;
+    }
+    .spatial-monolith {
+      width: 280px;
+      height: 380px;
+      background: var(--lf-glass-deep);
+      border: 1px solid var(--lf-glass-border);
+      border-top: 1.5px solid var(--lf-glass-border-bright);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--lf-shadow-card);
+      position: relative;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .spatial-monolith.selected {
+      border-color: var(--lf-lilac);
+      box-shadow: 0 0 0 2px rgba(183, 173, 223, 0.4), var(--lf-shadow-window);
+      transform: translateY(-4px);
+    }
+    .monolith-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .proj-title {
+      font-family: var(--lf-font-display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--lf-white);
+    }
+    .proj-domain {
+      font-family: var(--lf-font-mono);
+      font-size: 11px;
+      color: var(--lf-mist);
+      margin-top: 4px;
+    }
+    .status-pill {
+      font-family: var(--lf-font-mono);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-running {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--lf-health-healthy);
+    }
+    .status-stopped {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: var(--lf-health-warning);
+    }
+    .inspector-drawer {
+      width: 440px;
+      background: rgba(25, 19, 55, 0.95);
+      border-left: 1px solid var(--lf-glass-border);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      box-shadow: -20px 0 50px rgba(10, 6, 30, 0.7);
+    }
+    .drawer-title {
+      font-family: var(--lf-font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--lf-white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .alert-box {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .alert-title {
+      font-weight: 700;
+      color: var(--lf-health-warning);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-family: var(--lf-font-display);
+      font-size: 13px;
+    }
+    .terminal-snippet {
+      background: #0B0819;
+      border: 1px solid rgba(183, 173, 223, 0.18);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: var(--lf-font-mono);
+      font-size: 11px;
+      color: var(--lf-mist);
+      margin-top: 10px;
+      user-select: all;
+    }
+    .button-primary {
+      background: linear-gradient(135deg, var(--lf-violet), #4A4080);
+      color: var(--lf-white);
+      border: 1px solid var(--lf-lilac);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-family: var(--lf-font-display);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .button-primary:hover {
+      box-shadow: 0 0 20px rgba(183, 173, 223, 0.4);
+      transform: translateY(-1px);
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(183, 173, 223, 0.08);
+    }
+    .meta-label { color: var(--lf-mist); }
+    .meta-val { font-family: var(--lf-font-mono); font-weight: 600; color: var(--lf-white); }
+  </style>
+</head>
+<body>
+  <!-- Window Header -->
+  <header class="window-header">
+    <div style="width: 80px;"></div>
+    <div class="brand-title">
+      <img src="../brand_aligned/assets/localforge-emblem.png" alt="LocalForge Elephant" class="brand-emblem">
+      <span>LocalForge</span>
+      <span class="badge-stage">Gate U5: Runtime Uyumluluğu</span>
+    </div>
+    <div style="font-size: 11px; color: var(--lf-mist); font-family: var(--lf-font-mono);">
+      Apple Silicon arm64 · /Volumes/Mac Harici Disk
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Studio Stage -->
+    <main class="studio-stage">
+      <div style="text-align: center; max-width: 600px; margin-bottom: 16px;">
+        <h1 style="font-family: var(--lf-font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">
+          Spatial Studio Çalışma Alanı
+        </h1>
+        <p style="font-size: 13px; color: var(--lf-mist); margin-top: 6px;">
+          Yerel projeler bağımsız çalışma zamanı motorlarıyla izole olarak yönetilir.
+        </p>
+      </div>
+
+      <div class="monolith-grid">
+        <!-- Monolith 1: r1_acceptance_project -->
+        <div class="spatial-monolith">
+          <div class="monolith-header">
+            <div>
+              <div class="proj-title">r1_acceptance...</div>
+              <div class="proj-domain">r1_acceptance_project.test</div>
+            </div>
+            <span class="status-pill status-running">● 8.5 Çevrimiçi</span>
+          </div>
+          <div style="font-size: 12px; color: var(--lf-mist); margin: 24px 0;">
+            <div>Çalışma Zamanı: <strong style="color:var(--lf-white);">PHP 8.5.3 (FPM arm64)</strong></div>
+            <div style="margin-top: 6px;">Endpoint: <code style="color:var(--lf-lilac);">127.0.0.1:18081</code></div>
+          </div>
+          <div style="font-size: 11px; color: var(--lf-mist); border-top: 1px solid var(--lf-glass-border); padding-top: 12px;">
+            Tier-1 Harici APFS · VolumeBarrier Aktif
+          </div>
+        </div>
+
+        <!-- Monolith 2: Projetest (Selected) -->
+        <div class="spatial-monolith selected">
+          <div class="monolith-header">
+            <div>
+              <div class="proj-title">Projetest</div>
+              <div class="proj-domain">projetest.test</div>
+            </div>
+            <span class="status-pill status-stopped">● 8.4 Beklemede</span>
+          </div>
+          <div style="font-size: 12px; color: var(--lf-mist); margin: 24px 0;">
+            <div>Yapılandırılan: <strong style="color:#F59E0B;">PHP 8.4 (Eksik)</strong></div>
+            <div style="margin-top: 6px;">Endpoint: <code style="color:var(--lf-lilac);">127.0.0.1:18082</code></div>
+          </div>
+          <div style="font-size: 11px; color: var(--lf-health-warning); border-top: 1px solid var(--lf-glass-border); padding-top: 12px;">
+            ⚠️ FPM İkilisi Bulunamadı · Müfettiş Açık
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Project Inspector Drawer -->
+    <aside class="inspector-drawer">
+      <div class="drawer-title">
+        <span>Proje Müfettişi</span>
+        <span style="font-size: 12px; color: var(--lf-mist); font-family: var(--lf-font-mono);">Projetest</span>
+      </div>
+
+      <!-- Missing PHP 8.4 Warning Box -->
+      <div class="alert-box">
+        <div class="alert-title">
+          <span>⚠️</span>
+          <span>Eksik Çalışma Zamanı (PHP 8.4)</span>
+        </div>
+        <p style="color: var(--lf-white);">
+          Bu proje için yapılandırılmış olan <strong>PHP 8.4 FPM</strong> ikilisi ana makinenizde bulunamadı. 
+          Sisteminizde doğrulanmış sürüm: <code style="color:var(--lf-lilac);">PHP 8.5.3 (arm64)</code>.
+        </p>
+        <p style="margin-top: 8px; color: var(--lf-mist);">
+          <strong>Product Owner Kararı (PO-U5-01):</strong> Projetest PHP 8.4 olarak korunmalıdır. Otomatik geçiş yasaklanmıştır.
+        </p>
+      </div>
+
+      <!-- Action Plan Section -->
+      <div style="background: rgba(43, 36, 80, 0.4); border: 1px solid var(--lf-glass-border); border-radius: 16px; padding: 18px;">
+        <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px;">
+          Onay Bekleyen Çözüm Planı (Homebrew Keg-Only)
+        </div>
+        <p style="font-size: 12px; color: var(--lf-mist); line-height: 1.5;">
+          PHP 8.4, mevcut PHP 8.5.3 kurulumunu bozmadan ve genel symlink'leri değiştirmeden <code style="color:var(--lf-lilac);">keg-only</code> olarak kurulabilir:
+        </p>
+        <div class="terminal-snippet">
+          brew install php@8.4
+        </div>
+        <p style="font-size: 11px; color: #10B981; margin-top: 8px;">
+          ✓ Global PHP 8.5.3 aynen korunur.<br>
+          ✓ İkili /opt/homebrew/opt/php@8.4/sbin/php-fpm yoluna yerleşir.<br>
+          ✓ Sıfır port veya soket çakışması.
+        </p>
+      </div>
+
+      <!-- Metadata summary -->
+      <div style="margin-top: auto;">
+        <div class="meta-row">
+          <span class="meta-label">Belge Kökü:</span>
+          <span class="meta-val">/public</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Depolama Birimi:</span>
+          <span class="meta-val">Mac Harici Disk (APFS)</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Ayrılmış Loopback Port:</span>
+          <span class="meta-val" style="color:var(--lf-lilac);">18082</span>
+        </div>
+        <div style="margin-top: 16px; font-size: 11px; text-align: center; color: var(--lf-mist);">
+          LocalForge Gate U5 · Tasarım Prototipi
+        </div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

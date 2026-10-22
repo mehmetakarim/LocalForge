@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalForge — Gate U5: İzole Loopback Port Yönlendirme Mimarisi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand_aligned/tokens/tokens.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--lf-night);
+      color: var(--lf-white);
+      font-family: var(--lf-font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(105, 95, 164, 0.25), transparent),
+        radial-gradient(circle 600px at 90% 80%, rgba(43, 36, 80, 0.4), transparent);
+    }
+    .window-header {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--lf-glass-border);
+      background: rgba(25, 19, 55, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--lf-font-display);
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .brand-emblem { width: 24px; height: 24px; object-fit: contain; }
+    .main-stage {
+      flex: 1;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .hero-banner {
+      text-align: center;
+      max-width: 720px;
+      margin-bottom: 32px;
+    }
+    .hero-title {
+      font-family: var(--lf-font-display);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .hero-desc {
+      font-size: 13px;
+      color: var(--lf-mist);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .cards-row {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      width: 100%;
+      max-width: 900px;
+    }
+    .project-card {
+      flex: 1;
+      background: var(--lf-glass-deep);
+      border: 1px solid var(--lf-glass-border);
+      border-top: 1.5px solid var(--lf-glass-border-bright);
+      border-radius: 24px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: var(--lf-shadow-card);
+      position: relative;
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .p-name {
+      font-family: var(--lf-font-display);
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .p-path {
+      font-family: var(--lf-font-mono);
+      font-size: 11px;
+      color: var(--lf-mist);
+      margin-top: 4px;
+    }
+    .endpoint-box {
+      background: #0B0819;
+      border: 1px solid rgba(183, 173, 223, 0.2);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .endpoint-url {
+      font-family: var(--lf-font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lf-lilac);
+      text-decoration: none;
+    }
+    .port-tag {
+      font-family: var(--lf-font-mono);
+      font-size: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--lf-health-healthy);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .btn-open {
+      background: linear-gradient(135deg, var(--lf-violet), #4A4080);
+      color: var(--lf-white);
+      border: 1px solid var(--lf-lilac);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: var(--lf-font-display);
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-open:hover {
+      box-shadow: 0 0 20px rgba(183, 173, 223, 0.4);
+      transform: translateY(-1px);
+    }
+    .tech-specs {
+      font-size: 11px;
+      color: var(--lf-mist);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 1px solid rgba(183, 173, 223, 0.08);
+      padding-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="window-header">
+    <div style="width: 80px;"></div>
+    <div class="brand-title">
+      <img src="../brand_aligned/assets/localforge-emblem.png" alt="Emblem" class="brand-emblem">
+      <span>LocalForge</span>
+      <span style="font-family:var(--lf-font-mono); font-size:10px; background:rgba(105,95,164,0.3); border:1px solid var(--lf-lilac); color:var(--lf-white); padding:2px 8px; border-radius:9999px;">
+        PO-U5-03 Mimarisi
+      </span>
+    </div>
+    <div style="font-size:11px; font-family:var(--lf-font-mono); color:var(--lf-mist);">
+      Sıfır DNS Müdahalesi · Kök-Dışı İzolasyon
+    </div>
+  </header>
+
+  <main class="main-stage">
+    <div class="hero-banner">
+      <h1 class="hero-title">Proje Bazlı İzole Loopback Port Mimarisi</h1>
+      <p class="hero-desc">
+        Her proje bağımsız bir loopback portuna bağlanır (<code style="color:var(--lf-lilac);">127.0.0.1:18081..18999</code>). 
+        <strong style="color:var(--lf-white);">/etc/hosts</strong> veya <strong style="color:var(--lf-white);">DNS müdahalesi gerektirmeksizin</strong> 
+        "Tarayıcıda Aç" butonuna basıldığı an doğru proje doğrudan açılır.
+      </p>
+    </div>
+
+    <div class="cards-row">
+      <!-- Project A -->
+      <div class="project-card">
+        <div class="card-top">
+          <div>
+            <div class="p-name">r1_acceptance_project</div>
+            <div class="p-path">/Volumes/Mac Harici Disk/.../r1_acceptance_project</div>
+          </div>
+          <span style="font-family:var(--lf-font-mono); font-size:10px; color:#10B981; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:9999px;">
+            ● PHP 8.5.3 (Aktif)
+          </span>
+        </div>
+
+        <div class="endpoint-box">
+          <div>
+            <div style="font-size:10px; color:var(--lf-mist); text-transform:uppercase; font-family:var(--lf-font-mono);">Ayrılmış Uç Nokta</div>
+            <a href="http://127.0.0.1:18081/" class="endpoint-url" target="_blank">http://127.0.0.1:18081/</a>
+          </div>
+          <span class="port-tag">Port 18081</span>
+        </div>
+
+        <button class="btn-open" type="button">
+          <span>🌐</span>
+          <span>Tarayıcıda Aç (127.0.0.1:18081)</span>
+        </button>
+
+        <div class="tech-specs">
+          <div>FastCGI: <code style="color:var(--lf-white);">proj_e92e...sock</code></div>
+          <div>Nginx Kuralı: <code style="color:var(--lf-white);">listen 127.0.0.1:18081</code></div>
+          <div>Kiracı İzolasyonu: <strong style="color:#10B981;">Tam Fiziksel Port Ayrımı</strong></div>
+        </div>
+      </div>
+
+      <!-- Project B -->
+      <div class="project-card" style="border-color: rgba(183,173,223,0.3);">
+        <div class="card-top">
+          <div>
+            <div class="p-name">Projetest</div>
+            <div class="p-path">/Volumes/Mac Harici Disk/VibeProject/LocalForge/Projetest</div>
+          </div>
+          <span style="font-family:var(--lf-font-mono); font-size:10px; color:#F59E0B; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); padding:3px 8px; border-radius:9999px;">
+            ● PHP 8.4 (Ayrılmış)
+          </span>
+        </div>
+
+        <div class="endpoint-box">
+          <div>
+            <div style="font-size:10px; color:var(--lf-mist); text-transform:uppercase; font-family:var(--lf-font-mono);">Ayrılmış Uç Nokta</div>
+            <a href="http://127.0.0.1:18082/" class="endpoint-url" target="_blank">http://127.0.0.1:18082/</a>
+          </div>
+          <span class="port-tag">Port 18082</span>
+        </div>
+
+        <button class="btn-open" type="button">
+          <span>🌐</span>
+          <span>Tarayıcıda Aç (127.0.0.1:18082)</span>
+        </button>
+
+        <div class="tech-specs">
+          <div>FastCGI: <code style="color:var(--lf-white);">proj_db54...sock</code></div>
+          <div>Nginx Kuralı: <code style="color:var(--lf-white);">listen 127.0.0.1:18082</code></div>
+          <div>Kiracı İzolasyonu: <strong style="color:#10B981;">Tam Fiziksel Port Ayrımı</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparative Benefits Matrix -->
+    <div style="margin-top: 36px; max-width: 900px; width: 100%; background: rgba(43, 36, 80, 0.4); border: 1px solid var(--lf-glass-border); border-radius: 20px; padding: 24px;">
+      <h3 style="font-family:var(--lf-font-display); font-size:14px; font-weight:700; margin-bottom:12px; color:var(--lf-lilac);">
+        Eski Paylaşımlı Port (8080) vs Yeni İzole Loopback Mimarisi (PO-U5-03)
+      </h3>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; font-size:12px; line-height:1.5;">
+        <div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:12px; padding:14px;">
+          <strong style="color:#EF4444;">Eski Tek Port (8080) .test Mimarisi:</strong>
+          <ul style="padding-left:16px; margin-top:6px; color:var(--lf-mist);">
+            <li>macOS DNS .test alan adlarını 127.0.0.1'e çözmez (NXDOMAIN).</li>
+            <li>Kullanıcının sudo ile /etc/hosts dosyasını elle düzenlemesi gerekir.</li>
+            <li>Ham IP üzerinden açıldığında yanlış proje gelebilir.</li>
+          </ul>
+        </div>
+        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:12px; padding:14px;">
+          <strong style="color:#10B981;">Yeni İzole Loopback Port Mimarisi:</strong>
+          <ul style="padding-left:16px; margin-top:6px; color:var(--lf-mist);">
+            <li>127.0.0.1 doğrudan IP katmanında çözülür; sıfır DNS bağımlılığı.</li>
+            <li>Sudo veya /etc/hosts müdahalesi kesinlikle gerekmez.</li>
+            <li>Port 18082 yalnızca Projetest'i sunar; çapraz kirlenme imkansızdır.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

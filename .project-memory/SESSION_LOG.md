@@ -682,3 +682,36 @@ This document records the chronological engineering log for all development sess
 - `Projetest` kept at PHP 8.4 without automatic migration.
 - MariaDB datadir kept uninitialized pending explicit PO authorization.
 - System DNS / `/etc/hosts` kept unmodified.
+
+---
+
+## Session 018 — Phase R1.3B UAT Recovery — Gate U5 Runtime Readiness & Isolated Loopback Routing Architecture
+
+- **Date**: 2026-10-22
+- **Participants**: Principal Software Architect, Senior Rust Systems Engineer, Desktop/Tauri Architect, Database Architect, Lead Security Engineer, Lead UI Designer
+- **Authorized Scope**: **Gate U5 — Design & Read-Only Preflight Only** (Implementation & Production: STRICT NO-GO)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+
+### Summary of Activities
+1. **Binding Product Owner Decisions Enforced**:
+   - `Decision PO-U5-01 (PHP 8.4 Preservation)`: `Projetest` kept strictly configured with PHP 8.4 in SQLite (`localforge.db`). Zero silent migration, zero Homebrew package installations or upgrades, zero `brew link --overwrite`. Prepared non-destructive Homebrew `php@8.4` keg-only installation and multi-version supervisor FastCGI pool isolation plan.
+   - `Decision PO-U5-02 (MariaDB Initialization Hold)`: Audited host Application Support MariaDB datadir (`/Users/mehmetakar/Library/Application Support/LocalForge/runtime/mariadb`, 64 bytes empty, APFS container). Categorized as `VERIFIED EMPTY AND ELIGIBLE FOR INITIALIZATION (HELD)`. Formulated a 12-step approval-gated runbook with atomicity, 0700/0600 permissions, rollback plan, and explicit PO approval gate without executing initialization.
+   - `Decision PO-U5-03 (Isolated Loopback Routing Architecture)`: Architected dedicated loopback port allocation (`18081..18999`) completely eliminating `/etc/hosts`, `sudo`, and `.test` DNS dependencies. Selected Shared Multi-Port Nginx Master (Option A) over per-project daemons (Option B) for bounded resource consumption (<10MB RAM total), unified lifecycle, and physical port-to-FastCGI socket isolation.
+2. **Review Documents Delivered (`docs/phases/`)**:
+   - `R1_3B_U5_RUNTIME_READINESS_REPORT.md`: Host environment inventory (PHP 8.5.3, MariaDB 13.0.2 arm64, Nginx 1.31.7, SQLite 3.46.1), Homebrew `php@8.4` keg-only isolation analysis, zero-collision proof with global PHP 8.5.3, FastCGI pool isolation contract.
+   - `R1_3B_U5_MARIADB_INITIALIZATION_RUNBOOK.md`: Comprehensive 12-step initialization runbook with pre-initialization safety guards, atomic directory layout, unprivileged user execution, rollback mechanism, and PO approval checkpoint.
+   - `R1_3B_U5_LOOPBACK_ROUTING_ARCHITECTURE.md`: Dedicated loopback port architecture specification, Option A vs Option B trade-off analysis, SQLite schema diff (`loopback_port INTEGER UNIQUE`), Rust/TS model diffs, and browser compatibility matrix (redirects, WordPress siteurl, port-scoped cookies, CORS).
+   - `R1_3B_U5_SECURITY_THREAT_MODEL.md`: 11 STRIDE threat vectors analyzed (Host-header spoofing, loopback port hijacking, PID reuse, untrusted symlinks, port race conditions, cross-tenant isolation, directory traversal, remote network exposure, orphan FastCGI sockets, cookie scoping, fail-closed barriers).
+   - `R1_3B_U5_ACCEPTANCE_MATRIX.md`: 14 verification scenarios mapped across preflight state, future verification method, and Definition of Done.
+3. **High-Fidelity UX Prototypes Delivered (`docs/design/r1_3b/u5/`)**:
+   - `01_php_runtime_compatibility.html`: Missing PHP 8.4 runtime warning in Spatial Studio and Project Inspector, with keg-only solution guidance.
+   - `02_mariadb_initialization_approval.html`: First-run MariaDB initialization approval modal with detailed host storage audit evidence and safety checklist.
+   - `03_loopback_routing_endpoint.html`: Dedicated loopback endpoint UI (`127.0.0.1:18081` and `18082`) with direct browser opening and status indicators.
+   - `04_runtime_troubleshooting.html`: Port conflict detection and foreign PID 58491 diagnostic resolution screen with automatic reassignment to 18083 without terminating foreign processes.
+
+### Decisions Made & Governance
+- Implementation strictly withheld pending Product Owner authorization.
+- `localforge.db` remains untouched; `Projetest` retains PHP 8.4.
+- MariaDB datadir remains uninitialized.
+- Dedicated branch `phase-r1/r1-3b-uat-recovery` maintained.
+- Concluding status: `LOCALFORGE — GATE U5 DESIGN & READ-ONLY PREFLIGHT COMPLETE. AWAITING PRODUCT OWNER IMPLEMENTATION APPROVAL.`
