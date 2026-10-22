@@ -141,6 +141,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5-04** | Security Threat Model & STRIDE Analysis | Critical | COMPLETED (DESIGN) | Security Engineer | TASK-R1.3B-U5-01..03 | 11 STRIDE threat vectors analyzed (Host-header spoofing, loopback port hijacking, symlinks, cross-tenant leaks, cookie scope) (`docs/phases/R1_3B_U5_SECURITY_THREAT_MODEL.md`) |
 | **TASK-R1.3B-U5-05** | Gate U5 High-Fidelity UX Prototypes & Acceptance Matrix | Critical | COMPLETED (DESIGN) | Lead UI Designer / QA | TASK-R1.3B-U5-01..04 | 4 HTML prototypes (`01_php_runtime_compatibility.html`, `02_mariadb_initialization_approval.html`, `03_loopback_routing_endpoint.html`, `04_runtime_troubleshooting.html`) & 14-scenario matrix (`docs/phases/R1_3B_U5_ACCEPTANCE_MATRIX.md`) |
 
+### Subphase R1.3B-U5.A: Architecture Safety Reconciliation & Implementation Readiness (COMPLETED / AWAITING PO APPROVAL)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5A-01** | MariaDB Runbook Staging & Non-Destructive Reconciliation | Critical | COMPLETED | Database Architect | Gate U5.A Task 1 | Reconciled `R1_3B_U5_MARIADB_INITIALIZATION_RUNBOOK.md`: private staging on `/System/Volumes/Data`, socket peercred auth, atomic rename promotion, no blind `rm -rf`, quarantine failed states |
+| **TASK-R1.3B-U5A-02** | Loopback Routing & RFC 6265 Cookie Boundary Analysis | Critical | COMPLETED | Principal Architect | Gate U5.A Task 2 | Reconciled `R1_3B_U5_LOOPBACK_ROUTING_ARCHITECTURE.md` & `SECURITY_THREAT_MODEL.md`: analyzed all 14 points, RFC 6265 cookie sharing, SOP origin vs cookie scope, TOCTOU binding races, framework redirects |
+| **TASK-R1.3B-U5A-03** | PHP 8.4 Lifecycle Partitioning & Precondition Hardening | Critical | COMPLETED | Systems Engineer | Gate U5.A Task 3 | Reconciled `R1_3B_U5_RUNTIME_READINESS_REPORT.md`: 4 testable preconditions, 4 sequential stages (Provisioning, Discovery, Startup, Activation), stage-specific failure modes, non-destructive rollback |
+| **TASK-R1.3B-U5A-04** | Honest Acceptance Classification Across 5 Explicit States | Critical | COMPLETED | QA Lead | Gate U5.A Task 4 | Reconciled `R1_3B_U5_ACCEPTANCE_MATRIX.md`: classified across `DESIGN REVIEWED`, `PREFLIGHT VERIFIED`, `IMPLEMENTED & TESTED`, `NOT RUN`, and `BLOCKED`; documented what remains untested on PO Mac |
+| **TASK-R1.3B-U5A-05** | Master Safety Reconciliation & Implementation Packages (U5.B-D) | Critical | COMPLETED | Lead Team | Gate U5.A Task 5 | Authored `docs/phases/R1_3B_U5A_SECURITY_RECONCILIATION.md`: designed decoupled work packages U5.B (Loopback Routing), U5.C (PHP 8.4 Provisioning), U5.D (MariaDB Staging Init) with exact approval boundaries |
+
 ---
 
 ## Recovery Phase R0: Safety Stabilization & CI Repair (COMPLETED / CONDITIONALLY ACCEPTED)

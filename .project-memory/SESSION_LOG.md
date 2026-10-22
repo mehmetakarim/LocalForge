@@ -715,3 +715,55 @@ This document records the chronological engineering log for all development sess
 - MariaDB datadir remains uninitialized.
 - Dedicated branch `phase-r1/r1-3b-uat-recovery` maintained.
 - Concluding status: `LOCALFORGE — GATE U5 DESIGN & READ-ONLY PREFLIGHT COMPLETE. AWAITING PRODUCT OWNER IMPLEMENTATION APPROVAL.`
+
+---
+
+## Session 019 — Phase R1.3B UAT Recovery — Gate U5.A Architecture Safety Reconciliation & Implementation Readiness
+
+- **Date**: 2026-10-22
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Database Architect, QA Lead
+- **Authorized Scope**: **Gate U5.A — Architecture Safety Reconciliation & Implementation Readiness** (Implementation & Production: STRICT NO-GO)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Baseline Commit**: `4e2d762a5c3b4bd7437e33fb37a821b64c4c5c3d`
+- **GitHub Actions CI Status**: Run `39848607260` — SUCCESS
+
+### Summary of Activities
+1. **Binding Decisions Re-affirmed**:
+   - `Decision PO-U5-01`: `Projetest` strictly preserved on PHP 8.4. Zero package installs or system mutations.
+   - `Decision PO-U5-02`: MariaDB initialization held; requires separate explicit authorization.
+   - `Decision PO-U5-03`: Isolated loopback ports (`18081..18999`) confirmed as routing direction.
+2. **Task 1: MariaDB Runbook Security Correction**:
+   - Reconciled `docs/phases/R1_3B_U5_MARIADB_INITIALIZATION_RUNBOOK.md`.
+   - Prohibited direct target initialization; mandated private staging directory (`staging_<uuid>`) on `/System/Volumes/Data` with mode `0700` and proven unprivileged UID ownership.
+   - Specified atomic same-filesystem `rename()` promotion requirements.
+   - Enforced socket peercred authentication (`--auth-root-authentication-method=socket`), eliminating unsecured administrative windows.
+   - Clarified that ADR-0004 Keychain integration is an architectural target not yet implemented in production crates.
+   - Replaced blind `rm -rf` cleanup with non-destructive quarantined isolation (`staging_<uuid>.failed_<timestamp>`) for forensics.
+   - Re-affirmed that empty directory observation $\neq$ authorization to initialize, and preserved database deletion lock.
+3. **Task 2: Loopback Routing Security Reconciliation**:
+   - Reconciled `docs/phases/R1_3B_U5_LOOPBACK_ROUTING_ARCHITECTURE.md` and `docs/phases/R1_3B_U5_SECURITY_THREAT_MODEL.md`.
+   - Explicitly clarified that loopback ports provide a routing/usability boundary and Same-Origin Policy (SOP) origin partition, but NOT an OS container.
+   - Fully analyzed RFC 6265 cookie scoping (cookies ignore port numbers on `127.0.0.1`), mitigating via pool-specific session names (`LF_SESS_<id>`), isolated session directories, and `127.0.0.X` IP alias options.
+   - Analyzed OS-level TOCTOU port binding races, decoupling SQLite allocation from OS ownership, with fail-closed Nginx rollback and foreign PID diagnostics.
+   - Covered PHP framework absolute URL compatibility (WordPress `siteurl`, Laravel `APP_URL`, `port_in_redirect on`), W3C Secure Context compliance, and APFS unmount defenses.
+4. **Task 3: PHP 8.4 Provisioning Plan Hardening**:
+   - Reconciled `docs/phases/R1_3B_U5_RUNTIME_READINESS_REPORT.md`.
+   - Preserved `Projetest` at PHP 8.4; kept PHP 8.5.3 untouched.
+   - Replaced absolute guarantees with 4 testable preconditions (PATH integrity, sbin link, opt binary, config isolation).
+   - Structured 4 sequential lifecycle stages (Provisioning $\rightarrow$ Discovery $\rightarrow$ Pool Startup $\rightarrow$ Project Activation) with stage-specific failure handling.
+   - Replaced blanket `rm -rf` guidance with standard package manager uninstallation.
+5. **Task 4: Honest Acceptance Classification**:
+   - Reconciled `docs/phases/R1_3B_U5_ACCEPTANCE_MATRIX.md` across 5 explicit statuses: `DESIGN REVIEWED`, `PREFLIGHT VERIFIED`, `IMPLEMENTED & TESTED`, `NOT RUN`, and `BLOCKED`.
+   - Explicitly listed what remains untested on the actual Product Owner Mac.
+6. **Task 5: Implementation Gate Proposal & Master Deliverable**:
+   - Authored `docs/phases/R1_3B_U5A_SECURITY_RECONCILIATION.md`.
+   - Designed 3 decoupled, independently approvable work packages:
+     - **Gate U5.B**: Loopback Routing Engine (Code-only implementation, SQLite schema migration, regression tests).
+     - **Gate U5.C**: PHP 8.4 Environment Provisioning (User-approved keg-only package install, FPM pool validation).
+     - **Gate U5.D**: MariaDB Staging Initialization (Separate high-risk storage approval gate).
+
+### Decisions Made & Governance
+- No production application code modified.
+- No packages installed or daemons started/stopped.
+- `localforge.db` records unchanged.
+- Concluding status: `LOCALFORGE GATE U5.A — SECURITY RECONCILIATION COMPLETE. AWAITING PRODUCT OWNER IMPLEMENTATION APPROVAL.`

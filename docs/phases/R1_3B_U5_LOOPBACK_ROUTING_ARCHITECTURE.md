@@ -1,9 +1,9 @@
 # LocalForge — Gate U5 Isolated Loopback Routing Architecture
-## Dedicated Port Allocation, Multi-Port Nginx Gateway & Browser Compatibility Specification
+## Dedicated Port Allocation, Multi-Port Nginx Gateway & Security Reconciliation
 
 **Author:** Principal Software Architect & Systems Engineer  
-**Governance:** Gate U5 — Runtime Readiness & Isolated Loopback Routing Architecture  
-**Status:** ARCHITECTURAL DESIGN COMPLETED — IMPLEMENTATION ON HOLD  
+**Governance:** Gate U5.A — Architecture Safety Reconciliation & Implementation Readiness  
+**Status:** ARCHITECTURAL DESIGN RECONCILED — IMPLEMENTATION ON HOLD (STRICT NO-GO)  
 **Binding Decision:** `PO-U5-03` (Isolated Loopback Routing)  
 **Date:** 2026-10-22
 
@@ -24,7 +24,7 @@ The local development studio must provide an out-of-the-box browser experience t
 
 ### 1.2 The Root Cause of `.test` Domain Failure
 In Phase R1.1 through R1.3B, LocalForge routed all projects through a single shared Nginx port (`127.0.0.1:8080`), multiplexing virtual hosts based on the HTTP `Host:` header (e.g., `Host: projetest.test`).
-- While this works seamlessly for programmatic HTTP clients (`curl -H "Host: projetest.test" http://127.0.0.1:8080/`), standard macOS browsers (Safari, Chrome, Arc) rely on the operating system's `mDNSResponder` resolver.
+- While this works for HTTP clients with manual headers (`curl -H "Host: projetest.test" http://127.0.0.1:8080/`), standard macOS browsers (Safari, Chrome, Arc) rely on the operating system's `mDNSResponder` resolver.
 - RFC 6761 reserves `.test` for testing, but **does not specify** automatic resolution to `127.0.0.1`.
 - Consequently, typing `http://projetest.test:8080/` in a browser triggers an immediate `NXDOMAIN` (Name Not Resolved) DNS failure.
 
@@ -32,235 +32,153 @@ In Phase R1.1 through R1.3B, LocalForge routed all projects through a single sha
 By allocating each project an isolated loopback port on `127.0.0.1` (e.g. `127.0.0.1:18081`, `127.0.0.1:18082`), the endpoint is resolved directly by the IP protocol stack with **zero DNS lookup**:
 - Project A (`r1_acceptance_project`) $\longrightarrow$ `http://127.0.0.1:18081/`
 - Project B (`Projetest`) $\longrightarrow$ `http://127.0.0.1:18082/`
-- Every browser, mobile simulator, terminal, and API client can connect instantly and reliably.
 
 ---
 
-## 2. Gateway Architecture Trade-Off Analysis (Option A vs Option B)
+## 2. Fundamental Boundary Clarification: Routing vs Security Sandbox
 
-To route multiple distinct ports to their respective project document roots and FastCGI sockets, two architectural options were evaluated:
+> [!WARNING]
+> **Loopback Ports Provide a Routing & Usability Boundary, NOT a Complete Security Sandbox**  
+> Assigning separate TCP ports on `127.0.0.1` resolves local DNS and HTTP routing issues, but does NOT create an airtight operating system sandbox or total browser partition. Developers and security auditors must understand the exact boundaries below.
 
-| Architectural Metric | Option A: Shared Multi-Port Nginx Master | Option B: Per-Project Dedicated Nginx Daemons | Evaluation Winner |
-|---|---|---|---|
-| **Memory Footprint** | ~6–10 MB total for 1 master + 1 worker across 50 ports | ~10 MB *per running project* (100 MB for 10 projects) | **Option A** (Vastly more efficient) |
-| **Process Lifecycle** | 1 supervisor (`NginxSupervisor`) managing single PID | N supervisors managing N PIDs, PID files, and sockets | **Option A** (Minimal complexity) |
-| **Port Collision Defense** | Centrally verified before rewriting master `nginx.conf` | Decentralized startup races across independent processes | **Option A** (Fail-closed central registry) |
-| **Configuration Reload** | Atomic `nginx -s reload` (zero downtime) | Spawning / terminating separate daemons | **Option A** (Instantaneous) |
-| **ProcessIdentity Safety** | Reuses existing battle-tested Darwin kernel PID check | Must verify and register N independent process trees | **Option A** |
-| **Tenant Isolation** | Physical port separation; port X maps strictly to Project X | Full process isolation | **Tie** (Both physically isolate traffic) |
+### 2.1 Browser Same-Origin Policy (SOP) vs RFC 6265 Cookie Scoping
+- **Same-Origin Policy (SOP)**: In modern browsers, an Origin is defined as a tuple of `(Protocol, Host, Port)`.
+  - `http://127.0.0.1:18081` and `http://127.0.0.1:18082` are **DIFFERENT ORIGINS**.
+  - Cross-origin DOM access, `localStorage`, `sessionStorage`, `IndexedDB`, and `fetch()` requests are subject to strict CORS controls. Project A cannot directly inspect Project B's DOM or storage via client script.
+- **RFC 6265 Cookie Scoping (The Port Blind Spot)**:
+  - Standard HTTP cookies **IGNORE PORT NUMBERS** by default (RFC 6265 Section 8.5).
+  - A cookie set by `http://127.0.0.1:18081/` with default domain scoping is attached by the browser to subsequent requests to `http://127.0.0.1:18082/`!
+  - If both projects run default PHP session configurations (`session.name = PHPSESSID`), Project A and Project B will overwrite each other's session IDs, causing random logouts and session corruption.
 
-### 2.1 Authoritative Recommendation: **Option A (Shared Multi-Port Nginx Master)**
-LocalForge will retain its centralized, unprivileged `NginxSupervisor`. Each project will receive a dedicated `server { listen 127.0.0.1:<allocated_port>; ... }` block inside the managed `nginx.conf`. This guarantees:
-1. Zero cross-tenant leakage: Even if a client sends an arbitrary or spoofed `Host` header on port `18082`, Nginx serves **only** Project B's root directory and FastCGI pool.
-2. Lightweight execution: Event-driven epoll/kqueue handles dozens of loopback ports with negligible CPU and RAM overhead.
-
----
-
-## 3. Port Allocation Contract & Strategy
-
-```mermaid
-flowchart TD
-    A["New Project Created or Imported"] --> B["Check Existing allocated_port in SQLite"]
-    B --> C{"Port Assigned in Database?"}
-    C -- Yes --> D["Verify Port Available on Host (is_port_available)"]
-    D -- Free --> E["Bind Port to Project Record"]
-    D -- Occupied by Foreign Process --> F["Diagnose Conflict without Killing Foreign PID -> Propose Next Free Port"]
-    C -- No --> G["Query MAX(allocated_port) FROM projects"]
-    G --> H["Scan Range 18081..18999 for Next Free Port"]
-    H --> I["Validate Port Not Bound (TcpListener::bind)"]
-    I --> J["Atomically Persist allocated_port in localforge.db"]
-    J --> E
-```
-
-### 3.1 Allocation Specifications
-1. **Dedicated Port Range**: `18081` to `18999` (Unprivileged user space > 1024, distinct from macOS ephemeral ports > 49152).
-2. **Persistence Guarantee**: Once assigned, a project's `allocated_port` is permanently stored in SQLite and remains identical across application restarts and macOS reboots.
-3. **Collision Detection Without Process Killing**:
-   - Before binding or launching Nginx, LocalForge probes the port via `is_port_available(port)`.
-   - If an unrelated process owns the port, LocalForge reports `PORT ÇAKIŞMASI` with foreign PID diagnostics and **never attempts to kill foreign processes**.
-4. **Backward Compatibility**:
-   - The existing `local_domain` column (e.g. `projetest.test`) is preserved intact in SQLite and YAML manifests.
-   - Nginx server blocks will listen on both the dedicated port AND declare `server_name <local_domain> localhost 127.0.0.1`, preserving future compatibility with custom DNS or hosts setups.
+### 2.2 Reconciled Mitigation Strategy for Cookie & Session Isolation
+1. **Per-Project Session Cookie Names**: LocalForge injects a project-specific session name into each FastCGI pool configuration:
+   ```ini
+   php_value[session.name] = LF_SESS_proj_db5472bb
+   ```
+2. **Per-Project Session Save Path**: FastCGI pools use isolated session storage directories:
+   ```ini
+   php_value[session.save_path] = "/Users/mehmetakar/Library/Application Support/LocalForge/runtime/sessions/proj_db5472bb"
+   ```
+3. **Loopback IP Alias Partitioning (Recommended Architectural Enhancement)**:
+   - macOS loopback interface `lo0` routes the entire `127.0.0.0/8` block (16.7 million IPs) to localhost without any configuration.
+   - Assigning `127.0.0.2:18081` to Project A and `127.0.0.3:18082` to Project B partitions the host domain itself, completely eliminating RFC 6265 cookie collisions across projects.
 
 ---
 
-## 4. Nginx Server Block & FastCGI Isolation Template
+## 3. Comprehensive Analysis of the 14 Technical & Security Factors
 
-The generated `nginx.conf` (`crates/runtime/src/nginx.rs`) will implement the following isolation pattern:
+### 1. Host-Header Validation & Port Ownership
+- **Problem**: In a shared port setup, spoofing `Host:` can misroute requests.
+- **Reconciliation**: In the multi-port setup, each `server` block binds to a specific `listen 127.0.0.1:<port> default_server;`. Even if a client sends an arbitrary or spoofed `Host` header, Nginx serves strictly the document root and FastCGI socket associated with that specific port.
 
-```nginx
-# ==============================================================================
-# LOCALFORGE GATEWAY — ISOLATED LOOPBACK MULTI-PORT CONFIGURATION
-# ==============================================================================
-worker_processes 1;
-daemon off;
-pid /Users/mehmetakar/Library/Application Support/LocalForge/runtime/nginx/nginx.pid;
-error_log /Users/mehmetakar/Library/Application Support/LocalForge/runtime/nginx/error.log warn;
+### 2. Cookie Sharing Between Different Ports on `127.0.0.1`
+- **Problem**: As established in RFC 6265, cookies do not isolate by port.
+- **Reconciliation**: Mitigated via unique `session.name`, isolated `session.save_path`, and optional distinct `127.0.0.X` loopback IP assignments.
 
-events {
-    worker_connections 256;
-}
+### 3. Browser Same-Origin Policy (SOP) vs Cookie Scoping
+- **Reconciliation**: SOP protects DOM, `localStorage`, `IndexedDB`, and CacheStorage across distinct ports. Cookie scoping does not; cookie isolation must be handled explicitly at the application/runtime configuration layer.
 
-http {
-    include /opt/homebrew/etc/nginx/mime.types;
-    default_type application/octet-stream;
-    access_log off;
-    sendfile on;
-    keepalive_timeout 65;
+### 4. Session Namespace Isolation
+- **Reconciliation**: PHP sessions are physically separated on disk in Application Support. Permissions on session directories are `0700`, preventing cross-project inspection or session hijacking.
 
-    # --------------------------------------------------------------------------
-    # DEFAULT SERVER (Port 8080) — Fail-closed loopback trap
-    # Blocks cross-tenant leakage on unqualified requests
-    # --------------------------------------------------------------------------
-    server {
-        listen 127.0.0.1:8080 default_server;
-        server_name _;
-        return 404 "LocalForge Gateway: Unrecognized host or endpoint.\n";
-    }
+### 5. Port Allocation Races with Unrelated Local Processes (TOCTOU)
+- **Problem**: Time-of-Check to Time-of-Use (TOCTOU). Probing `is_port_available(port)` in Rust and then launching Nginx leaves a time window where an unrelated local daemon (e.g. Docker, Node.js) could bind the port.
+- **Reconciliation**: SQLite port reservation does NOT equal operating system port ownership! LocalForge must treat port allocation as an atomic database reservation, but handle OS bind failures gracefully at Nginx startup:
+  - If Nginx fails to bind with `EADDRINUSE`, LocalForge detects the failure, diagnoses the occupying PID via Darwin `lsof`, notifies the user, and reallocates an alternative port without terminating foreign processes.
 
-    # --------------------------------------------------------------------------
-    # PROJECT A: r1_acceptance_project (PHP 8.5)
-    # --------------------------------------------------------------------------
-    server {
-        listen 127.0.0.1:18081;
-        server_name r1_acceptance_project.test localhost 127.0.0.1;
-        root "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project/public";
-        index index.php index.html;
+### 6. Port Persistence and Conflict Recovery
+- **Reconciliation**: A project's `allocated_port` is stored in SQLite (`projects.allocated_port`). Upon host restart, LocalForge attempts to reuse the same port to preserve browser bookmarks and application configurations. If occupied, the system provides a non-destructive conflict recovery flow.
 
-        location / {
-            try_files $uri $uri/ /index.php?$query_string;
-        }
+### 7. Safe Behavior When the Assigned Port Cannot Be Bound
+- **Reconciliation**: Fail-closed! If port 18081 is blocked:
+  - Nginx configuration generation rolls back.
+  - Project status transitions to `PortConflict`.
+  - The UI presents an actionable modal explaining the conflict with the foreign PID and executable path, allowing the user to click "Reassign Port" (e.g. to 18083).
 
-        location ~ \.php$ {
-            fastcgi_pass unix:/Users/mehmetakar/Library/Application Support/LocalForge/runtime/run/proj_e92e56cd0e0c4c36952804a35b3587a3.sock;
-            fastcgi_index index.php;
-            include /opt/homebrew/etc/nginx/fastcgi_params;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            fastcgi_param SERVER_PORT 18081;
-        }
-    }
+### 8. Nginx Configuration Regeneration and Rollback
+- **Problem**: A corrupt Nginx configuration could take down all running projects.
+- **Reconciliation**: Configuration updates must be atomic:
+  1. Write candidate configuration to temporary file `nginx.conf.candidate_<uuid>`.
+  2. Validate candidate syntax: `nginx -t -c nginx.conf.candidate_<uuid>`.
+  3. If validation passes, atomically rename over `nginx.conf` and issue `nginx -s reload`.
+  4. If validation fails, discard candidate, retain active running configuration, log error, and alert user.
 
-    # --------------------------------------------------------------------------
-    # PROJECT B: Projetest (PHP 8.4)
-    # --------------------------------------------------------------------------
-    server {
-        listen 127.0.0.1:18082;
-        server_name projetest.test localhost 127.0.0.1;
-        root "/Volumes/Mac Harici Disk/VibeProject/LocalForge/Projetest/public";
-        index index.php index.html;
+### 9. Unknown or Stopped Project Behavior
+- **Problem**: What happens if a user navigates to a port of a stopped project?
+- **Reconciliation**:
+  - If Project B is stopped, its `server` block in Nginx does NOT route to Project A or default server.
+  - Nginx returns an honest `HTTP 503 Service Unavailable` with a dedicated LocalForge maintenance page: *"LocalForge: Proje başlatılmamış veya durdurulmuş (Project Stopped)"*.
+  - Wrong-project routing is strictly prohibited under all circumstances.
 
-        location / {
-            try_files $uri $uri/ /index.php?$query_string;
-        }
+### 10. Laravel, WordPress, CodeIgniter and PHP Application Compatibility
+- **Problem**: Web applications frequently construct absolute URLs:
+  - **WordPress**: Stores `siteurl` and `home` options in the database (e.g. `http://127.0.0.1:18081`). If the port changes unpredictably, CSS/JS assets fail to load.
+  - **Laravel**: Relies on `APP_URL=http://127.0.0.1:18081`. The `route()` and `asset()` helpers depend on this configuration.
+  - **CodeIgniter**: Uses `$config['base_url']`.
+- **Reconciliation**:
+  - Ports must be **persistent** in SQLite to avoid breaking hardcoded application URLs.
+  - FastCGI parameters must accurately convey port information:
+    ```nginx
+    fastcgi_param SERVER_PORT $server_port;
+    fastcgi_param HTTP_HOST $http_host;
+    fastcgi_param SERVER_NAME $server_name;
+    ```
 
-        location ~ \.php$ {
-            fastcgi_pass unix:/Users/mehmetakar/Library/Application Support/LocalForge/runtime/run/proj_db5472bb224c4fd0960ff69f793590a7.sock;
-            fastcgi_index index.php;
-            include /opt/homebrew/etc/nginx/fastcgi_params;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            fastcgi_param SERVER_PORT 18082;
-        }
-    }
-}
-```
+### 11. Absolute Redirects & Location Headers
+- **Problem**: When PHP sends `header("Location: /dashboard")`, Nginx or PHP might rewrite it to `http://127.0.0.1/dashboard` (omitting the non-standard port 18081).
+- **Reconciliation**: Enforce in Nginx:
+  ```nginx
+  port_in_redirect on;
+  server_name_in_redirect off;
+  ```
+  This ensures that relative 301/302 redirects preserve the client's actual connected port.
 
----
+### 12. WebSockets & HTTP/HTTPS Constraints
+- **Problem**: LocalForge uses unencrypted HTTP on loopback. Modern browser features (Service Workers, Web Crypto API, Clipboard API) require a "Secure Context".
+- **Reconciliation**:
+  - The W3C Secure Contexts specification and all major browsers (Chromium, Safari WebKit, Firefox) explicitly designate `http://127.0.0.1:*` and `http://localhost:*` as **Potentially Trustworthy / Secure Contexts**.
+  - Local developers can use Service Workers and Web APIs on `127.0.0.1:18081` without generating or trusting self-signed SSL certificates.
+  - WebSocket connections (`ws://127.0.0.1:18081/ws`) are fully supported by Nginx via `proxy_set_header Upgrade $http_upgrade;`.
 
-## 5. Browser Compatibility Analysis & Mitigation Matrix
+### 13. Existing `.test` Domains & Backward Compatibility
+- **Reconciliation**:
+  - The `local_domain` column (e.g. `projetest.test`) is NOT deleted.
+  - Nginx `server` blocks declare:
+    ```nginx
+    listen 127.0.0.1:18082;
+    server_name projetest.test 127.0.0.1;
+    ```
+  - If a user configures `/etc/hosts` or a local DNS proxy, `.test` domains continue to function identically.
 
-Accessing web applications via explicit loopback ports (`http://127.0.0.1:18082/`) has distinct behavioral characteristics that developers and frameworks must account for:
-
-| Web Subsystem | Behavioral Consideration | Framework Impact | LocalForge Architectural Solution |
-|---|---|---|---|
-| **Absolute Redirects** | Applications calling `header("Location: /path")` work transparently. Calls embedding `SERVER_NAME` without port may break. | WordPress, Drupal | Nginx explicitly forwards `fastcgi_param SERVER_PORT $server_port;` and `fastcgi_param HTTP_HOST $http_host;` preserving port in redirect headers. |
-| **WordPress Site URL** | WordPress hardcodes `siteurl` and `home` options in `wp_options`. | `wp-config.php` | LocalForge provides an actionable inspector helper: `define('WP_HOME', 'http://127.0.0.1:18082');` and `define('WP_SITEURL', 'http://127.0.0.1:18082');`. |
-| **Laravel `APP_URL`** | Laravel builds asset links using `.env` `APP_URL`. | Laravel / Symfony | Set `APP_URL=http://127.0.0.1:18082` in project `.env`. |
-| **Cookie Port Scoping** | Standard browser cookies (`Set-Cookie`) scope to IP/domain, NOT to port numbers. | Multi-project session sharing | Cookies set by Project A on `127.0.0.1` may be sent to Project B on `127.0.0.1` if cookie names collide (e.g. `PHPSESSID`). LocalForge FastCGI pool configuration isolates session storage paths (`php_value[session.save_path]`) and can configure custom session cookie names per pool. |
-| **CORS & Origin** | Origin header includes port: `http://127.0.0.1:18081` is treated as cross-origin from `http://127.0.0.1:18082`. | SPA frontends | Proper Same-Origin Policy boundary enforced by browser automatically. |
-| **Local WebSockets** | Connects directly to `ws://127.0.0.1:18082/...`. | Vite, Livewire | Works without proxy reconfiguration. |
+### 14. APFS Unmount & Stale FastCGI Socket Defenses
+- **Problem**: If `/Volumes/Mac Harici Disk` is disconnected while Nginx is running, requests to the docroot could hang or crash.
+- **Reconciliation**:
+  - All FastCGI Unix domain sockets and PID files reside on internal SSD (`Application Support/LocalForge/runtime/run/`).
+  - If the external disk is unmounted, Nginx cannot access the document root.
+  - LocalForge's `VolumeBarrier` trips immediately upon APFS container status changes, transitions the project to `VolumeDisconnected`, and Nginx returns `HTTP 502 Bad Gateway / Volume Disconnected` instead of corrupting data or attempting fallback writes to the internal drive.
 
 ---
 
-## 6. Tauri UX Contract — "Open in Browser" Workflow
-
-The desktop application (`apps/desktop/src/App.tsx`) will enforce a strict, 6-step verified preflight before launching any browser window:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Desktop as Tauri Desktop UI
-    participant Backend as Rust Core IPC
-    participant Supervisor as Runtime Supervisor
-    participant Browser as macOS Default Browser
-
-    User->>Desktop: Clicks "Tarayıcıda Aç" on Project
-    Desktop->>Backend: verify_project_readiness(project_id)
-    Backend->>Supervisor: Check PHP-FPM Socket + Nginx Port Listener
-    alt Project Stopped or Telemetry Missing
-        Supervisor-->>Desktop: Error: ProjectNotRunning
-        Desktop-->>User: Display HUD Alert: "Lütfen önce projeyi başlatın"
-    else Runtime Ready & Port Bound
-        Supervisor-->>Backend: Verified (Port 18082 Bound to Project B)
-        Backend->>Browser: open_url("http://127.0.0.1:18082/")
-        Browser-->>User: Displays Project B Homepage (HTTP 200)
-    end
-```
-
----
-
-## 7. Proposed Data-Contract Changes (For Future Implementation)
-
-### 7.1 SQLite Schema Migration Diff (`crates/storage/src/db.rs`)
+## 4. SQLite Schema & Rust Model Migration Design (For Future Implementation)
 
 ```sql
--- Migration: Add allocated_port column to projects table
-ALTER TABLE projects ADD COLUMN allocated_port INTEGER UNIQUE;
-
--- Create index for instant port lookup
-CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_allocated_port ON projects(allocated_port);
+-- Planned schema migration for Gate U5.B (SUBJECT TO PO APPROVAL)
+ALTER TABLE projects ADD COLUMN loopback_port INTEGER UNIQUE;
 ```
 
-### 7.2 Rust Domain Model Diff (`crates/core/src/project.rs`)
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectRecord {
-    pub id: ProjectId,
-    pub name: String,
-    pub path: PathBuf,
-    pub volume_uuid: VolumeId,
-    pub document_root: String,
-    pub php_version: String,
-    pub local_domain: String,
-    pub allocated_port: Option<u16>, // NEW: Isolated loopback port
-    pub status: ProjectStatus,
-    pub created_at: String,
-    pub updated_at: String,
-}
-```
-
-### 7.3 TypeScript Interface Diff (`apps/desktop/src/types.ts`)
-
-```typescript
-export interface ProjectRecord {
-  id: string;
-  name: string;
-  path: string;
-  volume_uuid: string;
-  document_root: string;
-  php_version: string;
-  local_domain: string;
-  allocated_port?: number | null; // NEW: Isolated loopback port
-  status: ProjectStatus;
-  created_at: string;
-  updated_at: string;
-}
-```
+Allocation Range: `18081` to `18999`.
 
 ---
 
-## 8. Architectural Summary & Gate Status
-- **Architecture Selected**: Option A (Shared Multi-Port Nginx Master).
-- **Port Strategy**: Dedicated range `18081–18999`, persistent in SQLite, collision-checked.
-- **Implementation Status**: **STRICT HOLD — NO CODE MODIFIED IN GATE U5**.
+## 5. Summary: Security Boundaries of Loopback Routing
+
+| Layer | Boundary Provided | Security Guarantee |
+|---|---|---|
+| **Operating System** | Unprivileged user process | Cannot bind ports < 1024 without root; no privilege escalation |
+| **Network Interface** | `127.0.0.1` (loopback only) | Immune to external LAN/WAN eavesdropping or network scans |
+| **HTTP Routing** | Dedicated TCP Port | Physical port-to-FastCGI pool mapping; no Host-header confusion |
+| **Browser DOM / Storage** | Same-Origin Policy (SOP) | Separate Origins; cross-project script access blocked |
+| **Browser Cookies** | Shared `127.0.0.1` domain | **NOT isolated by default**; requires custom session names/paths |
+| **Filesystem / OS User** | Shared Unix user `mehmetakar` | **NOT an OS sandbox**; malicious PHP code can read user files if not restricted by `open_basedir` |
+
+**Conclusion**: Dedicated loopback ports solve local URL routing, browser reachability, and origin isolation with zero DNS configuration. They are a routing architecture and usability standard, not an operating system container.

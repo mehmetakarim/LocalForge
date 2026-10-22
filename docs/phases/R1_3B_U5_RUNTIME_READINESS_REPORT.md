@@ -1,9 +1,9 @@
 # LocalForge — Gate U5 Runtime Readiness Report
-## Read-Only Environment Audit, Version Distinction & PHP 8.4 Provisioning Plan
+## Read-Only Environment Audit, Version Distinction & PHP 8.4 Provisioning Plan (Reconciled)
 
 **Author:** Principal Software Architect & Systems Engineer  
-**Governance:** Gate U5 — Runtime Readiness & Isolated Loopback Routing Architecture  
-**Status:** READ-ONLY PREFLIGHT COMPLETED — IMPLEMENTATION ON HOLD  
+**Governance:** Gate U5.A — Architecture Safety Reconciliation & Implementation Readiness  
+**Status:** READ-ONLY PREFLIGHT COMPLETED — IMPLEMENTATION ON HOLD (STRICT NO-GO)  
 **Binding Decisions:** `PO-U5-01` (PHP 8.4 Preservation), `PO-U5-02` (MariaDB Initialization Hold), `PO-U5-03` (Isolated Loopback Routing)  
 **Date:** 2026-10-22
 
@@ -11,16 +11,16 @@
 
 ## 1. Executive Summary & Governance Guardrails
 
-Under Product Owner Directive **Gate U5**, this report delivers an authoritative, evidence-based preflight inventory of the host environment runtimes, evaluates the feasibility and safety of side-by-side PHP-FPM co-existence, and specifies an approval-gated provisioning plan for PHP 8.4.
+Under Product Owner Directive **Gate U5.A**, this report delivers an authoritative, evidence-based preflight inventory of the host environment runtimes, evaluates the feasibility and safety of side-by-side PHP-FPM co-existence, and specifies an approval-gated provisioning plan for PHP 8.4.
 
 ### 1.1 Non-Negotiable Governance Invariants
 1. **Decision PO-U5-01 (PHP 8.4 Preservation)**:
    - Project `Projetest` (`proj_db5472bb224c4fd0960ff69f793590a7`) MUST remain configured for PHP 8.4 in `localforge.db`.
    - **Zero automated migrations**: Neither the backend, desktop UI, nor CLI may silently upgrade `Projetest` to PHP 8.5.
-   - **Zero system modification in Gate U5**: No Homebrew packages are installed, upgraded, linked, or altered during this gate.
+   - **Zero system modification in Gate U5.A**: No Homebrew packages are installed, upgraded, linked, or altered.
 2. **Read-Only Preflight**:
    - All diagnostic data herein was collected strictly via non-mutating system calls and filesystem inspections.
-   - All proposed installation actions are subject to subsequent, separate Product Owner approval.
+   - All proposed provisioning actions are subject to subsequent, separate Product Owner approval under **Gate U5.C**.
 
 ---
 
@@ -57,7 +57,7 @@ SELECT id, name, php_version, status, path, local_domain FROM projects;
 
 ## 3. Dissecting Runtime Availability: CLI vs FPM vs Architecture
 
-A common pitfall in local development tools is assuming that if `php -v` succeeds in the terminal, PHP is fully functional for web development. LocalForge strictly enforces a multi-tier runtime verification contract:
+LocalForge enforces a multi-tier runtime verification contract:
 
 ```mermaid
 flowchart TD
@@ -72,97 +72,87 @@ flowchart TD
     E -- Yes --> F["SUCCESS: Eligible for Isolated FastCGI Pool Supervision"]
 ```
 
-### 3.1 Five-Tier Classification Matrix
-
-1. **PHP CLI Availability**: Verifies whether `php` exists to run console commands, Composer scripts, or artisan commands.
-2. **PHP-FPM Binary Availability**: Verifies whether the dedicated FastCGI daemon executable (`php-fpm`) exists on disk.
-3. **Architecture Integrity**: Verifies whether the binary was compiled natively for `arm64`. LocalForge tier-1 policy rejects mixed Rosetta 2 emulation processes in production pipelines.
-4. **Requested Version Compatibility**: Verifies whether the discovered binary satisfies the project's exact declared version (`8.4.x` for `Projetest`, `8.5.x` for `r1_acceptance_project`).
-5. **Runtime Process Health**: Verifies whether the spawned master/worker pool is responsive on its assigned Unix domain socket (`is_unix_socket_alive`).
-
 ---
 
-## 4. PHP 8.4 Provisioning Plan (Subject to PO Approval)
+## 4. Reconciled PHP 8.4 Provisioning Plan (Subject to Gate U5.C Approval)
 
-To satisfy `Projetest`'s requirement for PHP 8.4 without altering or degrading the existing PHP 8.5 installation, the following safe provisioning plan has been formulated.
+To satisfy `Projetest`'s requirement for PHP 8.4 without altering or degrading the existing PHP 8.5 installation, the following hardened plan has been formulated.
 
-### 4.1 Homebrew Keg-Only Architecture
-Homebrew provides official versioned formulas for PHP. An inspection of `brew info php@8.4` confirms:
-- **Formula Name**: `php@8.4`
-- **Current Version**: `8.4.26 (bottled)`
-- **Packaging Strategy**: **`keg-only`**. Homebrew defines `keg-only` formulas as packages that are deliberately installed into their isolated Cellar prefix and NOT symlinked into `/opt/homebrew/bin` or `/opt/homebrew/sbin`.
-- **Target Installation Prefix**:
-  - Cellar: `/opt/homebrew/Cellar/php@8.4/8.4.26/`
+### 4.1 Homebrew Keg-Only Architecture & Formula Assumptions
+- **Target Formula**: `php@8.4` (bottled, Apple Silicon `arm64`).
+- **Packaging Mode**: **`keg-only`**. Homebrew defines `keg-only` formulas as packages installed strictly into their isolated Cellar prefix and NOT symlinked into `/opt/homebrew/bin` or `/opt/homebrew/sbin`.
+- **Target Paths**:
+  - Cellar: `/opt/homebrew/Cellar/php@8.4/<version>/`
   - Opt Link: `/opt/homebrew/opt/php@8.4/`
   - FPM Executable: `/opt/homebrew/opt/php@8.4/sbin/php-fpm`
-  - Configuration Dir: `/opt/homebrew/etc/php/8.4/`
+  - Configuration: `/opt/homebrew/etc/php/8.4/`
+- **Dependency Assumptions**: `php@8.4` shares common libraries (`openssl@3`, `icu4c`, `libpng`, `pcre2`). Homebrew manages shared dylibs safely via `@rpath` Mach-O linkages.
 
-### 4.2 Zero-Collision Guarantee
-Because `php@8.4` is keg-only:
-1. `/opt/homebrew/bin/php` remains pointing to `../Cellar/php/8.5.3/bin/php` (100% untouched).
-2. `/opt/homebrew/sbin/php-fpm` remains pointing to `../Cellar/php/8.5.3/sbin/php-fpm` (100% untouched).
-3. No environment variables in the user's `.zshrc` or global shell PATH are altered.
-4. Neither formula executes automatic service daemons unless `brew services` is explicitly invoked.
+### 4.2 Testable Preconditions (Replacing Absolute Guarantees)
+Rather than asserting an untested "zero-collision guarantee", LocalForge defines **four verifiable preconditions** that must be tested prior to project execution:
+1. **Precondition 1 (PATH Integrity)**: `/opt/homebrew/bin/php -v` must return `PHP 8.5.x` before and after installation.
+2. **Precondition 2 (Sbin Symlink Absence)**: `/opt/homebrew/sbin/php-fpm` must remain linked to `../Cellar/php/8.5.3/...` and never point to `php@8.4`.
+3. **Precondition 3 (Opt Existence)**: `/opt/homebrew/opt/php@8.4/sbin/php-fpm` must exist and be an independent `arm64` executable.
+4. **Precondition 4 (Independent Config)**: `/opt/homebrew/etc/php/8.4/php-fpm.conf` must not conflict with `/opt/homebrew/etc/php/8.5/`.
 
-### 4.3 Proposed Implementation Workflow (For Future Authorized Execution)
-
-```bash
-# STEP 1: Pre-installation check (Ensure Homebrew bottle is available)
-brew info php@8.4
-
-# STEP 2: Non-destructive installation (Explicitly avoid linking)
-brew install php@8.4
-
-# STEP 3: Verify binary integrity and architecture
-file /opt/homebrew/opt/php@8.4/sbin/php-fpm
-/opt/homebrew/opt/php@8.4/sbin/php-fpm -v
-
-# STEP 4: Confirm keg-only status (Ensure global php remains 8.5.3)
-/opt/homebrew/bin/php -v
-# Expected: PHP 8.5.3
-
-# STEP 5: LocalForge Telemetry Rescan
-# LocalForge's PhpFpmSupervisor automatically discovers /opt/homebrew/opt/php@8.4/sbin/php-fpm
-# and marks PHP 8.4 as (Kurulu · FPM arm64).
-```
-
-### 4.4 Rollback Procedure
-If the Product Owner ever orders removal:
-```bash
-brew uninstall php@8.4
-rm -rf /opt/homebrew/etc/php/8.4
-# System returns precisely to its current preflight state.
-```
+If any precondition fails, LocalForge treats the installation as unverified and blocks FPM startup.
 
 ---
 
-## 5. LocalForge Version-Specific FastCGI Supervisor Contract
+## 5. Four Distinct Lifecycle Stages & Failure Handling
 
-LocalForge does **NOT** rely on system-wide daemons or global symlinks. Each project is managed by `PhpFpmSupervisor` (`crates/runtime/src/php.rs`) using dynamic candidate resolution:
+The provisioning of PHP 8.4 is partitioned into four distinct, sequential stages. Each stage has its own failure handling and approval boundary:
 
-```rust
-// Candidate discovery order in crates/runtime/src/php.rs
-let candidates = vec![
-    format!("/opt/homebrew/opt/php@{requested_version}/sbin/php-fpm"), // Specific version keg-only
-    "/opt/homebrew/opt/php/sbin/php-fpm".to_string(),                 // Default keg opt
-    "/opt/homebrew/sbin/php-fpm".to_string(),                         // Default sbin
-    "/opt/homebrew/bin/php-fpm".to_string(),                          // Fallback bin
-    format!("/usr/local/opt/php@{requested_version}/sbin/php-fpm"),   // Intel Mac keg
-    "/usr/local/sbin/php-fpm".to_string(),
-    "/usr/local/bin/php-fpm".to_string(),
-];
+```mermaid
+flowchart LR
+    S1["Stage 1: Provisioning (Homebrew)"] --> S2["Stage 2: Binary Discovery"]
+    S2 --> S3["Stage 3: Pool Startup"]
+    S3 --> S4["Stage 4: Project Activation"]
 ```
 
-### 5.1 Per-Project FastCGI Pool Isolation
-When `Projetest` (PHP 8.4) and `r1_acceptance_project` (PHP 8.5) run concurrently:
-- `r1_acceptance_project`: Spawns master process using `/opt/homebrew/sbin/php-fpm` (8.5.3), bound to Unix socket `/Users/mehmetakar/Library/Application Support/LocalForge/runtime/run/proj_e92e56cd0e0c4c36952804a35b3587a3.sock`.
-- `Projetest`: Spawns master process using `/opt/homebrew/opt/php@8.4/sbin/php-fpm` (8.4.26), bound to Unix socket `/Users/mehmetakar/Library/Application Support/LocalForge/runtime/run/proj_db5472bb224c4fd0960ff69f793590a7.sock`.
-- **Zero cross-talk**: Neither pool shares configuration files, processes, worker pools, or sockets.
-- **Fail-Closed Monitoring**: If an FPM master crashes or socket is removed, LocalForge immediately transitions status to `stopped` or `degraded`.
+### Stage 1: Environment Provisioning (Requires PO Approval Checkpoint)
+- **Action**: Execute `brew install php@8.4` strictly without `brew link --overwrite`.
+- **Failure Modes & Handling**:
+  - *Network timeout / bottle missing*: Report Homebrew error code; abort without mutating filesystem.
+  - *Dependency conflict*: Halt provisioning; retain existing PHP 8.5 without modification.
+- **PO Checkpoint**: Requires explicit user authorization in the UI or CLI before launching Homebrew subprocess.
+
+### Stage 2: Binary Discovery & Architecture Verification (Automatic Read-Only)
+- **Action**: `PhpFpmSupervisor` scans `/opt/homebrew/opt/php@8.4/sbin/php-fpm`.
+- **Failure Modes & Handling**:
+  - *Binary not found*: Retain `RuntimeBinaryNotFound` status in UI; `Projetest` cannot be started.
+  - *Non-arm64 binary (Rosetta)*: Emit `IncompatibleArchitecture`; refuse execution.
+  - *CLI-only binary*: Emit `InvalidSAPI`; refuse execution.
+
+### Stage 3: Dedicated FastCGI Pool Startup (On Project Start)
+- **Action**: Spawn dedicated PHP 8.4 master process pointing to `~/.localforge/run/proj_db5472bb224c4fd0960ff69f793590a7.sock`.
+- **Failure Modes & Handling**:
+  - *Port/Socket conflict*: Fail closed, clean up temporary pool configuration, emit diagnostic error.
+  - *Configuration syntax error*: Validate pool configuration with `php-fpm -t` before spawning.
+
+### Stage 4: Project Activation & Routing Binding (On Successful Socket Ping)
+- **Action**: Once the socket responds (`is_unix_socket_alive`), Nginx configuration reloads to route requests to the active socket.
+- **Failure Modes & Handling**:
+  - *Socket unresponsive after 15s timeout*: Kill child process group cleanly (`bounded_sigterm_tree`), mark project `failed`, revert Nginx configuration.
 
 ---
 
-## 6. Preflight Conclusion & Status
-- **Current Status**: Preflight inventory completed.
+## 6. Non-Destructive Rollback Strategy (No Blind `rm -rf`)
+
+If removal of PHP 8.4 is requested by the Product Owner:
+1. Stop any active PHP 8.4 project pools cleanly via `PhpFpmSupervisor::stop()`.
+2. Verify no active FastCGI sockets remain in `~/.localforge/run/`.
+3. Run official package manager uninstallation:
+   ```bash
+   brew uninstall php@8.4
+   ```
+4. **No Blanket Deletion**: Never run blind recursive deletions (`rm -rf /opt/homebrew/etc/php/...`). Uninstalled configuration files in `/opt/homebrew/etc/` are harmless text files left to Homebrew's own standard package lifecycle.
+5. Verify `/opt/homebrew/bin/php -v` continues to report `PHP 8.5.3`.
+
+---
+
+## 7. Preflight Conclusion & Status
+
+- **Host Inspection**: COMPLETED (Read-only).
 - **Projetest Record**: **Preserved at PHP 8.4**.
-- **Installation Execution**: **HOLD** (Awaiting explicit Product Owner execution approval).
+- **Execution of Provisioning**: **HOLD** (Awaiting explicit Gate U5.C Product Owner authorization).
