@@ -187,6 +187,11 @@ impl MariaDbSupervisor {
         self.port.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Checks whether the data directory contains an initialized MariaDB system schema ('mysql/').
+    pub fn is_datadir_initialized(&self) -> bool {
+        self.data_dir.join("mysql").is_dir()
+    }
+
     /// Discovers installed MariaDB / MySQL binaries on the host without installing anything.
     pub fn discover_binaries() -> Result<MariaDbBinaries> {
         let daemon_candidates = [
@@ -520,7 +525,14 @@ user = root
             }
         }
 
-        // 4. Ensure data directory & configuration initialized
+        // 4. Safety Guard: Never automatically initialize production datadir without authorization
+        if let Ok(default_base) = resolve_mariadb_base_dir() {
+            if self.base_dir == default_base && !self.is_datadir_initialized() {
+                return Err(RuntimeError::DatabaseError(
+                    "MariaDB veri dizini başlatılmamış. Güvenlik politikası ve Product Owner direktifi gereği otomatik disk ilklendirme durdurulmuştur. Lütfen yetkilendirme talep ediniz.".into(),
+                ));
+            }
+        }
         self.ensure_datadir_initialized()?;
 
         // 5. Port conflict check & unprivileged fallback

@@ -215,6 +215,20 @@ impl MetadataStore {
         Ok(())
     }
 
+    pub fn update_project_php_version(&self, id: &ProjectId, php_version: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE projects SET php_version = ?1, updated_at = ?2 WHERE id = ?3",
+            params![php_version, now, id.0],
+        )
+        .map_err(|e| {
+            LocalForgeError::DatabaseError(format!("Failed to update php_version: {e}"))
+        })?;
+
+        Ok(())
+    }
+
     pub fn delete_project(&self, id: &ProjectId) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM projects WHERE id = ?1", params![id.0])

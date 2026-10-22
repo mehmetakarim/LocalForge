@@ -102,6 +102,7 @@ This document mirrors and indexes the active engineering tasks across project ph
 | **TASK-R1.3B-B6** | Welcome / First-Run Splash Experience | Medium | COMPLETED | Lead UI Designer | Official Apple squircle app icon, quickstart onboarding cards, non-intrusive dismiss logic |
 | **TASK-R1.3B-REM** | Final Acceptance Remediation (P0-P2 Findings) | Critical | COMPLETED | Systems & QA Lead | 9 re-captured verified screenshots; safe domain routing modal & cURL; capacity integrity guard; UNKNOWN preservation; ImportProjectModal; 77/77 tests PASS |
 | **TASK-R1.3B-CLOSE** | Final Acceptance Closeout (Findings 01-04) | Critical | COMPLETED | Principal Architect | Import error workflow & form state; production utility tests; live domain routing & Nginx isolation; genuine native macOS Tauri evidence (7 screenshots & zip); 78/78 tests PASS |
+| **TASK-R1.3B-UAT** | UAT Failure Recovery & Native macOS Polish (Gates 2A–4) | Critical | COMPLETED | Lead Team | Dynamic PHP-FPM discovery & confirmed switcher; MariaDB safe lifecycle & datadir protection; routing diagnostics; squircle icon geometry; traffic lights clean; storage scroll & capacity gauge; non-layout-shifting HUD; 11 native Tauri screenshots; 84/84 tests PASS |
 
 ---
 

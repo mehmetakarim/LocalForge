@@ -64,6 +64,29 @@ This document records all test scenarios, executed checks, environments, and ver
 
 ---
 
+## Phase R1.3B UAT Failure Recovery Matrix
+
+| Test ID | Test Category | Description / Command | Environment | Status | Verification Evidence / Notes |
+|---|---|---|---|---|---|
+| **TEST-R1.3B-UAT-01** | PHP-FPM Discovery & Validation | `discover_installed_details()` verifies FPM binary (`fpm-fcgi`) and arm64 architecture | macOS Darwin / Homebrew | **PASS** | Distinguishes installed (8.5.3 · FPM arm64) from missing (8.4). Verified via unit and desktop tests. |
+| **TEST-R1.3B-UAT-02** | Confirmed PHP Switcher | Project retains requested 8.4 until explicit user confirmation; updates persist to SQLite | React 19 / Tauri IPC | **PASS** | `ProjectInspector.tsx` renders Turkish warning, version switcher dialog, and persists via `update_project_php_version`. |
+| **TEST-R1.3B-UAT-03** | MariaDB Datadir Protection | Refuses automatic datadir initialization when uninitialized on Application Support storage | Rust Cargo & Runtime | **PASS** | `start()` fails safely requiring PO authorization; 13/13 MariaDB integration tests pass with isolated test datadirs. |
+| **TEST-R1.3B-UAT-04** | MariaDB Lifecycle Controls | Safe Start/Stop controls wired in `ServicesRuntime.tsx` | Tauri 2 & React 19 | **PASS** | `start_service` and `stop_service` IPC commands operational; verified state displayed honestly. |
+| **TEST-R1.3B-UAT-05** | Browser Routing Diagnostics | NXDOMAIN diagnostic matrix, copyable `/etc/hosts` and cURL commands | React 19 / RoutingAlertModal | **PASS** | Diagnostic pipeline distinguishes loopback port 8080 from system DNS NXDOMAIN. |
+| **TEST-R1.3B-UAT-06** | Native macOS Squircle Icon | Transparent corners at `(0,0)`, multi-resolution `icon.icns` compiled via `iconutil` | macOS Apple Silicon | **PASS** | Masked with Apple superellipse 824px on 1024px canvas; alpha=0 at corners; Dock renders native squircle. |
+| **TEST-R1.3B-UAT-07** | Traffic Lights Cleanliness | Duplicate HTML traffic lights removed; native Cocoa buttons unobstructed | macOS Cocoa / Tauri 2 | **PASS** | Window controls clearance area preserved without fake HTML colored dots. |
+| **TEST-R1.3B-UAT-08** | Inspector Zoom Control Invariant | Zoom controls hidden while Project Inspector is open | React 19 / AppShell | **PASS** | `isInspectorOpen` property hides zoom in `AppShell` header. |
+| **TEST-R1.3B-UAT-09** | Storage Viewport Scroll Hierarchy | `h-screen max-h-screen`, `justify-start min-h-0` on main | React 19 / Tailwind | **PASS** | Storage cards scroll smoothly for 1, 2, 5, 8, 12 APFS volumes. Verified on live Tauri app. |
+| **TEST-R1.3B-UAT-10** | Storage Available Capacity Gauge | Explicit display of verified free/available capacity | React 19 / StorageVolumes | **PASS** | Displays `Boş: {formatBytes(vol.available_bytes)} (%{usagePercent} dolu)` alongside total and used bytes. |
+| **TEST-R1.3B-UAT-11** | Non-Layout-Shifting Error HUD | Fixed floating HUD notification banner | React 19 / ErrorState | **PASS** | `aside` fixed floating container eliminates stage layout displacement. |
+| **TEST-R1.3B-UAT-12** | Full Native Tauri Screenshot Capture | 11 verified screenshots captured from live Cocoa app | macOS Darwin / Tauri 2 | **PASS** | 11 full-resolution screenshots stored in `docs/design/r1_3b/native_tauri_verified/` and packaged in ZIP. |
+| **TEST-R1.3B-UAT-13** | Frontend Desktop Test Suite | `npm test --prefix apps/desktop` | Node.js Test Runner | **PASS** | 26/26 tests passed (%100 PASS) in 887ms including all recovery gates. |
+| **TEST-R1.3B-UAT-14** | Workspace Rust Test Suite | `cargo test --workspace` | Apple Silicon Mac M1 | **PASS** | All unit and integration test suites pass across workspace. |
+| **TEST-R1.3B-UAT-15** | Clippy & Linter Audit | `cargo clippy --workspace --all-targets -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings across entire workspace. |
+| **TEST-R1.3B-UAT-16** | Formatting Audit | `cargo fmt --all -- --check` | Rust Toolchain 1.94.0 | **PASS** | Zero diffs across entire codebase. |
+
+---
+
 ## Verification Status Definitions
 - **PASS**: Executed with exit code 0 and actual output matched expectations.
 - **FAIL**: Executed and failed to meet expectations.

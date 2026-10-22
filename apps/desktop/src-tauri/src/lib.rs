@@ -209,6 +209,7 @@ fn update_project_status(
 #[derive(serde::Serialize)]
 pub struct RuntimeOverviewDto {
     pub php_versions: Vec<String>,
+    pub php_details: Vec<localforge_runtime::PhpVersionDetail>,
     pub nginx_port: u16,
     pub nginx_running: bool,
     pub nginx_port_conflict: bool,
@@ -217,11 +218,13 @@ pub struct RuntimeOverviewDto {
     pub mariadb_alive: bool,
     pub mariadb_version: Option<String>,
     pub mariadb_latency_ms: Option<u64>,
+    pub mariadb_datadir_initialized: bool,
     pub php_fpm_running: Option<bool>,
 }
 
 #[tauri::command]
 fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto, String> {
+    let php_details = localforge_runtime::PhpFpmSupervisor::discover_installed_details();
     let php_versions = localforge_runtime::PhpFpmSupervisor::discover_installed_versions();
     let nginx_port = 8080;
     let gateway_health = state
@@ -237,6 +240,8 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
         localforge_runtime::GatewayHealth::PortConflict { .. }
     );
     let db_status = state.runtime_service.get_database_status().ok();
+    let mariadb_supervisor = state.runtime_service.mariadb_supervisor();
+    let mariadb_datadir_initialized = mariadb_supervisor.is_datadir_initialized();
 
     let store = state.get_metadata_store()?;
     let projs = store
@@ -258,6 +263,7 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
 
     Ok(RuntimeOverviewDto {
         php_versions,
+        php_details,
         nginx_port,
         nginx_running,
         nginx_port_conflict,
@@ -269,8 +275,80 @@ fn get_runtime_overview(state: State<'_, AppState>) -> Result<RuntimeOverviewDto
         mariadb_alive: db_status.as_ref().map(|s| s.is_alive).unwrap_or(false),
         mariadb_version: db_status.as_ref().and_then(|s| s.version.clone()),
         mariadb_latency_ms: db_status.as_ref().and_then(|s| s.latency_ms),
+        mariadb_datadir_initialized,
         php_fpm_running: Some(php_fpm_running),
     })
+}
+
+#[tauri::command]
+fn update_project_php_version(
+    state: State<'_, AppState>,
+    id: String,
+    php_version: String,
+) -> Result<ProjectDto, String> {
+    let pid = ProjectId::from_string(id);
+    let store = state.get_metadata_store()?;
+    let _existing_proj = store
+        .get_project(&pid)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Proje bulunamadı: {}", pid.0))?;
+
+    // Strict validation: Validate against installed PHP-FPM binaries before persisting
+    state
+        .runtime_service
+        .php_supervisor()
+        .validate_php_version(&php_version)
+        .map_err(|e| format!("PHP sürümü doğrulanamadı: {e}"))?;
+
+    // Persist only after verified validation
+    store
+        .update_project_php_version(&pid, &php_version)
+        .map_err(|e| format!("Veritabanı güncellenemedi: {e}"))?;
+
+    let updated_proj = store
+        .get_project(&pid)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Proje bulunamadı: {}", pid.0))?;
+
+    Ok(ProjectDto::from(updated_proj))
+}
+
+#[tauri::command]
+fn start_service(
+    state: State<'_, AppState>,
+    service: String,
+) -> Result<RuntimeOverviewDto, String> {
+    match service.as_str() {
+        "mariadb" => {
+            let supervisor = state.runtime_service.mariadb_supervisor();
+            if !supervisor.is_datadir_initialized() {
+                return Err(
+                    "MariaDB veri dizini başlatılmamış. Güvenlik politikası ve Product Owner direktifi gereği otomatik disk ilklendirme durdurulmuştur. Lütfen yetkilendirme talep ediniz."
+                        .into(),
+                );
+            }
+            state
+                .runtime_service
+                .ensure_database_running()
+                .map_err(|e| format!("MariaDB başlatılamadı: {e}"))?;
+            get_runtime_overview(state)
+        }
+        _ => Err(format!("Bilinmeyen veya desteklenmeyen servis: {service}")),
+    }
+}
+
+#[tauri::command]
+fn stop_service(state: State<'_, AppState>, service: String) -> Result<RuntimeOverviewDto, String> {
+    match service.as_str() {
+        "mariadb" => {
+            let supervisor = state.runtime_service.mariadb_supervisor();
+            supervisor
+                .stop()
+                .map_err(|e| format!("MariaDB durdurulamadı: {e}"))?;
+            get_runtime_overview(state)
+        }
+        _ => Err(format!("Bilinmeyen veya desteklenmeyen servis: {service}")),
+    }
 }
 
 #[tauri::command]
@@ -354,6 +432,9 @@ pub fn run() {
             start_project,
             stop_project,
             update_project_status,
+            update_project_php_version,
+            start_service,
+            stop_service,
             get_runtime_overview,
             check_domain_resolution
         ])

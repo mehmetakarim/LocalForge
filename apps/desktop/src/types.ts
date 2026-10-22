@@ -24,8 +24,18 @@ export interface VolumeInfo {
   available_bytes: number;
 }
 
+export interface PhpVersionDetail {
+  version: string;
+  major_minor: string;
+  binary_path: string;
+  is_fpm_verified: boolean;
+  architecture: string;
+  is_supported: boolean;
+}
+
 export interface RuntimeOverview {
   php_versions: string[];
+  php_details?: PhpVersionDetail[];
   nginx_port: number;
   nginx_running: boolean;
   nginx_port_conflict?: boolean;
@@ -34,6 +44,7 @@ export interface RuntimeOverview {
   mariadb_alive: boolean;
   mariadb_version?: string;
   mariadb_latency_ms?: number;
+  mariadb_datadir_initialized?: boolean;
   php_fpm_running?: boolean;
 }
 

@@ -15,6 +15,16 @@ pub struct ManagedPool {
     pub child: Option<Child>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PhpVersionDetail {
+    pub version: String,
+    pub major_minor: String,
+    pub binary_path: String,
+    pub is_fpm_verified: bool,
+    pub architecture: String,
+    pub is_supported: bool,
+}
+
 pub struct PhpFpmSupervisor {
     run_dir: PathBuf,
     process_manager: Arc<dyn ProcessManager>,
@@ -33,17 +43,76 @@ impl PhpFpmSupervisor {
         }
     }
 
-    /// Discovers all available installed PHP versions on the host.
-    pub fn discover_installed_versions() -> Vec<String> {
-        let mut versions = Vec::new();
-        let common = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"];
+    /// Discovers all available installed PHP versions with verified FPM binary and architecture telemetry.
+    pub fn discover_installed_details() -> Vec<PhpVersionDetail> {
+        let mut details = Vec::new();
+        let common = ["8.5", "8.4", "8.3", "8.2", "8.1"];
         for v in common {
             if let Ok((bin_path, actual_v)) = Self::find_php_fpm_binary(v) {
-                if !versions.contains(&actual_v) {
-                    versions.push(actual_v);
-                } else if !versions.contains(&v.to_string()) {
-                    let _ = bin_path;
+                let bin_str = bin_path.display().to_string();
+                if details
+                    .iter()
+                    .any(|d: &PhpVersionDetail| d.binary_path == bin_str)
+                {
+                    continue;
                 }
+                let is_fpm = Self::is_fpm_binary(&bin_path);
+                let arch = Self::detect_architecture(&bin_path);
+                let major_minor = if let Some((maj, rest)) = actual_v.split_once('.') {
+                    if let Some((min_only, _)) = rest.split_once('.') {
+                        format!("{maj}.{min_only}")
+                    } else {
+                        format!("{maj}.{rest}")
+                    }
+                } else {
+                    actual_v.clone()
+                };
+                let is_supported =
+                    ["8.5", "8.4", "8.3", "8.2", "8.1"].contains(&major_minor.as_str());
+
+                details.push(PhpVersionDetail {
+                    version: actual_v,
+                    major_minor,
+                    binary_path: bin_str,
+                    is_fpm_verified: is_fpm,
+                    architecture: arch,
+                    is_supported,
+                });
+            }
+        }
+        details
+    }
+
+    pub fn is_fpm_binary(bin_path: &Path) -> bool {
+        if let Ok(output) = Command::new(bin_path).arg("-v").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return stdout.contains("fpm-fcgi");
+        }
+        false
+    }
+
+    pub fn detect_architecture(bin_path: &Path) -> String {
+        if let Ok(output) = Command::new("file").arg(bin_path).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("arm64") {
+                return "arm64".to_string();
+            } else if stdout.contains("x86_64") {
+                return "x86_64".to_string();
+            }
+        }
+        std::env::consts::ARCH.to_string()
+    }
+
+    /// Discovers all available installed PHP versions on the host.
+    pub fn discover_installed_versions() -> Vec<String> {
+        let details = Self::discover_installed_details();
+        let mut versions = Vec::new();
+        for d in details {
+            if !versions.contains(&d.major_minor) {
+                versions.push(d.major_minor.clone());
+            }
+            if !versions.contains(&d.version) {
+                versions.push(d.version);
             }
         }
         if versions.is_empty() {

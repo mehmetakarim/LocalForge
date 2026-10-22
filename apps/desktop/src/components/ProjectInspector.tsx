@@ -11,6 +11,7 @@ import {
   Lock,
   Database,
   CloudUpload,
+  AlertTriangle,
 } from "lucide-react";
 import { ProjectRecord, VolumeInfo, RuntimeOverview } from "../types";
 
@@ -23,6 +24,7 @@ export interface ProjectInspectorProps {
   onStartProject: (id: string) => void;
   onStopProject: (id: string) => void;
   onOpenBrowser: (project: ProjectRecord) => void;
+  onUpdatePhpVersion?: (id: string, version: string) => Promise<void>;
   isMutating?: boolean;
 }
 
@@ -35,9 +37,14 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   onStartProject,
   onStopProject,
   onOpenBrowser,
+  onUpdatePhpVersion,
   isMutating = false,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isChangingPhp, setIsChangingPhp] = useState(false);
+  const [targetPhp, setTargetPhp] = useState("");
+  const [updatingPhp, setUpdatingPhp] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   if (!isOpen || !project) return null;
 
@@ -45,6 +52,14 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   const activePort = runtime?.nginx_port || 8080;
   const isExternal = volume ? volume.is_removable || !volume.is_internal : false;
   const cleanDbName = `localforge_${project.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+
+  // Installed & verified PHP version detection
+  const verifiedList = (runtime?.php_details?.filter((d) => d.is_fpm_verified) || []).map((d) => d.major_minor);
+  const fallbackList = runtime?.php_versions?.filter((v) => ["8.5", "8.4", "8.3", "8.2", "8.1"].includes(v)) || [];
+  const installedVersions = Array.from(new Set([...verifiedList, ...fallbackList]));
+  const isCurrentPhpInstalled = installedVersions.some(
+    (v) => v === project.php_version || v.startsWith(project.php_version) || project.php_version.startsWith(v)
+  );
 
   const copyCurlHelper = () => {
     const cmd = `curl -s -H "Host: ${project.local_domain}" http://127.0.0.1:${activePort}/`;
@@ -127,9 +142,26 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
             <span>Çalışma Zamanı &amp; Ağ Geçidi</span>
           </div>
           <div className="p-3.5 rounded-xl bg-[#2B2450]/45 border border-[rgba(183,173,223,0.12)] space-y-2 font-mono text-xs">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-[#D4CCF1]/70">PHP Sürümü:</span>
-              <span className="text-[#FFFBFF] font-semibold">PHP {project.php_version} (FPM)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[#FFFBFF] font-semibold">
+                  PHP {project.php_version} (FPM)
+                </span>
+                {onUpdatePhpVersion && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetPhp(installedVersions[0] || "8.5");
+                      setIsChangingPhp(true);
+                      setUpdateError(null);
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded bg-[rgba(183,173,223,0.15)] hover:bg-[rgba(183,173,223,0.25)] text-[#B7ADDF] hover:text-[#FFFBFF] transition-all cursor-pointer font-sans"
+                  >
+                    Değiştir
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex justify-between">
               <span className="text-[#D4CCF1]/70">Ağ Geçidi Portu:</span>
@@ -140,6 +172,102 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
               <span className="text-[#B7ADDF] font-semibold">{project.local_domain}</span>
             </div>
           </div>
+
+          {/* Missing PHP Runtime Warning Banner (Turkish Guidance) */}
+          {!isCurrentPhpInstalled && (
+            <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs space-y-2 select-text font-['Figtree',sans-serif]">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Eksik Çalışma Zamanı (PHP {project.php_version})</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[#D4CCF1]">
+                Bu proje için yapılandırılmış olan <strong className="text-white">PHP {project.php_version}</strong> FPM ikilisi ana makinenizde bulunamadı. Sisteminizde doğrulanmış sürüm: <strong className="text-white">PHP {installedVersions.join(", ") || "Yok"} (FPM arm64)</strong>.
+              </p>
+              <div className="pt-1 flex items-center justify-between text-[11px]">
+                <span className="text-amber-300/80">Otomatik geçiş engellendi (PO Kuralı).</span>
+                {onUpdatePhpVersion && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetPhp(installedVersions[0] || "8.5");
+                      setIsChangingPhp(true);
+                      setUpdateError(null);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/40 border border-amber-500/40 text-amber-100 font-semibold cursor-pointer transition-colors"
+                  >
+                    Sürümü Değiştir...
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Confirmed Version Switcher Dialog */}
+          {isChangingPhp && (
+            <div className="p-4 rounded-xl bg-[#191337] border border-[#B7ADDF]/40 shadow-2xl space-y-3 font-['Figtree',sans-serif]">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-[#FFFBFF]">PHP Sürümünü Güncelle (Onaylı)</h4>
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPhp(false)}
+                  className="text-[#D4CCF1] hover:text-[#FFFBFF]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-[#D4CCF1] leading-relaxed">
+                "{project.name}" projesinin PHP sürümü değiştirilecektir. Bu işlem SQLite veritabanındaki kaydı günceller.
+              </p>
+              <div>
+                <label className="block text-[11px] text-[#B7ADDF] mb-1">Yeni PHP Sürümü Seçin:</label>
+                <select
+                  value={targetPhp}
+                  onChange={(e) => setTargetPhp(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-[#2B2450]/80 border border-[rgba(183,173,223,0.25)] text-xs text-white font-mono"
+                >
+                  {installedVersions.map((v) => (
+                    <option key={v} value={v}>
+                      PHP {v} (Doğrulanmış FPM arm64)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {updateError && (
+                <div className="text-[11px] text-red-300 bg-red-950/40 p-2 rounded border border-red-500/30">
+                  {updateError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2 border-t border-[rgba(183,173,223,0.12)]">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPhp(false)}
+                  className="px-3 py-1 rounded-lg border border-[rgba(183,173,223,0.2)] text-xs text-[#D4CCF1]"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingPhp || !targetPhp}
+                  onClick={async () => {
+                    if (!onUpdatePhpVersion) return;
+                    setUpdatingPhp(true);
+                    setUpdateError(null);
+                    try {
+                      await onUpdatePhpVersion(project.id, targetPhp);
+                      setIsChangingPhp(false);
+                    } catch (err: any) {
+                      setUpdateError(err?.message || String(err));
+                    } finally {
+                      setUpdatingPhp(false);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-[#695FA4] hover:bg-[#695FA4]/90 border border-[#B7ADDF] text-xs font-semibold text-white transition-all disabled:opacity-50"
+                >
+                  {updatingPhp ? "Kaydediliyor..." : "Onayla ve Kaydet"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Database & Persistence */}

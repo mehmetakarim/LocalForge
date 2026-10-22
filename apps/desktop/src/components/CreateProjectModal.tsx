@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, FolderPlus, Disc, HardDrive } from "lucide-react";
-import { VolumeInfo } from "../types";
+import { VolumeInfo, RuntimeOverview } from "../types";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   volumes: VolumeInfo[];
+  runtime?: RuntimeOverview | null;
   onCreate: (name: string, parentDir: string, docroot: string, phpVersion: string) => Promise<void>;
 }
 
@@ -13,6 +14,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   isOpen,
   onClose,
   volumes,
+  runtime,
   onCreate,
 }) => {
   const [name, setName] = useState("");
@@ -20,8 +22,21 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     volumes.find((v) => v.mount_point.startsWith("/Volumes"))?.mount_point || "/Volumes"
   );
   const [docroot, setDocroot] = useState("public");
-  const [phpVersion, setPhpVersion] = useState("8.4");
+
+  // Dynamically discover verified installed versions from runtime telemetry
+  const verifiedList = (runtime?.php_details?.filter((d) => d.is_fpm_verified) || []).map((d) => d.major_minor);
+  const fallbackList = runtime?.php_versions?.filter((v) => ["8.5", "8.4", "8.3", "8.2", "8.1"].includes(v)) || [];
+  const installedVersions = Array.from(new Set([...verifiedList, ...fallbackList]));
+  const defaultVersion = installedVersions[0] || "8.5";
+
+  const [phpVersion, setPhpVersion] = useState(defaultVersion);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (installedVersions.length > 0 && !installedVersions.includes(phpVersion)) {
+      setPhpVersion(installedVersions[0]);
+    }
+  }, [installedVersions.join(",")]);
 
   if (!isOpen) return null;
 
@@ -39,7 +54,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     }
   };
 
-  const phpOptions = ["8.4", "8.3", "8.2", "8.1"];
+  const allSupportedVersions = ["8.5", "8.4", "8.3", "8.2", "8.1"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xl p-4 animate-in fade-in duration-200 select-none">
@@ -141,11 +156,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 onChange={(e) => setPhpVersion(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#2B2450]/60 border border-[rgba(183,173,223,0.18)] rounded-xl text-xs text-[#FFFBFF] font-mono focus:outline-none focus:border-[#B7ADDF]"
               >
-                {phpOptions.map((v) => (
-                  <option key={v} value={v} className="bg-[#191337] text-white">
-                    PHP {v} (FPM)
-                  </option>
-                ))}
+                {allSupportedVersions.map((v) => {
+                  const isInstalled = installedVersions.includes(v);
+                  return (
+                    <option key={v} value={v} className="bg-[#191337] text-white">
+                      PHP {v} {isInstalled ? "(Kurulu · FPM arm64)" : "(Kurulu Değil)"}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

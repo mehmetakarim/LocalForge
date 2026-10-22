@@ -41,6 +41,7 @@ export const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mutatingProject, setMutatingProject] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -164,6 +165,50 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleUpdatePhpVersion = async (projectId: string, newVersion: string) => {
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        await invoke("update_project_php_version", { id: projectId, phpVersion: newVersion });
+        await loadData();
+      } else if (isFixtureMode) {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, php_version: newVersion } : p))
+        );
+      } else {
+        throw new Error("LocalForge masaüstü ortamında (Tauri) çalıştırılmalıdır.");
+      }
+    } catch (err: any) {
+      console.error("Update PHP version failed:", err);
+      throw err;
+    }
+  };
+
+  const handleStartService = async (service: string) => {
+    setErrorMsg(null);
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        const overview = await invoke<RuntimeOverview>("start_service", { service });
+        setRuntime(overview);
+      }
+    } catch (err: any) {
+      console.error(`Start ${service} failed:`, err);
+      setErrorMsg(`Servis başlatılamadı: ${err?.message || String(err)}`);
+    }
+  };
+
+  const handleStopService = async (service: string) => {
+    setErrorMsg(null);
+    try {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        const overview = await invoke<RuntimeOverview>("stop_service", { service });
+        setRuntime(overview);
+      }
+    } catch (err: any) {
+      console.error(`Stop ${service} failed:`, err);
+      setErrorMsg(`Servis durdurulamadı: ${err?.message || String(err)}`);
+    }
+  };
+
   const handleOpenBrowser = async (project: ProjectRecord) => {
     const port = runtime?.nginx_port || 8080;
     const { projectUrl, curlCommand } = computeProjectRouting(project.local_domain, port);
@@ -282,11 +327,20 @@ export const App: React.FC = () => {
       onZoomIn={() => setZoomLevel((z) => Math.min(125, z + 5))}
       onZoomOut={() => setZoomLevel((z) => Math.max(75, z - 5))}
       onZoomReset={() => setZoomLevel(100)}
+      isInspectorOpen={isInspectorOpen}
     >
+      {/* Non-Layout-Shifting Floating HUD Error Notification */}
       {errorMsg && (
-        <div className="w-full max-w-xl mx-auto mb-4">
-          <ErrorState message={errorMsg} onRetry={() => setErrorMsg(null)} />
-        </div>
+        <aside
+          aria-label="Sistem Hata Bildirimi"
+          className="fixed top-16 right-8 z-50 max-w-md w-full animate-in slide-in-from-top-3 duration-200"
+        >
+          <ErrorState
+            message={errorMsg}
+            onRetry={() => setErrorMsg(null)}
+            onDismiss={() => setErrorMsg(null)}
+          />
+        </aside>
       )}
 
       {/* Main Mode Views */}
@@ -305,6 +359,8 @@ export const App: React.FC = () => {
             onOpenBrowser={handleOpenBrowser}
             onCreateProject={() => setIsCreateModalOpen(true)}
             onRefresh={loadData}
+            onUpdatePhpVersion={handleUpdatePhpVersion}
+            onInspectorStateChange={setIsInspectorOpen}
           />
         )}
 
@@ -319,11 +375,18 @@ export const App: React.FC = () => {
             onOpenBrowser={handleOpenBrowser}
             onCreateProject={() => setIsCreateModalOpen(true)}
             onRefresh={loadData}
+            onUpdatePhpVersion={handleUpdatePhpVersion}
+            onInspectorStateChange={setIsInspectorOpen}
           />
         )}
 
         {viewMode === "services" && (
-          <ServicesRuntime runtime={runtime} onRefresh={loadData} />
+          <ServicesRuntime
+            runtime={runtime}
+            onRefresh={loadData}
+            onStartService={handleStartService}
+            onStopService={handleStopService}
+          />
         )}
 
         {viewMode === "storage" && (
@@ -419,6 +482,7 @@ export const App: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={handleCreateProject}
         volumes={volumes}
+        runtime={runtime}
       />
 
       {/* Project Import Modal */}

@@ -13,7 +13,7 @@ pub use mariadb::{
     MariaDbSupervisor,
 };
 pub use nginx::{GatewayHealth, NginxSupervisor};
-pub use php::PhpFpmSupervisor;
+pub use php::{PhpFpmSupervisor, PhpVersionDetail};
 pub use service::{
     classify_probe_result, GatewayHealthAssessment, ProjectRuntimeService, ProjectRuntimeStatus,
 };

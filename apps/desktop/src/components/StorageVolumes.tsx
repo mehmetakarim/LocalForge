@@ -24,7 +24,7 @@ export const StorageVolumes: React.FC<StorageVolumesProps> = ({
   };
 
   return (
-    <div className="w-full max-w-6xl py-8 px-6 flex flex-col gap-6">
+    <div className="w-full max-w-6xl pt-4 pb-28 px-6 flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-end justify-between border-b border-[rgba(183,173,223,0.12)] pb-5">
         <div>
@@ -100,17 +100,17 @@ export const StorageVolumes: React.FC<StorageVolumesProps> = ({
                   </div>
                 </div>
 
-                {/* Disk Gauge */}
+                {/* Disk Gauge with Verified Available Capacity */}
                 <div className="my-5 p-4 rounded-xl bg-[#191337]/60 border border-[rgba(183,173,223,0.10)]">
                   <div className="flex justify-between font-mono text-xs text-[#D4CCF1] mb-2">
                     <span>
                       {hasValidCapacity
-                        ? `Kullanılan: ${formatBytes(usedBytes)} (%${usagePercent})`
+                        ? `Boş: ${formatBytes(vol.available_bytes)} (%${usagePercent ?? 0} dolu)`
                         : "Kullanılan: BİLİNMİYOR"}
                     </span>
                     <span className="text-[#FFFBFF] font-semibold">
                       {hasValidCapacity
-                        ? `Toplam: ${formatBytes(vol.total_bytes)}`
+                        ? `Toplam: ${formatBytes(vol.total_bytes)} (Kullanılan: ${formatBytes(usedBytes)})`
                         : "Toplam: KAPASİTE OKUNAMADI"}
                     </span>
                   </div>

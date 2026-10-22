@@ -20,6 +20,7 @@ export interface AppShellProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onZoomReset?: () => void;
+  isInspectorOpen?: boolean;
   children: React.ReactNode;
 }
 
@@ -40,6 +41,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  isInspectorOpen = false,
   children,
 }) => {
   // Global Cmd+1..7 shortcut handler
@@ -87,7 +89,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const primaryVolumeName = externalVol?.mount_point || volumes[0]?.mount_point || "/Volumes/Mac Harici Disk";
 
   return (
-    <div className="min-h-screen relative flex flex-col font-['Figtree',sans-serif] text-[#FFFBFF] select-none overflow-hidden bg-[#191337]">
+    <div className="h-screen max-h-screen relative flex flex-col font-['Figtree',sans-serif] text-[#FFFBFF] select-none overflow-hidden bg-[#191337]">
       {/* Studio Deep Atmospheric Backdrop */}
       <div
         className="fixed inset-0 pointer-events-none z-0"
@@ -113,15 +115,15 @@ export const AppShell: React.FC<AppShellProps> = ({
         data-tauri-drag-region
         className="fixed top-0 left-0 right-0 h-[52px] z-50 flex items-center justify-between px-7 border-b border-[rgba(183,173,223,0.10)] bg-[#2B2450]/35 backdrop-blur-xl"
       >
-        {/* macOS Window Controls (Traffic Lights) */}
-        <div className="flex items-center gap-2 w-44">
-          <span className="w-3 h-3 rounded-full bg-[#FF5F56] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
-          <span className="w-3 h-3 rounded-full bg-[#FFBD2E] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
-          <span className="w-3 h-3 rounded-full bg-[#27C93F] inline-block shadow-[0_1px_3px_rgba(0,0,0,0.4)]" />
-        </div>
+        {/* Genuine macOS Native Traffic Lights Clearance Spacing (No Duplicate HTML Dots) */}
+        <div
+          data-tauri-drag-region
+          className="w-20 h-full flex items-center select-none pointer-events-none"
+          aria-hidden="true"
+        />
 
         {/* Official Brand Lockup with Rendered Elephant Emblem */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" data-tauri-drag-region>
           <img
             src="/brand/localforge-emblem.png"
             alt="LocalForge Elephant Emblem"
@@ -181,8 +183,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         onOpenWelcome={onOpenWelcome}
       />
 
-      {/* Floating Functional Zoom Controls on Right */}
-      {onZoomIn && onZoomOut && onZoomReset && (
+      {/* Floating Functional Zoom Controls on Right (Hidden when Project Inspector is open) */}
+      {onZoomIn && onZoomOut && onZoomReset && !isInspectorOpen && (
         <aside
           aria-label="Sahne Yakınlaştırma Denetimleri"
           className="fixed right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-[#2B2450]/55 border border-[rgba(183,173,223,0.16)] backdrop-blur-2xl shadow-xl font-mono text-xs text-[#D4CCF1]"
@@ -214,8 +216,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         </aside>
       )}
 
-      {/* Main Studio Viewport */}
-      <main className="relative z-10 flex-1 ml-24 mr-16 mt-14 flex flex-col items-center justify-center overflow-y-auto">
+      {/* Main Studio Viewport with Independent Vertical Scrolling */}
+      <main className="relative z-10 flex-1 ml-24 mr-4 mt-[52px] h-[calc(100vh-52px)] overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start min-h-0">
         {children}
       </main>
 

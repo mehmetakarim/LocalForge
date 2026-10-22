@@ -6,9 +6,16 @@ import { deriveServiceStates } from "../utils/servicesTelemetry";
 export interface ServicesRuntimeProps {
   runtime: RuntimeOverview | null;
   onRefresh: () => void;
+  onStartService?: (service: string) => Promise<void>;
+  onStopService?: (service: string) => Promise<void>;
 }
 
-export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRefresh }) => {
+export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({
+  runtime,
+  onRefresh,
+  onStartService,
+  onStopService,
+}) => {
   const { nginxStatus, phpFpmStatus, mariadbStatus } = deriveServiceStates(runtime);
 
   return (
@@ -231,6 +238,17 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
 
               <div className="p-2.5 rounded-xl bg-[#191337]/60 border border-[rgba(183,173,223,0.10)] flex flex-col gap-1">
                 <span className="font-mono text-[10px] uppercase text-[#B7ADDF] tracking-wider">
+                  Veri Dizini &amp; İlklendirme
+                </span>
+                <span className="font-mono text-xs text-[#D4CCF1]">
+                  {runtime?.mariadb_datadir_initialized
+                    ? "İlklendirilmiş (LocalForge İzolasyonu)"
+                    : "Boş / İlklendirilmemiş (Güvenlik Korumasında)"}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[#191337]/60 border border-[rgba(183,173,223,0.10)] flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase text-[#B7ADDF] tracking-wider">
                   Canlı Yoklama Gecikmesi
                 </span>
                 <span className="font-mono text-xs text-[#D4CCF1]">
@@ -245,8 +263,28 @@ export const ServicesRuntime: React.FC<ServicesRuntimeProps> = ({ runtime, onRef
           </div>
 
           <div className="pt-3 border-t border-[rgba(183,173,223,0.12)] flex items-center justify-between text-xs">
-            <span className="font-mono text-[11px] text-[#B7ADDF]">Güvenli Kural R1.2B</span>
-            <span className="text-[#10B981]">Silme Kilidi Devrede</span>
+            <span className="font-mono text-[11px] text-[#B7ADDF]">
+              {mariadbStatus === "running" ? "127.0.0.1:3306" : "Durduruldu"}
+            </span>
+            {onStartService && onStopService && (
+              mariadbStatus === "running" ? (
+                <button
+                  type="button"
+                  onClick={() => onStopService("mariadb")}
+                  className="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 text-xs font-semibold cursor-pointer transition-all"
+                >
+                  Durdur
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onStartService("mariadb")}
+                  className="px-3 py-1 rounded-lg bg-[#10B981]/20 hover:bg-[#10B981]/30 border border-[#10B981]/40 text-[#10B981] text-xs font-semibold cursor-pointer transition-all"
+                >
+                  Başlat
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>

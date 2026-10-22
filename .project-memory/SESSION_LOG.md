@@ -628,3 +628,57 @@ This document records the chronological engineering log for all development sess
 - Maintained strict branch isolation on `phase-r1/r1-3b-brand-implementation`.
 - Preserved Direction A+ visual architecture and canonical brand tokens.
 - All 4 findings from Product Owner Closeout directive resolved with zero synthetic fallbacks and 100% genuine evidence.
+
+---
+
+## Session 017 — Phase R1.3B UAT Failure Recovery & Native macOS Polish
+
+- **Date**: 2026-10-22
+- **Participants**: Lead Architect, Systems Engineer, Desktop Engineer, Frontend Lead, Security Engineer, QA Lead
+- **Authorized Phase**: **Phase R1.3B UAT Failure Recovery**
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+
+### Summary of Activities
+1. **Gate 2A — PHP-FPM Compatibility Recovery**:
+   - Replaced hardcoded PHP version choices with runtime-aware dynamic host telemetry (`PhpVersionDetail`) in `crates/runtime/src/php.rs`.
+   - Verified FPM binary identity via `is_fpm_binary()` (`php-fpm -v` fcgi check) and architecture via `detect_architecture()` (`file` command detecting `arm64`).
+   - Distinguishes supported, installed (8.5.3 · FPM arm64), missing (8.4), and incompatible versions.
+   - Added project-level PHP version switcher in `ProjectInspector.tsx` with explicit user confirmation modal; updates persist safely to SQLite via Tauri `update_project_php_version`.
+   - Preserved `Projetest` with PHP 8.4 intact without automatic migration per PO constraint; rendered Turkish missing runtime warning with guidance.
+2. **Gate 2B — MariaDB Lifecycle Recovery**:
+   - Wired safe Start and Stop controls in `ServicesRuntime.tsx` via Tauri commands `start_service` and `stop_service`.
+   - Added safety guard in `crates/runtime/src/mariadb.rs` refusing automatic datadir initialization when uninitialized on host Application Support storage without PO authorization.
+   - Displayed verified service state: `DOĞRULANDI / AKTİF` vs `DURDURULDU` vs `PORT ÇAKIŞMASI`, and datadir status (`İlklendirilmiş` vs `Boş / İlklendirilmemiş (Güvenlik Korumasında)`).
+   - Preserved credential boundaries and unprivileged non-root execution.
+3. **Gate 2C — Browser Routing Diagnostics UX**:
+   - Enhanced `RoutingAlertModal.tsx` with a diagnostic pipeline matrix (Nginx 8080 listener, VHost configuration, PHP-FPM pool status, macOS DNS NXDOMAIN).
+   - Provided one-click copyable `/etc/hosts` command and cURL Host-header verification command.
+   - Documented the two architectural approaches (independent loopback ports vs RFC 6761 `*.localforge.localhost:8080`) for PO evaluation without premature implementation.
+4. **Gate 3 — Native macOS Visual Recovery**:
+   - Built genuine macOS squircle app icon using Apple superellipse mask (1024x1024 canvas, 824x824 icon, transparent corners `(0,0)`, subtle drop shadow).
+   - Compiled native multi-resolution `icon.icns` via `/usr/bin/iconutil` and updated all icon sizes across `src-tauri/icons/` and `public/brand/`.
+   - Eliminated duplicate HTML traffic lights in `AppShell.tsx`, leaving genuine native macOS window traffic lights unobstructed.
+   - Wired `isInspectorOpen` to hide zoom controls when Project Inspector is open.
+   - Fixed main viewport scroll hierarchy (`h-screen max-h-screen`, `justify-start min-h-0`) for smooth scrolling of 1, 2, 5, 8, 12 APFS volume cards.
+   - Displayed verified available and free capacity: `Boş: {formatBytes(vol.available_bytes)} (%{usagePercent} dolu)` alongside total and used bytes.
+   - Refactored `ErrorState.tsx` into a fixed non-layout-shifting floating HUD notification banner.
+5. **Gate 4 — Verification Suite & Evidence Capture**:
+   - Re-compiled native Cocoa Tauri application (`target/debug/localforge-desktop`) backed by live SQLite database on `/Volumes/Mac Harici Disk`.
+   - Captured 11 verified native screenshots in `docs/design/r1_3b/native_tauri_verified/` and packaged into `docs/design/r1_3b/localforge_r1_3b_native_tauri_screenshots.zip`:
+     - `tauri_spatial_studio_2proj.png` (Spatial Studio showing 2 real projects with native traffic lights and no duplicate HTML dots)
+     - `tauri_project_inspector_missing_php.png` (Slide-over Inspector showing missing PHP 8.4 warning, version switcher, and zoom controls hidden)
+     - `tauri_services_runtime_mariadb.png` (Services & Runtime showing verified PHP 8.5.3 FPM arm64, MariaDB Start/Stop controls and uninitialized datadir protection)
+     - `tauri_storage_volumes_scrolling.png` (Storage & Volumes showing verified available/free capacity gauge and smooth scrolling)
+     - `tauri_routing_alert_modal.png` (Routing diagnostic modal showing NXDOMAIN distinction, copyable hosts command, and architectural options)
+     - `tauri_welcome_splash.png`, `tauri_welcome_import_modal.png`, `tauri_projects_workspace.png`
+   - Frontend unit tests: 26/26 passed (%100 PASS, added `r1_3b_uat_recovery.test.mjs`).
+   - MariaDB integration tests: 13/13 passed (%100 PASS).
+   - Runtime integration tests: 14/14 passed (%100 PASS).
+   - Rust formatting: 0 diffs (`cargo fmt --all -- --check`).
+   - Clippy linter: 0 warnings across all workspace targets (`cargo clippy --workspace --all-targets -- -D warnings`).
+
+### Decisions Made
+- Work conducted strictly on dedicated recovery branch `phase-r1/r1-3b-uat-recovery`; do not merge into `main`.
+- `Projetest` kept at PHP 8.4 without automatic migration.
+- MariaDB datadir kept uninitialized pending explicit PO authorization.
+- System DNS / `/etc/hosts` kept unmodified.

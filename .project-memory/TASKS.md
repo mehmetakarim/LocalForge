@@ -114,7 +114,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-REM-06** | Real Project Import Workflow Integration | High | COMPLETED | Desktop Engineer | PO Review Findings | Created `ImportProjectModal.tsx`; wired "Mevcut Projeyi Aç" in `WelcomeSplash.tsx` to `import_project` command |
 | **TASK-R1.3B-REM-07** | Full Workspace Regression Suite Verification | Critical | COMPLETED | QA Lead | TASK-R1.3B-REM-01..06 | 58 Rust tests + 19 frontend tests (77/77 PASS); zero clippy warnings; zero format diffs; clean Vite build |
 
-### Subphase R1.3B-CLOSE: Final Acceptance Closeout (COMPLETED / AWAITING SIGN-OFF)
+### Subphase R1.3B-CLOSE: Final Acceptance Closeout (COMPLETED / CONDITIONALLY ACCEPTED)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-CLOSE-01** | Import Error Workflow & Form State Preservation | Critical | COMPLETED | Frontend Lead | PO Closeout Finding 01 | Failed imports do not close `ImportProjectModal`; errors displayed inline; input path preserved for correction; close/reset strictly on confirmed success |
@@ -122,6 +122,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-CLOSE-03** | Live Nginx Routing Isolation & Adversarial Acceptance Test | Critical | COMPLETED | Senior Rust Eng | PO Closeout Finding 03 | Verified Nginx default_server 404, multi-project strict isolation, zero cross-tenant leakage; `test_r1_3b_live_domain_routing_acceptance_and_isolation` PASS |
 | **TASK-R1.3B-CLOSE-04** | Genuine Native macOS Tauri Application Evidence | Critical | COMPLETED | QA Lead | PO Closeout Finding 04 | Running native binary (`target/debug/localforge-desktop`) backed by live SQLite (`localforge.db`) with 2 persistent projects; 7 verified 1600x1000 screenshots in `docs/design/r1_3b/native_tauri_verified/` and zip archive |
 | **TASK-R1.3B-CLOSE-05** | Full Verification Suite & Project Memory Closeout | Critical | COMPLETED | Principal Architect | TASK-R1.3B-CLOSE-01..04 | 58 Rust tests + 20 frontend tests (78/78 PASS); zero clippy warnings; zero format diffs; clean Vite production bundle |
+
+### Subphase R1.3B-UAT: UAT Failure Recovery & Native macOS Polish (COMPLETED / AWAITING ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-UAT-01** | Gate 2A: PHP-FPM Discovery & Compatibility Recovery | Critical | COMPLETED | Systems Engineer | PO UAT Authorization | `PhpVersionDetail` runtime discovery; `is_fpm_binary()` and `detect_architecture()` validation; project PHP switcher with confirmation dialog; Projetest retains 8.4; Turkish guidance |
+| **TASK-R1.3B-UAT-02** | Gate 2B: MariaDB Lifecycle Controls & Datadir Safety Guard | Critical | COMPLETED | Senior Rust Eng | PO UAT Authorization | Safe Start/Stop controls wired in `ServicesRuntime.tsx`; automatic datadir initialization blocked on Application Support storage without PO approval; verified status display |
+| **TASK-R1.3B-UAT-03** | Gate 2C: Browser Routing Diagnostics & Architectural Options | High | COMPLETED | Desktop Architect | PO UAT Authorization | `RoutingAlertModal` diagnostic pipeline matrix; copyable `/etc/hosts` and cURL commands; documentation of independent loopback ports vs RFC 6761 options |
+| **TASK-R1.3B-UAT-04** | Gate 3: Native macOS Visual Polish & Dock Geometry | Critical | COMPLETED | Lead UI Designer | PO UAT Authorization | Apple squircle icon with transparent corners `(0,0)` compiled via `iconutil`; duplicate HTML traffic lights removed; zoom controls hidden with inspector open; storage scroll hierarchy fixed; available capacity gauge; non-layout-shifting HUD banner |
+| **TASK-R1.3B-UAT-05** | Gate 4: Verification Suite & Genuine Native Evidence Capture | Critical | COMPLETED | QA Lead | TASK-R1.3B-UAT-01..04 | 11 verified genuine Cocoa Tauri screenshots captured in `docs/design/r1_3b/native_tauri_verified/` and zipped; 26 frontend + 58 Rust workspace tests PASS; 0 clippy warnings; 0 fmt diffs |
 
 ---
 

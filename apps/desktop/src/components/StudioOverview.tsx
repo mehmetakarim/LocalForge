@@ -15,6 +15,8 @@ export interface StudioOverviewProps {
   onOpenBrowser: (project: ProjectRecord) => void;
   onCreateProject: () => void;
   onRefresh: () => void;
+  onUpdatePhpVersion?: (id: string, version: string) => Promise<void>;
+  onInspectorStateChange?: (isOpen: boolean) => void;
 }
 
 export const StudioOverview: React.FC<StudioOverviewProps> = ({
@@ -27,8 +29,19 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
   onOpenBrowser,
   onCreateProject,
   onRefresh,
+  onUpdatePhpVersion,
+  onInspectorStateChange,
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const handleSelectProject = (id: string | null) => {
+    setSelectedProjectId(id);
+    onInspectorStateChange?.(id !== null);
+  };
+
+  React.useEffect(() => {
+    onInspectorStateChange?.(selectedProjectId !== null);
+  }, [selectedProjectId, onInspectorStateChange]);
   const [pageIndex, setPageIndex] = useState(0);
   const runningProjects = projects.filter((p) => p.status === "running");
 
@@ -38,11 +51,11 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
       const param = new URLSearchParams(window.location.search).get("inspector");
       if (param) {
         if (param === "true" || param === "1") {
-          setSelectedProjectId(projects[0].id);
+          handleSelectProject(projects[0].id);
         } else {
           const found = projects.find((p) => p.id === param || p.name === param);
           if (found) {
-            setSelectedProjectId(found.id);
+            handleSelectProject(found.id);
           }
         }
       }
@@ -170,7 +183,7 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
                   project={project}
                   volume={vol}
                   isSelected={selectedProjectId === project.id}
-                  onSelect={(p) => setSelectedProjectId(p.id)}
+                  onSelect={(p) => handleSelectProject(p.id)}
                   scaleMode={scaleMode}
                 />
               );
@@ -296,10 +309,11 @@ export const StudioOverview: React.FC<StudioOverviewProps> = ({
         volume={selectedVolume}
         runtime={runtime}
         isOpen={selectedProjectId !== null}
-        onClose={() => setSelectedProjectId(null)}
+        onClose={() => handleSelectProject(null)}
         onStartProject={onStartProject}
         onStopProject={onStopProject}
         onOpenBrowser={onOpenBrowser}
+        onUpdatePhpVersion={onUpdatePhpVersion}
         isMutating={mutatingProject === selectedProjectId}
       />
     </div>

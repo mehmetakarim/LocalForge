@@ -13,6 +13,8 @@ export interface ProjectsWorkspaceProps {
   onOpenBrowser: (project: ProjectRecord) => void;
   onCreateProject: () => void;
   onRefresh: () => void;
+  onUpdatePhpVersion?: (id: string, version: string) => Promise<void>;
+  onInspectorStateChange?: (isOpen: boolean) => void;
 }
 
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
@@ -25,10 +27,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
   onOpenBrowser,
   onCreateProject,
   onRefresh: _onRefresh,
+  onUpdatePhpVersion,
+  onInspectorStateChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "running" | "stopped" | "external">("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const handleSelectProject = (id: string | null) => {
+    setSelectedProjectId(id);
+    onInspectorStateChange?.(id !== null);
+  };
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
   const selectedVolume = selectedProject
@@ -270,7 +279,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setSelectedProjectId(project.id)}
+                    onClick={() => handleSelectProject(project.id)}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#695FA4] to-[#2B2450] border border-[#B7ADDF] text-xs font-semibold text-[#FFFBFF] hover:brightness-110 shadow-[0_2px_8px_rgba(105,95,164,0.3)] transition-all cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -289,10 +298,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         volume={selectedVolume}
         runtime={runtime}
         isOpen={selectedProjectId !== null}
-        onClose={() => setSelectedProjectId(null)}
+        onClose={() => handleSelectProject(null)}
         onStartProject={onStartProject}
         onStopProject={onStopProject}
         onOpenBrowser={onOpenBrowser}
+        onUpdatePhpVersion={onUpdatePhpVersion}
         isMutating={mutatingProject === selectedProjectId}
       />
     </div>
