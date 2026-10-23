@@ -41,6 +41,7 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   isMutating = false,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedLoopback, setCopiedLoopback] = useState(false);
   const [isChangingPhp, setIsChangingPhp] = useState(false);
   const [targetPhp, setTargetPhp] = useState("");
   const [updatingPhp, setUpdatingPhp] = useState(false);
@@ -53,6 +54,13 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   const isExternal = volume ? volume.is_removable || !volume.is_internal : false;
   const cleanDbName = `localforge_${project.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
 
+  const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const preferredDomain = `${slug}.localforge`;
+  const localhostCandidate = `${slug}.localforge.localhost`;
+  const loopbackPort = project.loopback_port || activePort;
+  const loopbackEndpoint = `127.0.0.1:${loopbackPort}`;
+  const directLoopbackUrl = `http://${loopbackEndpoint}/`;
+
   // Installed & verified PHP version detection
   const verifiedList = (runtime?.php_details?.filter((d) => d.is_fpm_verified) || []).map((d) => d.major_minor);
   const fallbackList = runtime?.php_versions?.filter((v) => ["8.5", "8.4", "8.3", "8.2", "8.1"].includes(v)) || [];
@@ -62,10 +70,16 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   );
 
   const copyCurlHelper = () => {
-    const cmd = `curl -s -H "Host: ${project.local_domain}" http://127.0.0.1:${activePort}/`;
+    const cmd = `curl -s -H "Host: ${preferredDomain}" http://127.0.0.1:${loopbackPort}/`;
     navigator.clipboard.writeText(cmd);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyLoopbackHelper = () => {
+    navigator.clipboard.writeText(directLoopbackUrl);
+    setCopiedLoopback(true);
+    setTimeout(() => setCopiedLoopback(false), 2000);
   };
 
   return (
@@ -163,13 +177,40 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
                 )}
               </div>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[#D4CCF1]/70">Tercih Edilen Alan Adı:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#B7ADDF] font-semibold">{preferredDomain}</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#695FA4]/40 text-[#D4CCF1] font-sans">
+                  Önerilen
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[#D4CCF1]/70">Doğrudan Loopback:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#10B981] font-semibold">{loopbackEndpoint}</span>
+                <button
+                  type="button"
+                  onClick={copyLoopbackHelper}
+                  className="text-[10px] text-[#B7ADDF] hover:text-[#FFFBFF] cursor-pointer"
+                  title="Loopback URL'sini Kopyala"
+                >
+                  {copiedLoopback ? <Check className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#D4CCF1]/70">Bağımsız Alan Adı:</span>
+              <span className="text-[#D4CCF1]">{localhostCandidate}:{loopbackPort}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#D4CCF1]/70">Eski Alan Adı (Legacy):</span>
+              <span className="text-[#D4CCF1]/80">{project.local_domain}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-[#D4CCF1]/70">Ağ Geçidi Portu:</span>
               <span className="text-[#FFFBFF]">127.0.0.1:{activePort}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#D4CCF1]/70">Yerel Etki Alanı:</span>
-              <span className="text-[#B7ADDF] font-semibold">{project.local_domain}</span>
             </div>
           </div>
 
@@ -368,7 +409,7 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
             </button>
           </div>
           <code className="block p-2 rounded-lg bg-[#191337]/90 text-[10px] font-mono text-[#D4CCF1] break-all select-all border border-[rgba(183,173,223,0.10)]">
-            curl -s -H "Host: {project.local_domain}" http://127.0.0.1:{activePort}/
+            curl -s -H "Host: {preferredDomain}" http://127.0.0.1:{loopbackPort}/
           </code>
         </div>
       </div>

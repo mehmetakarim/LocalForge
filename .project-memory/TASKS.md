@@ -150,6 +150,16 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5A-04** | Honest Acceptance Classification Across 5 Explicit States | Critical | COMPLETED | QA Lead | Gate U5.A Task 4 | Reconciled `R1_3B_U5_ACCEPTANCE_MATRIX.md`: classified across `DESIGN REVIEWED`, `PREFLIGHT VERIFIED`, `IMPLEMENTED & TESTED`, `NOT RUN`, and `BLOCKED`; documented what remains untested on PO Mac |
 | **TASK-R1.3B-U5A-05** | Master Safety Reconciliation & Implementation Packages (U5.B-D) | Critical | COMPLETED | Lead Team | Gate U5.A Task 5 | Authored `docs/phases/R1_3B_U5A_SECURITY_RECONCILIATION.md`: designed decoupled work packages U5.B (Loopback Routing), U5.C (PHP 8.4 Provisioning), U5.D (MariaDB Staging Init) with exact approval boundaries |
 
+### Subphase R1.3B-U5.B: Isolated Loopback Routing & Branded Local Domains (COMPLETED / AWAITING PO ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5B-01** | SQLite Schema Migration V2 & Storage Constraints | Critical | COMPLETED | Database Architect | Gate U5.B Auth | Extended `projects` with nullable `loopback_port INTEGER`, `UNIQUE` partial index, backward-compatible inspector, atomic allocation, isolated tests |
+| **TASK-R1.3B-U5B-02** | Deterministic Port Allocator Engine (`18081..18999`) | Critical | COMPLETED | Systems Engineer | Gate U5.B Auth | `PortAllocator` bounded to `18081..18999`, foreign PID inspection via `lsof` without termination, Mutex concurrency guard |
+| **TASK-R1.3B-U5B-03** | Multi-Port Nginx Gateway & Fail-Closed VHosts | Critical | COMPLETED | Systems Engineer | TASK-R1.3B-U5B-02 | Dynamic multi-port vhosts, preferred `.localforge` + `.localhost` + `.test`, 503 stopped, 502 unmounted, config rollback on invalid `nginx -t` |
+| **TASK-R1.3B-U5B-04** | Hybrid Domain Routing Engine & Scenarios A-F | Critical | COMPLETED | Principal Architect | TASK-R1.3B-U5B-02..03 | `ProjectRoutingEngine` with `slugify()` and Scenarios A-F typed profile generation with Turkish guidance |
+| **TASK-R1.3B-U5B-05** | Desktop UI & Tauri IPC Routing Integration | High | COMPLETED | Desktop Lead | TASK-R1.3B-U5B-04 | `ProjectInspector` routing display with 1-click copy, `SpatialCard` preferred domain + port, direct unblocked browser open in `App.tsx` |
+| **TASK-R1.3B-U5B-06** | Test Suite Verification & Master Report | Critical | COMPLETED | QA Lead | TASK-R1.3B-U5B-01..05 | Rust workspace tests + 30 frontend tests PASS; master implementation report `docs/phases/R1_3B_U5B_LOOPBACK_IMPLEMENTATION_REPORT.md` |
+
 ---
 
 ## Recovery Phase R0: Safety Stabilization & CI Repair (COMPLETED / CONDITIONALLY ACCEPTED)

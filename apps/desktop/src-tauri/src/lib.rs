@@ -20,6 +20,7 @@ pub struct ProjectDto {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    pub loopback_port: Option<u16>,
 }
 
 impl From<ProjectRecord> for ProjectDto {
@@ -35,6 +36,7 @@ impl From<ProjectRecord> for ProjectDto {
             status: r.status.to_string(),
             created_at: r.created_at,
             updated_at: r.updated_at,
+            loopback_port: r.loopback_port,
         }
     }
 }
@@ -352,6 +354,35 @@ fn stop_service(state: State<'_, AppState>, service: String) -> Result<RuntimeOv
 }
 
 #[tauri::command]
+fn get_project_routing(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<localforge_core::ProjectRoutingProfile, String> {
+    let pid = ProjectId::from_string(id);
+    let mut profile = state
+        .runtime_service
+        .get_project_routing_profile(&pid)
+        .map_err(|e| e.to_string())?;
+
+    // Check if preferred domain resolves on the host
+    use std::net::ToSocketAddrs;
+    let target = format!("{}:80", profile.preferred_domain);
+    let resolves = target
+        .to_socket_addrs()
+        .map(|mut addrs| addrs.any(|a| a.ip().is_loopback()))
+        .unwrap_or(false);
+
+    if resolves {
+        profile.resolution_status = localforge_core::DomainResolutionStatus::Resolved;
+        profile.effective_url = format!("http://{}", profile.preferred_domain);
+        profile.scenario = "Scenario A: Branded Local Domain Resolved".into();
+        profile.guidance_tr = format!("http://{} yerel adı başarıyla çözümlendi ve ağ geçidine yönlendirildi.", profile.preferred_domain);
+    }
+
+    Ok(profile)
+}
+
+#[tauri::command]
 fn check_domain_resolution(domain: String) -> Result<bool, String> {
     use std::net::ToSocketAddrs;
     let target = format!("{}:80", domain.trim());
@@ -436,7 +467,8 @@ pub fn run() {
             start_service,
             stop_service,
             get_runtime_overview,
-            check_domain_resolution
+            check_domain_resolution,
+            get_project_routing
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalForge application");
@@ -511,6 +543,7 @@ mod tests {
             status: ProjectStatus::Stopped,
             created_at: "2026-10-20T00:00:00Z".into(),
             updated_at: "2026-10-20T00:00:00Z".into(),
+            loopback_port: None,
         };
         persistent_store.insert_project(&existing_project).unwrap();
         drop(persistent_store);

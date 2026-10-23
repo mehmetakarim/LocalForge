@@ -167,34 +167,88 @@ fastcgi_param  REDIRECT_STATUS    200;
         let _ = std::fs::write(main_conf_path, main_conf);
     }
 
-    /// Generates isolated virtual host configuration for a project.
-    pub fn generate_vhost_config(&self, project: &ProjectRecord, socket_path: &Path) -> String {
+    /// Generates multi-port virtual host configuration for a project supporting
+    /// branded local domains (.localforge), .localhost subdomains, dedicated loopback ports,
+    /// and fail-closed wrong-project isolation when stopped or unmounted.
+    pub fn generate_multi_port_vhost_config(
+        &self,
+        project: &ProjectRecord,
+        socket_path: Option<&Path>,
+        is_running: bool,
+        is_volume_mounted: bool,
+    ) -> String {
+        let slug = crate::routing::ProjectRoutingEngine::slugify(&project.name);
+        let preferred_domain = format!("{slug}.localforge");
+        let localhost_domain = format!("{slug}.localforge.localhost");
+
+        let mut listen_directives = Vec::new();
+        if let Some(port) = project.loopback_port {
+            listen_directives.push(format!("        listen 127.0.0.1:{port};"));
+        }
+        // Retain shared gateway port for backward-compatibility with Host: header routing
+        listen_directives.push(format!("        listen 127.0.0.1:{};", self.listen_port));
+        let listen_block = listen_directives.join("\n");
+
+        let server_names = format!("{preferred_domain} {localhost_domain} {} localhost 127.0.0.1", project.local_domain);
+
+        if !is_volume_mounted {
+            return format!(
+                "server {{\n\
+{listen_block}\n\
+        server_name {server_names};\n\
+        port_in_redirect on;\n\
+        server_name_in_redirect off;\n\
+        return 502 \"LocalForge Gateway: Depolama Sürücüsü Bağlı Değil (Volume Disconnected)\\n\";\n\
+    }}\n"
+            );
+        }
+
+        if !is_running || socket_path.is_none() {
+            return format!(
+                "server {{\n\
+{listen_block}\n\
+        server_name {server_names};\n\
+        port_in_redirect on;\n\
+        server_name_in_redirect off;\n\
+        return 503 \"LocalForge Gateway: Proje Başlatılmamış veya Durdurulmuş (Project Stopped)\\n\";\n\
+    }}\n"
+            );
+        }
+
         let docroot = if project.document_root.is_empty() {
             project.path.clone()
         } else {
             project.path.join(&project.document_root)
         };
+        let sock = socket_path.unwrap();
 
         format!(
             "server {{\n\
-                 listen 127.0.0.1:{port};\n\
-                 server_name {domain};\n\
-                 root \"{docroot}\";\n\
-                 index index.php index.html;\n\n\
-                 location / {{\n\
-                     try_files $uri $uri/ /index.php?$query_string;\n\
-                 }}\n\n\
-                 location ~ \\.php$ {{\n\
-                     include fastcgi_params;\n\
-                     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
-                     fastcgi_pass unix:{sock};\n\
-                 }}\n\
-             }}\n",
-            port = self.listen_port,
-            domain = project.local_domain,
+{listen_block}\n\
+        server_name {server_names};\n\
+        port_in_redirect on;\n\
+        server_name_in_redirect off;\n\
+        root \"{docroot}\";\n\
+        index index.php index.html;\n\n\
+        location / {{\n\
+            try_files $uri $uri/ /index.php?$query_string;\n\
+        }}\n\n\
+        location ~ \\.php$ {{\n\
+            include fastcgi_params;\n\
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
+            fastcgi_param SERVER_PORT $server_port;\n\
+            fastcgi_param HTTP_HOST $http_host;\n\
+            fastcgi_pass unix:{sock};\n\
+        }}\n\
+    }}\n",
             docroot = docroot.display(),
-            sock = socket_path.display()
+            sock = sock.display()
         )
+    }
+
+    /// Generates isolated virtual host configuration for a project.
+    pub fn generate_vhost_config(&self, project: &ProjectRecord, socket_path: &Path) -> String {
+        self.generate_multi_port_vhost_config(project, Some(socket_path), true, true)
     }
 
     /// Validates the entire Nginx configuration via `nginx -t`.
@@ -223,24 +277,50 @@ fastcgi_param  REDIRECT_STATUS    200;
         Ok(())
     }
 
-    /// Adds or updates a project's virtual host and applies configuration.
-    pub fn add_or_update_vhost(&self, project: &ProjectRecord, socket_path: &Path) -> Result<()> {
+    /// Updates virtual host state with rollback to last known-good configuration.
+    pub fn update_vhost_state(
+        &self,
+        project: &ProjectRecord,
+        socket_path: Option<&Path>,
+        is_running: bool,
+        is_volume_mounted: bool,
+    ) -> Result<()> {
         let vhost_dir = self.conf_dir.join("conf.d");
+        let _ = std::fs::create_dir_all(&vhost_dir);
         let vhost_file = vhost_dir.join(format!("{}.conf", project.id.0));
-        let vhost_content = self.generate_vhost_config(project, socket_path);
+        let backup_file = vhost_dir.join(format!("{}.conf.bak", project.id.0));
 
-        // Write new virtual host
+        let had_previous = vhost_file.exists();
+        if had_previous {
+            let _ = std::fs::copy(&vhost_file, &backup_file);
+        }
+
+        let vhost_content =
+            self.generate_multi_port_vhost_config(project, socket_path, is_running, is_volume_mounted);
         std::fs::write(&vhost_file, vhost_content).map_err(RuntimeError::Io)?;
 
         // Validate configuration with nginx -t
         if let Err(e) = self.validate_configuration() {
-            // Rollback failing virtual host so running projects are unharmed
-            let _ = std::fs::remove_file(&vhost_file);
+            // Rollback failing virtual host to last known-good configuration
+            if had_previous && backup_file.exists() {
+                let _ = std::fs::rename(&backup_file, &vhost_file);
+            } else {
+                let _ = std::fs::remove_file(&vhost_file);
+            }
             return Err(e);
+        }
+
+        if backup_file.exists() {
+            let _ = std::fs::remove_file(&backup_file);
         }
 
         // Apply changes (reload or spawn)
         self.ensure_running_and_reloaded()
+    }
+
+    /// Adds or updates a project's virtual host and applies configuration.
+    pub fn add_or_update_vhost(&self, project: &ProjectRecord, socket_path: &Path) -> Result<()> {
+        self.update_vhost_state(project, Some(socket_path), true, true)
     }
 
     /// Removes a project's virtual host and reloads gateway.
@@ -720,6 +800,21 @@ fastcgi_param  REDIRECT_STATUS    200;
 
     /// Stops Nginx gracefully.
     pub fn stop(&self) -> Result<()> {
+        // Attempt clean stop via nginx -s stop first
+        if let Ok(nginx_bin) = Self::find_nginx_binary() {
+            let conf_file = self.conf_dir.join("nginx.conf");
+            if conf_file.exists() && self.run_dir.join("nginx.pid").exists() {
+                let _ = Command::new(&nginx_bin)
+                    .arg("-p")
+                    .arg(&self.conf_dir)
+                    .arg("-c")
+                    .arg(&conf_file)
+                    .arg("-s")
+                    .arg("stop")
+                    .status();
+            }
+        }
+
         let mut lock = self.master_process.lock().unwrap();
         if let Some((identity, mut child_opt)) = lock.take() {
             let _ = self.process_manager.terminate_process_group_verified(
@@ -727,10 +822,11 @@ fastcgi_param  REDIRECT_STATUS    200;
                 identity.executable_path(),
                 identity.start_time_secs,
                 identity.start_time_usecs,
-                5,
+                2,
             );
 
             if let Some(mut child) = child_opt.take() {
+                let _ = child.kill();
                 let _ = child.wait();
             }
         } else {
@@ -744,7 +840,7 @@ fastcgi_param  REDIRECT_STATUS    200;
                                 identity.executable_path(),
                                 identity.start_time_secs,
                                 identity.start_time_usecs,
-                                5,
+                                2,
                             );
                         }
                     }
@@ -757,15 +853,15 @@ fastcgi_param  REDIRECT_STATUS    200;
             let _ = std::fs::remove_file(&pid_file);
         }
 
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
         Ok(())
     }
 }
 
 impl Drop for NginxSupervisor {
     fn drop(&mut self) {
-        if self.terminate_on_drop {
-            let _ = self.stop();
-        }
+        let _ = self.stop();
     }
 }
 
@@ -793,12 +889,14 @@ mod tests {
             status: ProjectStatus::Running,
             created_at: "2026-10-18T00:00:00Z".into(),
             updated_at: "2026-10-18T00:00:00Z".into(),
+            loopback_port: None,
         };
 
         let sock = Path::new("/tmp/localforge/site1.sock");
         let vhost = sup.generate_vhost_config(&project, sock);
         assert!(vhost.contains("listen 127.0.0.1:8080;"));
-        assert!(vhost.contains("server_name site1.test"));
+        assert!(vhost.contains("site-one.localforge"));
+        assert!(vhost.contains("site1.test"));
         assert!(vhost.contains("fastcgi_pass unix:/tmp/localforge/site1.sock;"));
         assert!(vhost.contains("root \"/Volumes/Mac Harici Disk/Projects/site1/public\";"));
     }

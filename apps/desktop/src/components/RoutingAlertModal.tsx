@@ -9,6 +9,7 @@ export interface RoutingAlertModalProps {
   port: number;
   url: string;
   curlCommand: string;
+  onOpenDirect?: (url: string) => void;
 }
 
 export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
@@ -18,13 +19,21 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
   port,
   url,
   curlCommand,
+  onOpenDirect,
 }) => {
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [copiedHosts, setCopiedHosts] = useState(false);
+  const [copiedLoopback, setCopiedLoopback] = useState(false);
 
   if (!isOpen || !project) return null;
 
-  const hostsCmd = `sudo sh -c 'echo "127.0.0.1 ${project.local_domain}" >> /etc/hosts'`;
+  const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const preferredDomain = `${slug}.localforge`;
+  const loopbackPort = project.loopback_port || port;
+  const loopbackUrl = `http://127.0.0.1:${loopbackPort}/`;
+  const localhostCandidateUrl = `http://${slug}.localforge.localhost:${loopbackPort}/`;
+
+  const hostsCmd = `sudo sh -c 'echo "127.0.0.1 ${preferredDomain} ${project.local_domain}" >> /etc/hosts'`;
 
   const handleCopyCurl = () => {
     navigator.clipboard.writeText(curlCommand);
@@ -36,6 +45,21 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
     navigator.clipboard.writeText(hostsCmd);
     setCopiedHosts(true);
     setTimeout(() => setCopiedHosts(false), 2000);
+  };
+
+  const handleCopyLoopback = () => {
+    navigator.clipboard.writeText(loopbackUrl);
+    setCopiedLoopback(true);
+    setTimeout(() => setCopiedLoopback(false), 2000);
+  };
+
+  const handleOpenDirectClick = () => {
+    if (onOpenDirect) {
+      onOpenDirect(loopbackUrl);
+    } else {
+      window.open(loopbackUrl, "_blank");
+    }
+    onClose();
   };
 
   return (
@@ -102,19 +126,51 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
         {/* Explanation */}
         <div className="space-y-3.5 text-xs text-[#D4CCF1] font-['Figtree',sans-serif] leading-relaxed">
           <p>
-            macOS varsayılan sistem DNS'i <code className="text-[#B7ADDF]">.test</code> uzantılı alan adlarını yerel IP adresine (<code className="text-[#B7ADDF]">127.0.0.1</code>) otomatik yönlendirmez. Bu nedenle tarayıcınız bu adrese doğrudan erişememektedir.
+            macOS varsayılan sistem DNS'i <code className="text-[#B7ADDF]">.localforge</code> ve <code className="text-[#B7ADDF]">.test</code> uzantılarını henüz yerel IP adresine (<code className="text-[#B7ADDF]">127.0.0.1</code>) yönlendirmemektedir.
           </p>
 
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-[11px] leading-snug">
-            <strong>Kiracı İzolasyonu Güvencesi:</strong> Yanlış veya başka bir projenin sitesinin sunulmasını önlemek amacıyla, doğrulanmamış ham IP (<code className="text-white">http://127.0.0.1:{port}/</code>) üzerinden tarayıcı açılması engellenmiştir.
+          <div className="p-3.5 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-emerald-200 text-[11px] leading-snug space-y-1">
+            <strong className="text-white block flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+              Gate U5.B Ayrık Loopback Güvencesi:
+            </strong>
+            <span>
+              Bu projeye özel ve izole port <strong className="text-white font-mono">127.0.0.1:{loopbackPort}</strong> tahsis edilmiştir. Yanlış kiracı riski olmaksızın doğrudan bu adresi tarayıcınızda açabilirsiniz!
+            </span>
           </div>
 
-          {/* Action 1: Add to /etc/hosts */}
+          {/* Action 1: Direct Loopback Access */}
+          <div className="p-3 rounded-xl bg-[#2B2450]/45 border border-[rgba(183,173,223,0.14)] flex items-center justify-between">
+            <div className="font-mono text-[11px]">
+              <span className="text-[#D4CCF1]/70 block text-[10px]">Doğrudan Loopback Uç Noktası:</span>
+              <span className="text-[#10B981] font-bold">{loopbackUrl}</span>
+              <span className="text-[#D4CCF1]/60 block text-[10px] mt-0.5">RFC 6761 Adayı: {localhostCandidateUrl}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyLoopback}
+              className="flex items-center gap-1 text-[11px] font-mono text-[#B7ADDF] hover:text-[#FFFBFF] cursor-pointer"
+            >
+              {copiedLoopback ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400">Kopyalandı</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Kopyala</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Action 2: Add to /etc/hosts */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="font-semibold text-[#FFFBFF] flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-[#B7ADDF]" />
-                <span>Çözüm 1: Yerel /etc/hosts Kaydı Ekleme (Terminal):</span>
+                <span>Tercih Edilen Alan Adı /etc/hosts Kaydı (İsteğe Bağlı):</span>
               </span>
               <button
                 type="button"
@@ -139,12 +195,12 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
             </pre>
           </div>
 
-          {/* Action 2: cURL helper */}
+          {/* Action 3: cURL helper */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="font-semibold text-[#FFFBFF] flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-[#B7ADDF]" />
-                <span>Çözüm 2: Anında cURL ile HTTP Başlığı Doğrulama:</span>
+                <span>Anında cURL Test Komutu:</span>
               </span>
               <button
                 type="button"
@@ -168,31 +224,23 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
               {curlCommand}
             </pre>
           </div>
-
-          {/* Architectural Discussion for PO Review */}
-          <div className="p-3 rounded-xl bg-[#2B2450]/40 border border-[rgba(183,173,223,0.14)] text-[11px] space-y-1">
-            <span className="font-bold text-[#FFFBFF] block">
-              Gelecek Aşama İçin Mimari Yaklaşım Seçenekleri:
-            </span>
-            <ul className="list-disc pl-4 space-y-1 text-[#D4CCF1]">
-              <li>
-                <strong>Yaklaşım A (Ayrık Loopback Portları):</strong> Her projeye ayrı port verilmesi (<code className="text-white">127.0.0.1:8081</code>). DNS müdahalesi gerektirmez.
-              </li>
-              <li>
-                <strong>Yaklaşım B (RFC 6761 .localhost Alt Alan Adı):</strong> Tarayıcıların yerel olarak çözümlediği <code className="text-white">proje.localforge.localhost:8080</code> formatına geçiş.
-              </li>
-            </ul>
-          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-[rgba(183,173,223,0.12)]">
+        <div className="flex items-center justify-between gap-3 pt-4 mt-4 border-t border-[rgba(183,173,223,0.12)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-[#695FA4] hover:bg-[#695FA4]/90 text-xs font-semibold text-[#FFFBFF] border border-[#B7ADDF] transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-[#2B2450]/60 hover:bg-[#695FA4]/30 border border-[rgba(183,173,223,0.18)] text-xs text-[#D4CCF1] hover:text-[#FFFBFF] transition-all cursor-pointer"
           >
-            Anladım, Kapat
+            Kapat
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenDirectClick}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#695FA4] to-[#2B2450] hover:brightness-110 border border-[#B7ADDF] text-xs font-semibold text-[#FFFBFF] transition-all shadow-[0_4px_16px_rgba(105,95,164,0.35)] cursor-pointer"
+          >
+            Doğrudan Aç (127.0.0.1:{loopbackPort}) ↗
           </button>
         </div>
       </div>

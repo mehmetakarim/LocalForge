@@ -3,6 +3,7 @@ pub mod health;
 pub mod mariadb;
 pub mod nginx;
 pub mod php;
+pub mod routing;
 pub mod service;
 
 pub use error::{Result, RuntimeError};
@@ -14,6 +15,7 @@ pub use mariadb::{
 };
 pub use nginx::{GatewayHealth, NginxSupervisor};
 pub use php::{PhpFpmSupervisor, PhpVersionDetail};
+pub use routing::{PortAllocationResult, PortAllocator, ProjectRoutingEngine};
 pub use service::{
     classify_probe_result, GatewayHealthAssessment, ProjectRuntimeService, ProjectRuntimeStatus,
 };

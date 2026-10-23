@@ -87,6 +87,7 @@ impl ProjectService {
             status: ProjectStatus::Stopped,
             created_at: now.clone(),
             updated_at: now,
+            loopback_port: None,
         };
 
         self.metadata_store.insert_project(&record)?;
@@ -143,6 +144,7 @@ impl ProjectService {
             status: ProjectStatus::Stopped,
             created_at: now.clone(),
             updated_at: now,
+            loopback_port: None,
         };
 
         self.metadata_store.insert_project(&record)?;

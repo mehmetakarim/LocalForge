@@ -20,6 +20,7 @@ pub struct ProjectRuntimeStatus {
     pub socket_path: Option<PathBuf>,
     pub nginx_pid: Option<u32>,
     pub gateway_port: u16,
+    pub loopback_port: Option<u16>,
     pub local_domain: String,
     pub local_url: String,
     pub message: String,
@@ -254,6 +255,19 @@ impl ProjectRuntimeService {
         // 3. Mark project STARTING
         let _ = store.update_project_status(&project.id, ProjectStatus::Starting);
 
+        // 3b. Allocate or revalidate persistent loopback port (if V2 schema active)
+        let allocator = crate::routing::PortAllocator::default();
+        if let Ok(crate::routing::PortAllocationResult::Conflict { port, details, .. }) =
+            allocator.allocate_port_for_project(&store, &project.id, self.process_manager.as_ref())
+        {
+            let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
+            return Err(RuntimeError::ServiceUnhealthy {
+                service: format!("port-{}", port),
+                reason: details,
+            });
+        }
+        let project = store.get_project(project_id)?.unwrap_or(project);
+
         // 4. Start isolated PHP-FPM pool
         let socket_path =
             match self
@@ -267,10 +281,10 @@ impl ProjectRuntimeService {
                 }
             };
 
-        // 5. Register virtual host with shared Nginx gateway
+        // 5. Register virtual host with shared Nginx gateway (multi-port listener)
         if let Err(e) = self
             .nginx_supervisor
-            .add_or_update_vhost(&project, &socket_path)
+            .update_vhost_state(&project, Some(&socket_path), true, true)
         {
             let _ = self.php_supervisor.stop_pool(&project.id);
             let _ = store.update_project_status(&project.id, ProjectStatus::Failed);
@@ -300,14 +314,24 @@ impl ProjectRuntimeService {
 
         // 7. Real HTTP Health Probe (allow 50ms for worker reload)
         std::thread::sleep(std::time::Duration::from_millis(50));
-        let local_url = format!("http://127.0.0.1:{}", self.gateway_port);
+        let probe_port = project.loopback_port.unwrap_or(self.gateway_port);
+        let local_url = project
+            .loopback_port
+            .map(|p| format!("http://127.0.0.1:{p}"))
+            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
 
-        let mut probe_result = probe_http_health(self.gateway_port, &project.local_domain, "/");
+        let mut probe_result = probe_http_health(probe_port, &project.local_domain, "/");
         if probe_result.is_err() {
-            let loopback_host = format!("{}:{}", project.local_domain, self.gateway_port);
-            let retry = probe_http_health(self.gateway_port, &loopback_host, "/");
+            let loopback_host = format!("{}:{}", project.local_domain, probe_port);
+            let retry = probe_http_health(probe_port, &loopback_host, "/");
             if retry.is_ok() {
                 probe_result = retry;
+            } else {
+                // Also retry with 127.0.0.1 host
+                let direct_retry = probe_http_health(probe_port, "127.0.0.1", "/");
+                if direct_retry.is_ok() {
+                    probe_result = direct_retry;
+                }
             }
         }
 
@@ -330,6 +354,7 @@ impl ProjectRuntimeService {
             socket_path: Some(socket_path),
             nginx_pid: nginx_id.map(|i| i.pid),
             gateway_port: self.gateway_port,
+            loopback_port: project.loopback_port,
             local_domain: project.local_domain,
             local_url,
             message,
@@ -349,11 +374,18 @@ impl ProjectRuntimeService {
         // 2. Stop independent PHP-FPM pool (Project A stopped, Project B untouched)
         self.php_supervisor.stop_pool(&project.id)?;
 
-        // 3. Remove virtual host from Nginx gateway
-        self.nginx_supervisor.remove_vhost(&project.id)?;
+        // 3. Update virtual host to stopped state in Nginx gateway (or remove if needed)
+        let _ = self
+            .nginx_supervisor
+            .update_vhost_state(&project, None, false, true);
 
         // 4. Mark project STOPPED in metadata store
         let _ = store.update_project_status(&project.id, ProjectStatus::Stopped);
+
+        let local_url = project
+            .loopback_port
+            .map(|p| format!("http://127.0.0.1:{p}"))
+            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
 
         Ok(ProjectRuntimeStatus {
             project_id: project.id,
@@ -364,10 +396,45 @@ impl ProjectRuntimeService {
             socket_path: None,
             nginx_pid: self.nginx_supervisor.get_gateway_identity().map(|i| i.pid),
             gateway_port: self.gateway_port,
+            loopback_port: project.loopback_port,
             local_domain: project.local_domain.clone(),
-            local_url: format!("http://127.0.0.1:{}", self.gateway_port),
+            local_url,
             message: "Project runtime stopped cleanly.".into(),
         })
+    }
+
+    /// Stops the shared Nginx gateway master process.
+    pub fn stop_gateway(&self) -> Result<()> {
+        self.nginx_supervisor.stop()
+    }
+
+    /// Computes full typed routing profile for a project across Scenarios A through F.
+    pub fn get_project_routing_profile(
+        &self,
+        project_id: &ProjectId,
+    ) -> Result<localforge_core::ProjectRoutingProfile> {
+        let store = self.metadata_store();
+        let project = store
+            .get_project(project_id)?
+            .ok_or_else(|| RuntimeError::ProjectNotFound(project_id.0.clone()))?;
+
+        let is_volume_mounted = self
+            .volume_barrier
+            .verify_volume_available(&project.path, &project.volume_uuid)
+            .is_ok();
+
+        let gateway_running = self.nginx_supervisor.is_gateway_alive();
+        let fpm_running = self.php_supervisor.is_pool_alive(&project.id);
+
+        Ok(crate::routing::ProjectRoutingEngine::compute_profile(
+            &project,
+            project.loopback_port,
+            gateway_running,
+            fpm_running,
+            is_volume_mounted,
+            false, // Domain resolution checked separately by client/host probe
+            None,
+        ))
     }
 
     /// Returns verified runtime health status for a project.
@@ -386,6 +453,11 @@ impl ProjectRuntimeService {
         if !volume_ok {
             let _ = store.update_project_status(&project.id, ProjectStatus::Disconnected);
 
+            let local_url = project
+                .loopback_port
+                .map(|p| format!("http://127.0.0.1:{p}/"))
+                .unwrap_or_else(|| format!("http://127.0.0.1:{}/", self.gateway_port));
+
             return Ok(ProjectRuntimeStatus {
                 project_id: project.id,
                 name: project.name,
@@ -395,8 +467,9 @@ impl ProjectRuntimeService {
                 socket_path: None,
                 nginx_pid: None,
                 gateway_port: self.gateway_port,
+                loopback_port: project.loopback_port,
                 local_domain: project.local_domain.clone(),
-                local_url: format!("http://127.0.0.1:{}", self.gateway_port),
+                local_url,
                 message: "External storage volume unmounted or missing.".into(),
             });
         }
@@ -449,6 +522,11 @@ impl ProjectRuntimeService {
             let _ = store.update_project_status(&project.id, verified_status);
         }
 
+        let local_url = project
+            .loopback_port
+            .map(|p| format!("http://127.0.0.1:{p}"))
+            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
+
         Ok(ProjectRuntimeStatus {
             project_id: project.id.clone(),
             name: project.name,
@@ -462,8 +540,9 @@ impl ProjectRuntimeService {
             },
             nginx_pid: nginx_id.map(|i| i.pid),
             gateway_port: self.gateway_port,
+            loopback_port: project.loopback_port,
             local_domain: project.local_domain.clone(),
-            local_url: format!("http://127.0.0.1:{}", self.gateway_port),
+            local_url,
             message,
         })
     }

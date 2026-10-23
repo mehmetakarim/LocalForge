@@ -34,6 +34,9 @@ pub enum LocalForgeError {
     #[error("Database error: {0}")]
     DatabaseError(String),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Platform error: {0}")]
     PlatformError(String),
 

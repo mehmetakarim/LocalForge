@@ -767,3 +767,54 @@ This document records the chronological engineering log for all development sess
 - No packages installed or daemons started/stopped.
 - `localforge.db` records unchanged.
 - Concluding status: `LOCALFORGE GATE U5.A — SECURITY RECONCILIATION COMPLETE. AWAITING PRODUCT OWNER IMPLEMENTATION APPROVAL.`
+
+---
+
+## Session 020 — Phase R1.3B UAT Recovery — Gate U5.B Isolated Loopback Routing & Branded Local Domains
+
+- **Date**: 2026-10-23
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Frontend Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.B — Isolated Loopback Routing Engine & Branded Local Domain Architecture** (Isolated Code & Test Environments Only)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Baseline Commit**: `d96fd550f6cb5f1bbe9f0a19c62b6e65619a569d`
+
+### Summary of Activities
+1. **Binding Decisions & Boundary Integrity**:
+   - `Decision PO-U5-01`: `Projetest` strictly preserved on PHP 8.4; zero Homebrew mutations.
+   - `Decision PO-U5-02`: MariaDB datadir initialization held; zero host datadir mutations.
+   - `Decision PO-U5-03`: Deprecated shared port 8080 as primary browser navigation target.
+   - `Decision PO-U5-04`: Dedicated per-project loopback ports in unprivileged range `18081..18999`.
+   - `Decision PO-U5-05`: LocalForge Branded Local Domains implemented across 4 tiers (`.localforge`, `.localhost`, `127.0.0.1:<port>`, legacy `.test`).
+2. **Core Domain & Type Safety (`crates/core`)**:
+   - Added typed `DomainResolutionStatus`, `GatewayPortStatus`, and `ProjectRoutingProfile`.
+   - Added `Validation(String)` variant to `LocalForgeError`.
+3. **Database Schema V2 Migration (`crates/storage`)**:
+   - Extended `projects` table with nullable `loopback_port INTEGER` and `UNIQUE` partial index `idx_projects_loopback_port`.
+   - Built backwards-compatible schema inspection reading V1 databases safely.
+   - Built atomic port allocation helper `update_project_loopback_port`.
+   - Unit tests verified on isolated in-memory and tempfile databases; user's real `localforge.db` strictly untouched.
+4. **Deterministic Port Allocator & Routing Engine (`crates/runtime`)**:
+   - Implemented `PortAllocator` bounded to `18081..18999` with foreign PID inspection via `lsof` without killing foreign processes.
+   - Synchronized via thread-safe mutex preventing startup race conditions.
+   - Implemented `ProjectRoutingEngine` with `slugify()` and Scenarios A through F typed classification.
+5. **Multi-Port Nginx Gateway (`crates/runtime/src/nginx.rs`)**:
+   - Implemented multi-port virtual host generation declaring dedicated loopback port, shared port, branded local domain (`<slug>.localforge`), RFC 6761 subdomain (`<slug>.localforge.localhost`), legacy domain, and loopback IP.
+   - Enforced fail-closed wrong-project isolation: HTTP 503 for stopped projects, HTTP 502 for unmounted volumes.
+   - Implemented atomic configuration rollback to `<project_id>.conf.bak` on invalid `nginx -t`.
+   - Implemented clean Nginx stop via `nginx -s stop` and auto-cleanup on drop.
+6. **Desktop UI & Tauri IPC (`apps/desktop`)**:
+   - Updated TypeScript types with `loopback_port` and `ProjectRoutingProfile`.
+   - Enhanced `ProjectInspector` to display Preferred Domain, Direct Loopback with 1-click copy, Localhost candidate, Legacy domain, and gateway port.
+   - Updated `SpatialCard` to show `<slug>.localforge` and dedicated port `:<loopback_port>`.
+   - Updated `App.tsx` browser opening workflow to check domain resolution and open dedicated loopback endpoint directly without blocking the user.
+   - Updated `RoutingAlertModal` with Gate U5.B context and direct 1-click open button.
+7. **Verification Suites**:
+   - Rust workspace unit and integration tests verified.
+   - Desktop frontend test suite (`npm test --prefix apps/desktop`): 30 of 30 tests PASS.
+   - Deliverable report compiled: `docs/phases/R1_3B_U5B_LOOPBACK_IMPLEMENTATION_REPORT.md`.
+
+### Decisions Made & Governance
+- Implementation strictly verified in isolated test and code environments.
+- Real user `localforge.db` untouched; host `/etc/hosts` untouched; MariaDB datadir untouched.
+- Dedicated branch `phase-r1/r1-3b-uat-recovery` maintained without merging to `main`.
+- Concluding status: `LOCALFORGE GATE U5.B — ISOLATED IMPLEMENTATION COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`

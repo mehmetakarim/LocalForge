@@ -86,3 +86,59 @@ pub struct VolumeInfo {
     pub total_bytes: u64,
     pub available_bytes: u64,
 }
+
+/// Status of local domain DNS resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DomainResolutionStatus {
+    Resolved,
+    NxDomain,
+    Unsupported,
+    Untested,
+}
+
+impl fmt::Display for DomainResolutionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Resolved => write!(f, "resolved"),
+            Self::NxDomain => write!(f, "nxdomain"),
+            Self::Unsupported => write!(f, "unsupported"),
+            Self::Untested => write!(f, "untested"),
+        }
+    }
+}
+
+/// Operational status of a project's dedicated loopback gateway port.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum GatewayPortStatus {
+    Active {
+        port: u16,
+    },
+    PortConflict {
+        port: u16,
+        occupying_pid: Option<u32>,
+        details: String,
+    },
+    Stopped {
+        port: u16,
+    },
+    Unassigned,
+    VolumeDisconnected,
+}
+
+/// Comprehensive typed routing profile for a LocalForge project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectRoutingProfile {
+    pub preferred_domain: String,
+    pub localhost_domain: String,
+    pub loopback_endpoint: String,
+    pub legacy_domain: String,
+    pub allocated_port: Option<u16>,
+    pub resolution_status: DomainResolutionStatus,
+    pub gateway_status: GatewayPortStatus,
+    pub effective_url: String,
+    pub scenario: String,
+    pub guidance_tr: String,
+}
+

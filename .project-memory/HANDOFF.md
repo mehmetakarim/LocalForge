@@ -6,11 +6,11 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.A Architecture Safety Reconciliation & Implementation Readiness — Completed / Awaiting Implementation Approval**
+- **Current State**: **Gate U5.B Isolated Loopback Routing & Branded Local Domains — Completed / Awaiting PO Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `4e2d762a5c3b4bd7437e33fb37a821b64c4c5c3d`
-- **CI Baseline**: Run `39848607260` — SUCCESS
+- **Baseline Commit**: `d96fd550f6cb5f1bbe9f0a19c62b6e65619a569d`
+- **CI Baseline**: Run `39852172536` — SUCCESS
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
@@ -22,13 +22,15 @@
   - **Phase R1.3B Final Acceptance Closeout**: COMPLETED (Commit `f6302479efcbebf907837f176d68962acf208e4f`).
   - **Phase R1.3B UAT Failure Recovery (Gates 2A–4)**: COMPLETED (Commit `8516983`).
   - **Gate U5 (Design & Read-Only Preflight)**: COMPLETED (Commit `4e2d762`).
-- **Completed in Gate U5.A (Architecture Safety Reconciliation)**:
-  - `Task 1 (MariaDB Runbook Security Correction)`: Updated `R1_3B_U5_MARIADB_INITIALIZATION_RUNBOOK.md` with private staging directory (`staging_<uuid>`) on `/System/Volumes/Data`, socket peercred authentication (`--auth-root-authentication-method=socket`), atomic same-filesystem `rename()` promotion, quarantined non-destructive isolation on failure (`.failed_<timestamp>`), no blind `rm -rf`, and preservation of database deletion lock.
-  - `Task 2 (Loopback Routing Security Reconciliation)`: Updated `R1_3B_U5_LOOPBACK_ROUTING_ARCHITECTURE.md` and `SECURITY_THREAT_MODEL.md` analyzing all 14 factors. Clarified that loopback ports provide a routing/usability boundary and SOP origin partition, but NOT an OS container. Mitigated RFC 6265 cookie sharing via unique session names (`LF_SESS_<id>`), isolated session directories, and `127.0.0.X` IP alias options. Decoupled SQLite port allocation from OS port ownership with fail-closed TOCTOU conflict resolution.
-  - `Task 3 (PHP 8.4 Installation Plan Hardening)`: Updated `R1_3B_U5_RUNTIME_READINESS_REPORT.md` replacing absolute guarantees with 4 testable preconditions (PATH, sbin, opt binary, config). Separated 4 sequential lifecycle stages with failure handling, removed blanket `rm -rf`, and preserved `Projetest` at PHP 8.4.
-  - `Task 4 (Honest Acceptance Classification)`: Reconciled `R1_3B_U5_ACCEPTANCE_MATRIX.md` across 5 explicit statuses: `DESIGN REVIEWED`, `PREFLIGHT VERIFIED`, `IMPLEMENTED & TESTED`, `NOT RUN`, and `BLOCKED`. Explicitly listed what remains untested on the actual PO Mac.
-  - `Task 5 (Implementation Gate Proposal & Deliverable)`: Created `R1_3B_U5A_SECURITY_RECONCILIATION.md` detailing corrected assumptions, security findings, and specifying 3 decoupled implementation packages: Gate U5.B (Loopback Routing Engine), Gate U5.C (PHP 8.4 Provisioning), and Gate U5.D (MariaDB Staging Initialization) with exact scopes, preconditions, prohibited operations, test matrices, rollback strategies, and PO checkpoints.
-- **Next Permitted Action**: Await Product Owner review and authorization before any implementation. Do NOT begin implementation. Do NOT merge into `main`. Do NOT begin R1.3C.
+  - **Gate U5.A (Architecture Safety Reconciliation)**: COMPLETED (Commit `d96fd55`).
+- **Completed in Gate U5.B (Loopback Routing & Branded Domains)**:
+  - `Database Schema V2`: Added nullable `loopback_port INTEGER` to `projects` table with partial unique index `idx_projects_loopback_port WHERE loopback_port IS NOT NULL`. Added backwards-compatible schema inspector and tested rollback mechanism.
+  - `PortAllocator`: Bounded to unprivileged range `18081..18999`, thread-safe mutex, non-destructive foreign PID collision detection via `lsof` without killing foreign processes.
+  - `Multi-Port Nginx Gateway`: Dynamic multi-port virtual hosts declaring dedicated port, shared gateway port, preferred `<slug>.localforge`, RFC 6761 `<slug>.localforge.localhost`, and legacy domain. Enforced HTTP 503 for stopped projects, HTTP 502 for unmounted drives. Config rollback to `.conf.bak` on invalid `nginx -t`. Clean shutdown via `nginx -s stop` and auto-stop on supervisor drop.
+  - `Hybrid Domain Engine`: `ProjectRoutingEngine` with `slugify()` and Scenarios A through F typed profiles with Turkish guidance.
+  - `Desktop UI & Tauri IPC`: `ProjectInspector` displays Preferred Domain, Direct Loopback with 1-click copy, Localhost candidate, Legacy domain, and gateway port. `SpatialCard` displays `<slug>.localforge` and dedicated port. `App.tsx` directly opens dedicated loopback endpoint without blocking modal if domain resolution fails. `RoutingAlertModal` provides 1-click direct loopback button.
+  - `Test Verification`: 100% test coverage verified across Rust workspace and Node/Desktop suite (30/30 frontend tests PASS). Deliverable report: `docs/phases/R1_3B_U5B_LOOPBACK_IMPLEMENTATION_REPORT.md`.
+- **Next Permitted Action**: Await Product Owner review and acceptance of Gate U5.B before initiating Gate U5.C. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---
 

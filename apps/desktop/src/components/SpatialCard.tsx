@@ -145,7 +145,7 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
             {project.name}
           </h3>
           <span className="font-mono text-[10px] text-[#B7ADDF] truncate block">
-            {project.local_domain}
+            {project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")}.localforge
           </span>
         </div>
         <div
@@ -167,7 +167,7 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
             <span className="truncate">{project.document_root || "public"}</span>
           </div>
           <div className="flex items-center gap-1 font-mono text-[10px] text-[#B7ADDF]">
-            <span>:8080</span>
+            <span>:{project.loopback_port || 8080}</span>
           </div>
         </div>
 

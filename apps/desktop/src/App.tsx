@@ -211,13 +211,21 @@ export const App: React.FC = () => {
 
   const handleOpenBrowser = async (project: ProjectRecord) => {
     const port = runtime?.nginx_port || 8080;
-    const { projectUrl, curlCommand } = computeProjectRouting(project.local_domain, port);
+    const { preferredUrl, loopbackUrl } = computeProjectRouting(
+      project.local_domain,
+      port,
+      project.name,
+      project.loopback_port
+    );
+
+    const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    const preferredDomain = `${slug}.localforge`;
 
     let isResolvable = false;
     try {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
         isResolvable = await invoke<boolean>("check_domain_resolution", {
-          domain: project.local_domain,
+          domain: preferredDomain,
         });
       } else {
         isResolvable = false;
@@ -228,14 +236,10 @@ export const App: React.FC = () => {
     }
 
     if (isResolvable) {
-      window.open(projectUrl, "_blank");
+      window.open(preferredUrl, "_blank");
     } else {
-      setRoutingAlert({
-        project,
-        port,
-        url: projectUrl,
-        curlCommand,
-      });
+      // In Gate U5.B: Directly open dedicated loopback endpoint
+      window.open(loopbackUrl, "_blank");
     }
   };
 

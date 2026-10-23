@@ -335,6 +335,7 @@ try {{
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&project).unwrap();
 
@@ -485,6 +486,7 @@ echo json_encode(['site' => 'beta', 'php' => PHP_VERSION]);
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     let proj_b = ProjectRecord {
         id: ProjectId::from_string("proj_beta"),
@@ -497,6 +499,7 @@ echo json_encode(['site' => 'beta', 'php' => PHP_VERSION]);
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj_a).unwrap();
     store.insert_project(&proj_b).unwrap();

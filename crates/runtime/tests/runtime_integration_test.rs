@@ -40,11 +40,13 @@ fn test_r1_1_02_nginx_vhost_validation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
 
     let sock = dir.path().join("run").join("proj_valid.sock");
     let vhost = sup.generate_vhost_config(&project, &sock);
-    assert!(vhost.contains("server_name valid.test"));
+    assert!(vhost.contains("valid.test"));
+    assert!(vhost.contains("valid-site.localforge"));
     assert!(vhost.contains("fastcgi_pass unix:"));
 
     // Validate generated base configuration passes `nginx -t` if nginx binary is installed
@@ -108,6 +110,7 @@ echo json_encode([
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&project).unwrap();
 
@@ -178,6 +181,7 @@ echo json_encode([
         !sock_path.exists(),
         "PHP-FPM socket must be removed on stop"
     );
+    let _ = service.stop_gateway();
 }
 
 #[test]
@@ -219,6 +223,7 @@ fn test_r1_1_06_multi_project_isolation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     let proj_b = ProjectRecord {
         id: ProjectId::from_string("proj_beta"),
@@ -231,6 +236,7 @@ fn test_r1_1_06_multi_project_isolation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj_a).unwrap();
     store.insert_project(&proj_b).unwrap();
@@ -310,6 +316,7 @@ fn test_r1_1_06_multi_project_isolation() {
     // Stop Project B
     service.stop_project(&proj_b.id).unwrap();
     assert!(!sock_b.exists());
+    let _ = service.stop_gateway();
 }
 
 #[test]
@@ -389,6 +396,7 @@ fn test_r1_1a_02_loopback_url_and_domain_separation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&project).unwrap();
 
@@ -432,6 +440,7 @@ fn test_r1_1a_03_stale_or_dead_fpm_socket_never_reports_running() {
         status: ProjectStatus::Running,
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&project).unwrap();
 
@@ -474,6 +483,7 @@ fn test_r1_3a_v1_01_sync_all_projects_surfaces_failures_and_syncs_sqlite() {
         status: ProjectStatus::Running, // Stale persisted status!
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj_disconnected).unwrap();
 
@@ -494,6 +504,7 @@ fn test_r1_3a_v1_01_sync_all_projects_surfaces_failures_and_syncs_sqlite() {
         status: ProjectStatus::Running, // Stale persisted status!
         created_at: "2026-10-18T00:00:00Z".into(),
         updated_at: "2026-10-18T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj_crashed).unwrap();
 
@@ -603,6 +614,7 @@ fn test_r1_3b_prep_02_persistent_metadata_safety_and_error_propagation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-20T00:00:00Z".into(),
         updated_at: "2026-10-20T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj).unwrap();
 
@@ -809,6 +821,7 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-21T00:00:00Z".into(),
         updated_at: "2026-10-21T00:00:00Z".into(),
+        loopback_port: None,
     };
     let proj_b = ProjectRecord {
         id: ProjectId::from_string("proj_beta_routing"),
@@ -821,6 +834,7 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
         status: ProjectStatus::Stopped,
         created_at: "2026-10-21T00:00:00Z".into(),
         updated_at: "2026-10-21T00:00:00Z".into(),
+        loopback_port: None,
     };
     store.insert_project(&proj_a).unwrap();
     store.insert_project(&proj_b).unwrap();
@@ -879,4 +893,5 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
     // 5. Cleanup
     let _ = service.stop_project(&proj_a.id);
     let _ = service.stop_project(&proj_b.id);
+    let _ = service.stop_gateway();
 }

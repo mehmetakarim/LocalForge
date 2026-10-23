@@ -8,9 +8,30 @@ export interface ProjectRecord {
   document_root: string;
   php_version: string;
   local_domain: string;
+  loopback_port?: number;
   status: ProjectStatus;
   created_at: string;
   updated_at: string;
+}
+
+export type DomainResolutionStatus = "Resolved" | "NxDomain" | "PortConflict" | "GatewayDown";
+export type GatewayPortStatus = "Available" | "OccupiedByUs" | "OccupiedByOther";
+
+export interface ProjectRoutingProfile {
+  preferred_domain: string;
+  dns_independent_domain: string;
+  loopback_endpoint: string;
+  legacy_domain: string;
+  preferred_url: string;
+  dns_independent_url: string;
+  loopback_url: string;
+  legacy_url: string;
+  allocated_port?: number;
+  domain_resolution: DomainResolutionStatus;
+  gateway_port_status: GatewayPortStatus;
+  is_accessible: boolean;
+  recommended_url: string;
+  guidance_tr: string;
 }
 
 export interface VolumeInfo {
