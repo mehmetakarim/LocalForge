@@ -141,4 +141,3 @@ pub struct ProjectRoutingProfile {
     pub scenario: String,
     pub guidance_tr: String,
 }
-

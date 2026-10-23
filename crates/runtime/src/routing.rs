@@ -260,11 +260,17 @@ impl ProjectRoutingEngine {
                 loopback_endpoint,
                 legacy_domain,
                 allocated_port,
-                resolution_status: if domain_resolves { DomainResolutionStatus::Resolved } else { DomainResolutionStatus::NxDomain },
+                resolution_status: if domain_resolves {
+                    DomainResolutionStatus::Resolved
+                } else {
+                    DomainResolutionStatus::NxDomain
+                },
                 gateway_status: GatewayPortStatus::Stopped { port },
                 effective_url: "".into(),
                 scenario: "Project Stopped".into(),
-                guidance_tr: "Proje durdurulmuş durumda. Tarayıcıda açmak için Başlat butonuna tıklayınız.".into(),
+                guidance_tr:
+                    "Proje durdurulmuş durumda. Tarayıcıda açmak için Başlat butonuna tıklayınız."
+                        .into(),
             };
         }
 
@@ -311,8 +317,14 @@ mod tests {
     #[test]
     fn test_slugify() {
         assert_eq!(ProjectRoutingEngine::slugify("Projetest"), "projetest");
-        assert_eq!(ProjectRoutingEngine::slugify("My Cool Project!"), "my-cool-project");
-        assert_eq!(ProjectRoutingEngine::slugify("Site_Alpha.2"), "site-alpha-2");
+        assert_eq!(
+            ProjectRoutingEngine::slugify("My Cool Project!"),
+            "my-cool-project"
+        );
+        assert_eq!(
+            ProjectRoutingEngine::slugify("Site_Alpha.2"),
+            "site-alpha-2"
+        );
     }
 
     #[test]
@@ -354,7 +366,9 @@ mod tests {
         let allocator = PortAllocator::new(18081, 18090);
 
         // Allocate for project 1
-        let res1 = allocator.allocate_port_for_project(&store, &proj1.id, &pm).unwrap();
+        let res1 = allocator
+            .allocate_port_for_project(&store, &proj1.id, &pm)
+            .unwrap();
         let port1 = match res1 {
             PortAllocationResult::NewlyAllocated { port } => port,
             _ => panic!("Expected newly allocated port"),
@@ -362,7 +376,9 @@ mod tests {
         assert!(port1 >= 18081);
 
         // Allocate for project 2
-        let res2 = allocator.allocate_port_for_project(&store, &proj2.id, &pm).unwrap();
+        let res2 = allocator
+            .allocate_port_for_project(&store, &proj2.id, &pm)
+            .unwrap();
         let port2 = match res2 {
             PortAllocationResult::NewlyAllocated { port } => port,
             _ => panic!("Expected newly allocated port"),
@@ -371,7 +387,9 @@ mod tests {
         assert_ne!(port1, port2);
 
         // Reallocate for project 1 (stable persistence across restarts)
-        let res1_repeat = allocator.allocate_port_for_project(&store, &proj1.id, &pm).unwrap();
+        let res1_repeat = allocator
+            .allocate_port_for_project(&store, &proj1.id, &pm)
+            .unwrap();
         match res1_repeat {
             PortAllocationResult::ReusedExisting { port } => assert_eq!(port, port1),
             _ => panic!("Expected reused existing port"),
@@ -395,29 +413,68 @@ mod tests {
         };
 
         // Scenario A: Branded Local Domain Resolved
-        let profile_a = ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, true, true, true, None);
+        let profile_a =
+            ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, true, true, true, None);
         assert_eq!(profile_a.effective_url, "http://projetest.localforge");
-        assert_eq!(profile_a.resolution_status, DomainResolutionStatus::Resolved);
+        assert_eq!(
+            profile_a.resolution_status,
+            DomainResolutionStatus::Resolved
+        );
         assert!(profile_a.scenario.contains("Scenario A"));
 
         // Scenario B: DNS-Independent Loopback Fallback (NXDOMAIN)
-        let profile_b = ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, true, true, false, None);
+        let profile_b = ProjectRoutingEngine::compute_profile(
+            &proj,
+            Some(18082),
+            true,
+            true,
+            true,
+            false,
+            None,
+        );
         assert_eq!(profile_b.effective_url, "http://127.0.0.1:18082/");
-        assert_eq!(profile_b.resolution_status, DomainResolutionStatus::NxDomain);
+        assert_eq!(
+            profile_b.resolution_status,
+            DomainResolutionStatus::NxDomain
+        );
         assert!(profile_b.scenario.contains("Scenario B"));
 
         // Scenario D: Port conflict
-        let profile_d = ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, true, true, false, Some((58491, "Conflict".into())));
+        let profile_d = ProjectRoutingEngine::compute_profile(
+            &proj,
+            Some(18082),
+            true,
+            true,
+            true,
+            false,
+            Some((58491, "Conflict".into())),
+        );
         assert_eq!(profile_d.effective_url, "");
         assert!(profile_d.scenario.contains("Scenario D"));
 
         // Scenario E: PHP-FPM unavailable
-        let profile_e = ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, false, true, false, None);
+        let profile_e = ProjectRoutingEngine::compute_profile(
+            &proj,
+            Some(18082),
+            true,
+            false,
+            true,
+            false,
+            None,
+        );
         assert_eq!(profile_e.effective_url, "");
         assert!(profile_e.scenario.contains("Scenario E"));
 
         // Scenario F: Storage disconnected
-        let profile_f = ProjectRoutingEngine::compute_profile(&proj, Some(18082), true, true, false, false, None);
+        let profile_f = ProjectRoutingEngine::compute_profile(
+            &proj,
+            Some(18082),
+            true,
+            true,
+            false,
+            false,
+            None,
+        );
         assert_eq!(profile_f.effective_url, "");
         assert!(profile_f.scenario.contains("Scenario F"));
     }

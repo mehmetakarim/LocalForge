@@ -282,9 +282,9 @@ impl ProjectRuntimeService {
             };
 
         // 5. Register virtual host with shared Nginx gateway (multi-port listener)
-        if let Err(e) = self
-            .nginx_supervisor
-            .update_vhost_state(&project, Some(&socket_path), true, true)
+        if let Err(e) =
+            self.nginx_supervisor
+                .update_vhost_state(&project, Some(&socket_path), true, true)
         {
             let _ = self.php_supervisor.stop_pool(&project.id);
             let _ = store.update_project_status(&project.id, ProjectStatus::Failed);

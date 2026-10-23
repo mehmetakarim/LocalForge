@@ -376,7 +376,10 @@ fn get_project_routing(
         profile.resolution_status = localforge_core::DomainResolutionStatus::Resolved;
         profile.effective_url = format!("http://{}", profile.preferred_domain);
         profile.scenario = "Scenario A: Branded Local Domain Resolved".into();
-        profile.guidance_tr = format!("http://{} yerel adı başarıyla çözümlendi ve ağ geçidine yönlendirildi.", profile.preferred_domain);
+        profile.guidance_tr = format!(
+            "http://{} yerel adı başarıyla çözümlendi ve ağ geçidine yönlendirildi.",
+            profile.preferred_domain
+        );
     }
 
     Ok(profile)

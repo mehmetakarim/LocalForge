@@ -136,9 +136,7 @@ impl MetadataStore {
             .prepare("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
             .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
-        let version: u32 = stmt
-            .query_row([], |row| row.get(0))
-            .unwrap_or(0);
+        let version: u32 = stmt.query_row([], |row| row.get(0)).unwrap_or(0);
 
         Ok(version)
     }
@@ -163,15 +161,14 @@ impl MetadataStore {
             });
         }
 
-        let tx = conn
-            .transaction()
-            .map_err(|e| LocalForgeError::DatabaseError(format!("Failed to begin migration transaction: {e}")))?;
+        let tx = conn.transaction().map_err(|e| {
+            LocalForgeError::DatabaseError(format!("Failed to begin migration transaction: {e}"))
+        })?;
 
-        tx.execute(
-            "ALTER TABLE projects ADD COLUMN loopback_port INTEGER;",
-            [],
-        )
-        .map_err(|e| LocalForgeError::DatabaseError(format!("Failed to add loopback_port column: {e}")))?;
+        tx.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+            .map_err(|e| {
+                LocalForgeError::DatabaseError(format!("Failed to add loopback_port column: {e}"))
+            })?;
 
         tx.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_loopback_port
@@ -179,23 +176,32 @@ impl MetadataStore {
              WHERE loopback_port IS NOT NULL;",
             [],
         )
-        .map_err(|e| LocalForgeError::DatabaseError(format!("Failed to create unique index on loopback_port: {e}")))?;
+        .map_err(|e| {
+            LocalForgeError::DatabaseError(format!(
+                "Failed to create unique index on loopback_port: {e}"
+            ))
+        })?;
 
         tx.execute(
             "INSERT OR REPLACE INTO schema_migrations (version, description, applied_at)
              VALUES (2, 'Add loopback_port with unique index', datetime('now'));",
             [],
         )
-        .map_err(|e| LocalForgeError::DatabaseError(format!("Failed to record migration version 2: {e}")))?;
+        .map_err(|e| {
+            LocalForgeError::DatabaseError(format!("Failed to record migration version 2: {e}"))
+        })?;
 
-        tx.commit()
-            .map_err(|e| LocalForgeError::DatabaseError(format!("Failed to commit migration transaction: {e}")))?;
+        tx.commit().map_err(|e| {
+            LocalForgeError::DatabaseError(format!("Failed to commit migration transaction: {e}"))
+        })?;
 
         Ok(MigrationReport {
             previous_version: current_version,
             target_version: 2,
             applied: true,
-            details: "Schema successfully upgraded to version 2 (loopback_port and unique index added).".into(),
+            details:
+                "Schema successfully upgraded to version 2 (loopback_port and unique index added)."
+                    .into(),
         })
     }
 
@@ -478,7 +484,11 @@ impl MetadataStore {
     }
 
     /// Finds the highest currently allocated port within a specific range in SQLite.
-    pub fn find_highest_allocated_port(&self, range_start: u16, range_end: u16) -> Result<Option<u16>> {
+    pub fn find_highest_allocated_port(
+        &self,
+        range_start: u16,
+        range_end: u16,
+    ) -> Result<Option<u16>> {
         let conn = self.conn.lock().unwrap();
         if !has_column(&conn, "projects", "loopback_port") {
             return Ok(None);
@@ -489,7 +499,9 @@ impl MetadataStore {
             .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
         let max_port: Option<i64> = stmt
-            .query_row(params![range_start as i64, range_end as i64], |row| row.get(0))
+            .query_row(params![range_start as i64, range_end as i64], |row| {
+                row.get(0)
+            })
             .unwrap_or(None);
 
         Ok(max_port.and_then(|p| u16::try_from(p).ok()))
@@ -528,9 +540,7 @@ fn self_get_schema_version_locked(conn: &Connection) -> Result<u32> {
         .prepare("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
         .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
-    let version: u32 = stmt
-        .query_row([], |row| row.get(0))
-        .unwrap_or(0);
+    let version: u32 = stmt.query_row([], |row| row.get(0)).unwrap_or(0);
 
     Ok(version)
 }
@@ -614,7 +624,9 @@ mod tests {
         assert_eq!(store.get_schema_version().unwrap(), 2);
 
         // Assign valid port
-        store.update_project_loopback_port(&proj1.id, Some(18081)).unwrap();
+        store
+            .update_project_loopback_port(&proj1.id, Some(18081))
+            .unwrap();
         let fetched_with_port = store.get_project(&proj1.id).unwrap().unwrap();
         assert_eq!(fetched_with_port.loopback_port, Some(18081));
         assert!(store.is_port_allocated_in_db(18081).unwrap());
@@ -643,8 +655,13 @@ mod tests {
         assert!(conflict_res.is_err());
 
         // Assign non-conflicting port
-        store.update_project_loopback_port(&proj2.id, Some(18082)).unwrap();
-        assert_eq!(store.find_highest_allocated_port(18080, 18999).unwrap(), Some(18082));
+        store
+            .update_project_loopback_port(&proj2.id, Some(18082))
+            .unwrap();
+        assert_eq!(
+            store.find_highest_allocated_port(18080, 18999).unwrap(),
+            Some(18082)
+        );
 
         // Test Rollback to V1
         let rb_report = store.rollback_v2_migration_for_test().unwrap();

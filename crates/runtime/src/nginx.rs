@@ -189,7 +189,10 @@ fastcgi_param  REDIRECT_STATUS    200;
         listen_directives.push(format!("        listen 127.0.0.1:{};", self.listen_port));
         let listen_block = listen_directives.join("\n");
 
-        let server_names = format!("{preferred_domain} {localhost_domain} {} localhost 127.0.0.1", project.local_domain);
+        let server_names = format!(
+            "{preferred_domain} {localhost_domain} {} localhost 127.0.0.1",
+            project.local_domain
+        );
 
         if !is_volume_mounted {
             return format!(
@@ -295,8 +298,12 @@ fastcgi_param  REDIRECT_STATUS    200;
             let _ = std::fs::copy(&vhost_file, &backup_file);
         }
 
-        let vhost_content =
-            self.generate_multi_port_vhost_config(project, socket_path, is_running, is_volume_mounted);
+        let vhost_content = self.generate_multi_port_vhost_config(
+            project,
+            socket_path,
+            is_running,
+            is_volume_mounted,
+        );
         std::fs::write(&vhost_file, vhost_content).map_err(RuntimeError::Io)?;
 
         // Validate configuration with nginx -t
