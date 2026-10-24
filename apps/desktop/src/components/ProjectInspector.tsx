@@ -57,9 +57,13 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   const preferredDomain = `${slug}.localforge`;
   const localhostCandidate = `${slug}.localforge.localhost`;
-  const loopbackPort = project.loopback_port || activePort;
-  const loopbackEndpoint = `127.0.0.1:${loopbackPort}`;
-  const directLoopbackUrl = `http://${loopbackEndpoint}/`;
+  const isPortAssigned =
+    project.loopback_port !== undefined &&
+    project.loopback_port !== null &&
+    project.loopback_port > 0;
+  const loopbackPort = isPortAssigned ? project.loopback_port : null;
+  const loopbackEndpoint = loopbackPort ? `127.0.0.1:${loopbackPort}` : "Tahsis Edilmedi";
+  const directLoopbackUrl = loopbackPort ? `http://${loopbackEndpoint}/` : "";
 
   // Installed & verified PHP version detection
   const verifiedList = (runtime?.php_details?.filter((d) => d.is_fpm_verified) || []).map((d) => d.major_minor);
@@ -70,6 +74,7 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   );
 
   const copyCurlHelper = () => {
+    if (!loopbackPort) return;
     const cmd = `curl -s -H "Host: ${preferredDomain}" http://127.0.0.1:${loopbackPort}/`;
     navigator.clipboard.writeText(cmd);
     setCopied(true);
@@ -77,6 +82,7 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
   };
 
   const copyLoopbackHelper = () => {
+    if (!directLoopbackUrl) return;
     navigator.clipboard.writeText(directLoopbackUrl);
     setCopiedLoopback(true);
     setTimeout(() => setCopiedLoopback(false), 2000);
@@ -399,17 +405,21 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
         <div className="p-3.5 rounded-xl bg-[#2B2450]/45 border border-[rgba(183,173,223,0.12)] space-y-2">
           <div className="flex items-center justify-between text-xs text-[#D4CCF1]">
             <span>cURL Test Komutu:</span>
-            <button
-              type="button"
-              onClick={copyCurlHelper}
-              className="flex items-center gap-1 text-[11px] font-mono text-[#B7ADDF] hover:underline cursor-pointer"
-            >
-              {copied ? <Check className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3 text-[#B7ADDF]" />}
-              <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
-            </button>
+            {loopbackPort && (
+              <button
+                type="button"
+                onClick={copyCurlHelper}
+                className="flex items-center gap-1 text-[11px] font-mono text-[#B7ADDF] hover:underline cursor-pointer"
+              >
+                {copied ? <Check className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3 text-[#B7ADDF]" />}
+                <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
+              </button>
+            )}
           </div>
           <code className="block p-2 rounded-lg bg-[#191337]/90 text-[10px] font-mono text-[#D4CCF1] break-all select-all border border-[rgba(183,173,223,0.10)]">
-            curl -s -H "Host: {preferredDomain}" http://127.0.0.1:{loopbackPort}/
+            {loopbackPort
+              ? `curl -s -H "Host: ${preferredDomain}" http://127.0.0.1:${loopbackPort}/`
+              : `# Port tahsis edilmedi (Projeyi başlattığınızda otomatik atanır)`}
           </code>
         </div>
       </div>
@@ -447,7 +457,19 @@ export const ProjectInspector: React.FC<ProjectInspectorProps> = ({
         <button
           type="button"
           onClick={() => onOpenBrowser(project)}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#2B2450]/60 hover:bg-[#695FA4]/30 border border-[rgba(183,173,223,0.2)] text-[#FFFBFF] font-semibold text-xs transition-colors cursor-pointer"
+          disabled={!project.loopback_port || project.status !== "running"}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-xs transition-colors ${
+            !project.loopback_port || project.status !== "running"
+              ? "bg-[#2B2450]/30 border-[rgba(183,173,223,0.1)] text-[#D4CCF1]/40 cursor-not-allowed"
+              : "bg-[#2B2450]/60 hover:bg-[#695FA4]/30 border-[rgba(183,173,223,0.2)] text-[#FFFBFF] cursor-pointer"
+          }`}
+          title={
+            !project.loopback_port
+              ? "Port henüz atanmadı. Önce projeyi başlatınız."
+              : project.status !== "running"
+              ? "Proje durdurulmuş durumda."
+              : "Tarayıcıda Aç"
+          }
         >
           <ExternalLink className="w-3.5 h-3.5 text-[#B7ADDF]" />
           <span>Tarayıcıda Aç ↗</span>

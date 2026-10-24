@@ -26,6 +26,9 @@ pub enum RuntimeError {
     #[error("Process identity mismatch / PID reuse detected: {0}")]
     ProcessIdentityMismatch(String),
 
+    #[error("Process mismatch: expected '{expected}', found '{found}'")]
+    ProcessMismatch { expected: String, found: String },
+
     #[error("Database error: {0}")]
     DatabaseError(String),
 

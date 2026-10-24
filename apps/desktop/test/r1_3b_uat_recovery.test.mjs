@@ -72,12 +72,19 @@ test("Gate 2C: Domain routing rejects unqualified loopback browsing", () => {
   const project = {
     name: "Projetest",
     local_domain: "projetest.test",
+    loopback_port: 18081,
   };
   const port = 8080;
 
-  const { projectUrl, curlCommand } = computeProjectRouting(project.local_domain, port);
-  assert.equal(projectUrl, "http://projetest.test:8080/");
-  assert.ok(curlCommand.includes("-H \"Host: projetest.test\""), "cURL helper must include explicit Host header");
+  const { projectUrl, curlCommand, canOpenBrowser } = computeProjectRouting(
+    project.local_domain,
+    port,
+    project.name,
+    project.loopback_port
+  );
+  assert.equal(projectUrl, "http://projetest.test:18081/");
+  assert.equal(canOpenBrowser, true);
+  assert.ok(curlCommand.includes("-H \"Host: projetest.localforge\""), "cURL helper must include explicit Host header");
   assert.ok(!projectUrl.startsWith("http://127.0.0.1"), "Never open unqualified loopback IP directly");
 });
 

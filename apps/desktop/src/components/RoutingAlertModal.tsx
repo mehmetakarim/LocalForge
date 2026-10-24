@@ -29,9 +29,10 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
 
   const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   const preferredDomain = `${slug}.localforge`;
-  const loopbackPort = project.loopback_port || port;
-  const loopbackUrl = `http://127.0.0.1:${loopbackPort}/`;
-  const localhostCandidateUrl = `http://${slug}.localforge.localhost:${loopbackPort}/`;
+  const isPortValid = typeof project.loopback_port === "number" && project.loopback_port >= 18081 && project.loopback_port <= 18999;
+  const loopbackPort = isPortValid ? project.loopback_port : (typeof port === "number" && port >= 18081 && port <= 18999 ? port : null);
+  const loopbackUrl = loopbackPort ? `http://127.0.0.1:${loopbackPort}/` : "";
+  const localhostCandidateUrl = loopbackPort ? `http://${slug}.localforge.localhost:${loopbackPort}/` : "";
 
   const hostsCmd = `sudo sh -c 'echo "127.0.0.1 ${preferredDomain} ${project.local_domain}" >> /etc/hosts'`;
 
@@ -48,12 +49,14 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
   };
 
   const handleCopyLoopback = () => {
+    if (!loopbackUrl) return;
     navigator.clipboard.writeText(loopbackUrl);
     setCopiedLoopback(true);
     setTimeout(() => setCopiedLoopback(false), 2000);
   };
 
   const handleOpenDirectClick = () => {
+    if (!loopbackUrl) return;
     if (onOpenDirect) {
       onOpenDirect(loopbackUrl);
     } else {
@@ -129,40 +132,60 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
             macOS varsayılan sistem DNS'i <code className="text-[#B7ADDF]">.localforge</code> ve <code className="text-[#B7ADDF]">.test</code> uzantılarını henüz yerel IP adresine (<code className="text-[#B7ADDF]">127.0.0.1</code>) yönlendirmemektedir.
           </p>
 
-          <div className="p-3.5 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-emerald-200 text-[11px] leading-snug space-y-1">
-            <strong className="text-white block flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
-              Gate U5.B Ayrık Loopback Güvencesi:
-            </strong>
-            <span>
-              Bu projeye özel ve izole port <strong className="text-white font-mono">127.0.0.1:{loopbackPort}</strong> tahsis edilmiştir. Yanlış kiracı riski olmaksızın doğrudan bu adresi tarayıcınızda açabilirsiniz!
-            </span>
-          </div>
+          {loopbackPort ? (
+            <div className="p-3.5 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-emerald-200 text-[11px] leading-snug space-y-1">
+              <strong className="text-white block flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                Gate U5.B Ayrık Loopback Güvencesi:
+              </strong>
+              <span>
+                Bu projeye özel ve izole port <strong className="text-white font-mono">127.0.0.1:{loopbackPort}</strong> tahsis edilmiştir. Yanlış kiracı riski olmaksızın doğrudan bu adresi tarayıcınızda açabilirsiniz!
+              </span>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] leading-snug space-y-1">
+              <strong className="text-white block flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                Loopback Port Tahsis Edilmedi:
+              </strong>
+              <span>
+                Bu proje için henüz 18081-18999 aralığında geçerli bir ayrık port atanmamıştır. Port tahsisi yapılana kadar doğrudan loopback erişimi kısıtlanmıştır.
+              </span>
+            </div>
+          )}
 
           {/* Action 1: Direct Loopback Access */}
           <div className="p-3 rounded-xl bg-[#2B2450]/45 border border-[rgba(183,173,223,0.14)] flex items-center justify-between">
             <div className="font-mono text-[11px]">
               <span className="text-[#D4CCF1]/70 block text-[10px]">Doğrudan Loopback Uç Noktası:</span>
-              <span className="text-[#10B981] font-bold">{loopbackUrl}</span>
-              <span className="text-[#D4CCF1]/60 block text-[10px] mt-0.5">RFC 6761 Adayı: {localhostCandidateUrl}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleCopyLoopback}
-              className="flex items-center gap-1 text-[11px] font-mono text-[#B7ADDF] hover:text-[#FFFBFF] cursor-pointer"
-            >
-              {copiedLoopback ? (
+              {loopbackPort ? (
                 <>
-                  <Check className="w-3 h-3 text-emerald-400" />
-                  <span className="text-emerald-400">Kopyalandı</span>
+                  <span className="text-[#10B981] font-bold">{loopbackUrl}</span>
+                  <span className="text-[#D4CCF1]/60 block text-[10px] mt-0.5">RFC 6761 Adayı: {localhostCandidateUrl}</span>
                 </>
               ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  <span>Kopyala</span>
-                </>
+                <span className="text-amber-400 font-bold">Port Atanmadı</span>
               )}
-            </button>
+            </div>
+            {loopbackPort && (
+              <button
+                type="button"
+                onClick={handleCopyLoopback}
+                className="flex items-center gap-1 text-[11px] font-mono text-[#B7ADDF] hover:text-[#FFFBFF] cursor-pointer"
+              >
+                {copiedLoopback ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400">Kopyalandı</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Kopyala</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Action 2: Add to /etc/hosts */}
@@ -235,13 +258,23 @@ export const RoutingAlertModal: React.FC<RoutingAlertModalProps> = ({
           >
             Kapat
           </button>
-          <button
-            type="button"
-            onClick={handleOpenDirectClick}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#695FA4] to-[#2B2450] hover:brightness-110 border border-[#B7ADDF] text-xs font-semibold text-[#FFFBFF] transition-all shadow-[0_4px_16px_rgba(105,95,164,0.35)] cursor-pointer"
-          >
-            Doğrudan Aç (127.0.0.1:{loopbackPort}) ↗
-          </button>
+          {loopbackPort ? (
+            <button
+              type="button"
+              onClick={handleOpenDirectClick}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#695FA4] to-[#2B2450] hover:brightness-110 border border-[#B7ADDF] text-xs font-semibold text-[#FFFBFF] transition-all shadow-[0_4px_16px_rgba(105,95,164,0.35)] cursor-pointer"
+            >
+              Doğrudan Aç (127.0.0.1:{loopbackPort}) ↗
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2 rounded-xl bg-[#2B2450]/40 border border-[rgba(183,173,223,0.1)] text-xs font-semibold text-[#D4CCF1]/40 cursor-not-allowed"
+            >
+              Port Tahsis Edilmedi
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -150,7 +150,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5A-04** | Honest Acceptance Classification Across 5 Explicit States | Critical | COMPLETED | QA Lead | Gate U5.A Task 4 | Reconciled `R1_3B_U5_ACCEPTANCE_MATRIX.md`: classified across `DESIGN REVIEWED`, `PREFLIGHT VERIFIED`, `IMPLEMENTED & TESTED`, `NOT RUN`, and `BLOCKED`; documented what remains untested on PO Mac |
 | **TASK-R1.3B-U5A-05** | Master Safety Reconciliation & Implementation Packages (U5.B-D) | Critical | COMPLETED | Lead Team | Gate U5.A Task 5 | Authored `docs/phases/R1_3B_U5A_SECURITY_RECONCILIATION.md`: designed decoupled work packages U5.B (Loopback Routing), U5.C (PHP 8.4 Provisioning), U5.D (MariaDB Staging Init) with exact approval boundaries |
 
-### Subphase R1.3B-U5.B: Isolated Loopback Routing & Branded Local Domains (COMPLETED / AWAITING PO ACCEPTANCE)
+### Subphase R1.3B-U5.B: Isolated Loopback Routing & Branded Local Domains (COMPLETED / ACCEPTED IN U5.B1 BASELINE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-U5B-01** | SQLite Schema Migration V2 & Storage Constraints | Critical | COMPLETED | Database Architect | Gate U5.B Auth | Extended `projects` with nullable `loopback_port INTEGER`, `UNIQUE` partial index, backward-compatible inspector, atomic allocation, isolated tests |
@@ -159,6 +159,15 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5B-04** | Hybrid Domain Routing Engine & Scenarios A-F | Critical | COMPLETED | Principal Architect | TASK-R1.3B-U5B-02..03 | `ProjectRoutingEngine` with `slugify()` and Scenarios A-F typed profile generation with Turkish guidance |
 | **TASK-R1.3B-U5B-05** | Desktop UI & Tauri IPC Routing Integration | High | COMPLETED | Desktop Lead | TASK-R1.3B-U5B-04 | `ProjectInspector` routing display with 1-click copy, `SpatialCard` preferred domain + port, direct unblocked browser open in `App.tsx` |
 | **TASK-R1.3B-U5B-06** | Test Suite Verification & Master Report | Critical | COMPLETED | QA Lead | TASK-R1.3B-U5B-01..05 | Rust workspace tests + 30 frontend tests PASS; master implementation report `docs/phases/R1_3B_U5B_LOOPBACK_IMPLEMENTATION_REPORT.md` |
+
+### Subphase R1.3B-U5.B1: Routing Security Hardening & Acceptance Closeout (COMPLETED / AWAITING PO ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5B1-01** | Nginx Process Identity Safety & Pre-Signal Verification (P0) | Critical | COMPLETED | Security Specialist | Gate U5.B1 Auth | 7-step pre-signal verification; canonical binary path & cmdline check; PID reuse start-time protection; safe ESRCH stale PID reaping; `paths_match` macOS /private symlink normalization; adversarial PID replacement tests |
+| **TASK-R1.3B-U5B1-02** | Complete Removal of Unsafe Port Fallback (P0) | Critical | COMPLETED | Desktop/Backend Eng | Gate U5.B1 Auth | Eliminated silent fallback to 8080 across UI & Rust IPC; explicit `UNASSIGNED` state; `canOpenBrowser: false` on unassigned/invalid ports; strict range `18081..=18999` enforcement |
+| **TASK-R1.3B-U5B1-03** | Nginx Shared-Port Host Isolation & Duplicate Name Elimination (P1) | High | COMPLETED | Systems Engineer | Gate U5.B1 Auth | Dedicated port default server 404 mismatch; shared 8080 block matches only project domains; removed generic localhost/127.0.0.1 from 8080 vhosts; `nginx -t` conflicting server name fail-closed validation |
+| **TASK-R1.3B-U5B1-04** | SQLite V2 Migration Integrity & Fault Tolerance (P1) | High | COMPLETED | Database Architect | Gate U5.B1 Auth | Interrupted migration recovery via `has_unique_index()`; pre-existing duplicate port fail-closed detection; port bounds constraints in DB operations |
+| **TASK-R1.3B-U5B1-05** | Master Test Verification & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B1-01..04 | 14/14 runtime integration tests PASS; 16/16 runtime unit tests PASS; 7/7 storage tests PASS; 32/32 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B1_ROUTING_SECURITY_CLOSEOUT.md` |
 
 ---
 

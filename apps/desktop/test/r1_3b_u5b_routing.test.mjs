@@ -21,8 +21,43 @@ test("Gate U5.B: ProjectRouting - Multi-word project slugification", () => {
   assert.equal(result.curlCommand, 'curl -s -H "Host: site-one-two.localforge" http://127.0.0.1:18082/');
 });
 
-test("Gate U5.B: ProjectRouting - Fallback to gateway port when loopback_port is unassigned", () => {
-  const result = computeProjectRouting("legacy.test", 8080, "Legacy Project");
+test("Gate U5.B1: ProjectRouting - Unassigned loopback port blocks browser and returns unassigned status", () => {
+  const unassigned1 = computeProjectRouting("legacy.test", 8080, "Legacy Project");
+  assert.equal(unassigned1.canOpenBrowser, false);
+  assert.equal(unassigned1.portStatus, "unassigned");
+  assert.equal(unassigned1.projectUrl, null);
+  assert.equal(unassigned1.loopbackUrl, null);
+  assert.equal(unassigned1.localhostUrl, null);
+
+  const unassigned2 = computeProjectRouting("legacy.test", 8080, "Legacy Project", null);
+  assert.equal(unassigned2.canOpenBrowser, false);
+  assert.equal(unassigned2.portStatus, "unassigned");
+
+  const unassigned3 = computeProjectRouting("legacy.test", 8080, "Legacy Project", 0);
+  assert.equal(unassigned3.canOpenBrowser, false);
+  assert.equal(unassigned3.portStatus, "unassigned");
+});
+
+test("Gate U5.B1: ProjectRouting - Out of range loopback port (<18081 or >18999) fails closed", () => {
+  const lowPort = computeProjectRouting("invalid.test", 8080, "Invalid Low", 8080);
+  assert.equal(lowPort.canOpenBrowser, false);
+  assert.equal(lowPort.portStatus, "invalid_range");
+  assert.equal(lowPort.projectUrl, null);
+  assert.equal(lowPort.loopbackUrl, null);
+
+  const edgeLow = computeProjectRouting("invalid.test", 8080, "Invalid Low Edge", 18080);
+  assert.equal(edgeLow.canOpenBrowser, false);
+  assert.equal(edgeLow.portStatus, "invalid_range");
+
+  const edgeHigh = computeProjectRouting("invalid.test", 8080, "Invalid High Edge", 19000);
+  assert.equal(edgeHigh.canOpenBrowser, false);
+  assert.equal(edgeHigh.portStatus, "invalid_range");
+});
+
+test("Gate U5.B1: ProjectRouting - Legacy mode fallback allows 8080 when explicitly requested", () => {
+  const result = computeProjectRouting("legacy.test", 8080, "Legacy Project", null, { legacyMode: true });
+  assert.equal(result.canOpenBrowser, true);
+  assert.equal(result.portStatus, "valid");
   assert.equal(result.preferredUrl, "http://legacy-project.localforge/");
   assert.equal(result.loopbackUrl, "http://127.0.0.1:8080/");
   assert.equal(result.localhostUrl, "http://legacy-project.localforge.localhost:8080/");

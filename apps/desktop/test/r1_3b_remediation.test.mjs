@@ -98,10 +98,17 @@ test("R1.3B Production Utility: deriveServiceStates explicitly distinguishes UNK
 });
 
 test("R1.3B Production Utility: computeProjectRouting generates domain-specific URL and cURL helper", () => {
-  const res = computeProjectRouting("site-a.test", 8080);
-  assert.equal(res.projectUrl, "http://site-a.test:8080/");
-  assert.equal(res.curlCommand, 'curl -H "Host: site-a.test" http://127.0.0.1:8080/');
+  const res = computeProjectRouting("site-a.test", 8080, "site-a", 18081);
+  assert.equal(res.projectUrl, "http://site-a.test:18081/");
+  assert.equal(res.canOpenBrowser, true);
+  assert.equal(res.portStatus, "valid");
   assert.ok(!res.projectUrl.includes("127.0.0.1"), "Project URL must target domain, never raw loopback IP");
+
+  // Unassigned port must safely reject browser opening and return unassigned status
+  const unassigned = computeProjectRouting("site-a.test", 8080);
+  assert.equal(unassigned.projectUrl, null);
+  assert.equal(unassigned.canOpenBrowser, false);
+  assert.equal(unassigned.portStatus, "unassigned");
 });
 
 test("R1.3B Import Error Workflow: Failed import preserves entered path, displays error, and never closes modal", async () => {

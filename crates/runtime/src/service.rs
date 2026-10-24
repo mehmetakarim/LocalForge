@@ -318,7 +318,7 @@ impl ProjectRuntimeService {
         let local_url = project
             .loopback_port
             .map(|p| format!("http://127.0.0.1:{p}"))
-            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
+            .unwrap_or_default();
 
         let mut probe_result = probe_http_health(probe_port, &project.local_domain, "/");
         if probe_result.is_err() {
@@ -385,7 +385,7 @@ impl ProjectRuntimeService {
         let local_url = project
             .loopback_port
             .map(|p| format!("http://127.0.0.1:{p}"))
-            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
+            .unwrap_or_default();
 
         Ok(ProjectRuntimeStatus {
             project_id: project.id,
@@ -525,7 +525,7 @@ impl ProjectRuntimeService {
         let local_url = project
             .loopback_port
             .map(|p| format!("http://127.0.0.1:{p}"))
-            .unwrap_or_else(|| format!("http://127.0.0.1:{}", self.gateway_port));
+            .unwrap_or_default();
 
         Ok(ProjectRuntimeStatus {
             project_id: project.id.clone(),

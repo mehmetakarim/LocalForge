@@ -211,12 +211,21 @@ export const App: React.FC = () => {
 
   const handleOpenBrowser = async (project: ProjectRecord) => {
     const port = runtime?.nginx_port || 8080;
-    const { preferredUrl, loopbackUrl } = computeProjectRouting(
+    const routing = computeProjectRouting(
       project.local_domain,
       port,
       project.name,
       project.loopback_port
     );
+
+    if (!routing.canOpenBrowser || !routing.loopbackUrl) {
+      setErrorMsg(
+        routing.portStatus === "unassigned"
+          ? `"${project.name}" projesine henüz ayrık bir loopback portu tahsis edilmemiştir. Port tahsis etmek için önce projeyi başlatınız.`
+          : `"${project.name}" projesinin port numarası (${project.loopback_port}) geçersiz (18081..18999 aralığında olmalıdır).`
+      );
+      return;
+    }
 
     const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     const preferredDomain = `${slug}.localforge`;
@@ -235,11 +244,10 @@ export const App: React.FC = () => {
       isResolvable = false;
     }
 
-    if (isResolvable) {
-      window.open(preferredUrl, "_blank");
+    if (isResolvable && routing.preferredUrl) {
+      window.open(routing.preferredUrl, "_blank");
     } else {
-      // In Gate U5.B: Directly open dedicated loopback endpoint
-      window.open(loopbackUrl, "_blank");
+      window.open(routing.loopbackUrl, "_blank");
     }
   };
 

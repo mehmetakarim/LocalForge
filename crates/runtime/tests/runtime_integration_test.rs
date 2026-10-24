@@ -238,6 +238,7 @@ fn test_r1_1_06_multi_project_isolation() {
         updated_at: "2026-10-18T00:00:00Z".into(),
         loopback_port: None,
     };
+    store.migrate_to_v2_loopback_ports().unwrap();
     store.insert_project(&proj_a).unwrap();
     store.insert_project(&proj_b).unwrap();
 
@@ -410,9 +411,19 @@ fn test_r1_1a_02_loopback_url_and_domain_separation() {
     );
 
     let status = service.get_runtime_status(&project.id).unwrap();
-    // Must report loopback IP with port, NEVER unresolvable domain
-    assert_eq!(status.local_url, "http://127.0.0.1:18099");
+    // In Gate U5.B1: Missing loopback_port is an explicit UNASSIGNED state (empty local_url)
+    assert_eq!(status.local_url, "");
+    assert_eq!(status.loopback_port, None);
     assert_eq!(status.local_domain, "urltest.test");
+
+    // When loopback_port is assigned, local_url reports dedicated loopback IP with port
+    store.migrate_to_v2_loopback_ports().unwrap();
+    store
+        .update_project_loopback_port(&project.id, Some(18081))
+        .unwrap();
+    let status_assigned = service.get_runtime_status(&project.id).unwrap();
+    assert_eq!(status_assigned.local_url, "http://127.0.0.1:18081");
+    assert_eq!(status_assigned.loopback_port, Some(18081));
 }
 
 #[test]
@@ -836,6 +847,7 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
         updated_at: "2026-10-21T00:00:00Z".into(),
         loopback_port: None,
     };
+    store.migrate_to_v2_loopback_ports().unwrap();
     store.insert_project(&proj_a).unwrap();
     store.insert_project(&proj_b).unwrap();
 
@@ -890,8 +902,57 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
         "Project B must NOT contain Project A payload"
     );
 
-    // 5. Cleanup
-    let _ = service.stop_project(&proj_a.id);
+    // 5. Dedicated Project Ports Verification (Gate U5.B1)
+    let st_a = service.get_runtime_status(&proj_a.id).unwrap();
+    let port_a = st_a
+        .loopback_port
+        .expect("Project A must have dedicated loopback port");
+    let st_b = service.get_runtime_status(&proj_b.id).unwrap();
+    let port_b = st_b
+        .loopback_port
+        .expect("Project B must have dedicated loopback port");
+    assert_ne!(port_a, port_b, "Dedicated ports must be distinct");
+
+    // 5a. Direct loopback request to Project A dedicated port
+    let (dcode_a, dbody_a) = probe_http_health(port_a, "127.0.0.1", "/").unwrap();
+    assert_eq!(dcode_a, 200);
+    assert!(dbody_a.contains("LOCALFORGE_SITE_A_PAYLOAD_ONLY"));
+
+    // 5b. Direct loopback request to Project B dedicated port
+    let (dcode_b, dbody_b) = probe_http_health(port_b, "127.0.0.1", "/").unwrap();
+    assert_eq!(dcode_b, 200);
+    assert!(dbody_b.contains("LOCALFORGE_SITE_B_PAYLOAD_ONLY"));
+
+    // 5c. Cross-Project Host Isolation: Project A Host sent to Project B dedicated port must be REJECTED (Fail-Closed 404)
+    let (cross_code, cross_body) =
+        probe_http_health(port_b, "routing-alpha.localforge", "/").unwrap();
+    assert_eq!(
+        cross_code, 404,
+        "Foreign Host sent to dedicated port must fail closed with 404"
+    );
+    assert!(cross_body.contains("Host mismatch on dedicated project port"));
+
+    // 5d. Bare IP request to shared gateway port must return 404 default_server
+    let (bare_code, bare_body) = probe_http_health(test_port, "127.0.0.1", "/").unwrap();
+    assert_eq!(bare_code, 404);
+    assert!(bare_body.contains("Host header required or project domain not found"));
+
+    // 5e. Stopped Project isolation on dedicated port
+    let _ = service.stop_project(&proj_a.id).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let (stop_code, stop_body) = probe_http_health(port_a, "127.0.0.1", "/").unwrap();
+    assert_eq!(
+        stop_code, 503,
+        "Stopped project must return 503 on dedicated port"
+    );
+    assert!(stop_body.contains("Project Stopped"));
+
+    // 5f. Project B remains healthy and isolated while Project A is stopped
+    let (b_still_up_code, b_still_up_body) = probe_http_health(port_b, "127.0.0.1", "/").unwrap();
+    assert_eq!(b_still_up_code, 200);
+    assert!(b_still_up_body.contains("LOCALFORGE_SITE_B_PAYLOAD_ONLY"));
+
+    // 6. Cleanup
     let _ = service.stop_project(&proj_b.id);
     let _ = service.stop_gateway();
 }

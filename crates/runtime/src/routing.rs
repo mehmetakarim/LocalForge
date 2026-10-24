@@ -191,10 +191,7 @@ impl ProjectRoutingEngine {
                 format!("127.0.0.1:{port}"),
             )
         } else {
-            (
-                format!("{slug}.localforge.localhost:8080"),
-                "127.0.0.1:8080".to_string(),
-            )
+            (format!("{slug}.localforge.localhost"), "".to_string())
         };
 
         // Scenario F: Storage volume disconnected
@@ -215,7 +212,6 @@ impl ProjectRoutingEngine {
 
         // Scenario D: Port conflict
         if let Some((occ_pid, details)) = port_conflict {
-            let port = allocated_port.unwrap_or(18081);
             return ProjectRoutingProfile {
                 preferred_domain,
                 localhost_domain,
@@ -223,20 +219,22 @@ impl ProjectRoutingEngine {
                 legacy_domain,
                 allocated_port,
                 resolution_status: DomainResolutionStatus::Untested,
-                gateway_status: GatewayPortStatus::PortConflict {
-                    port,
-                    occupying_pid: Some(occ_pid),
-                    details,
+                gateway_status: match allocated_port {
+                    Some(port) => GatewayPortStatus::PortConflict {
+                        port,
+                        occupying_pid: Some(occ_pid),
+                        details,
+                    },
+                    None => GatewayPortStatus::Unassigned,
                 },
                 effective_url: "".into(),
                 scenario: "Scenario D: Port Conflict".into(),
-                guidance_tr: format!("Atanan port ({port}) yabancı süreç (PID: {occ_pid}) tarafından kullanılıyor. Port çakışması ekranından yeni port tahsis edilebilir."),
+                guidance_tr: format!("Atanan port ({:?}) yabancı süreç (PID: {occ_pid}) tarafından kullanılıyor. Port çakışması ekranından yeni port tahsis edilebilir.", allocated_port),
             };
         }
 
         // Scenario E: PHP-FPM unavailable
         if !fpm_running && gateway_running {
-            let port = allocated_port.unwrap_or(18081);
             return ProjectRoutingProfile {
                 preferred_domain,
                 localhost_domain,
@@ -244,7 +242,10 @@ impl ProjectRoutingEngine {
                 legacy_domain,
                 allocated_port,
                 resolution_status: if domain_resolves { DomainResolutionStatus::Resolved } else { DomainResolutionStatus::NxDomain },
-                gateway_status: GatewayPortStatus::Stopped { port },
+                gateway_status: match allocated_port {
+                    Some(port) => GatewayPortStatus::Stopped { port },
+                    None => GatewayPortStatus::Unassigned,
+                },
                 effective_url: "".into(),
                 scenario: "Scenario E: PHP-FPM Runtime Unavailable".into(),
                 guidance_tr: format!("PHP-FPM çalışma zamanı (PHP {}) aktif değil veya ikili bulunamadı. Proje başlatılamadı.", project.php_version),
@@ -253,7 +254,6 @@ impl ProjectRoutingEngine {
 
         // If stopped
         if !gateway_running || project.status != localforge_core::ProjectStatus::Running {
-            let port = allocated_port.unwrap_or(18081);
             return ProjectRoutingProfile {
                 preferred_domain,
                 localhost_domain,
@@ -265,14 +265,40 @@ impl ProjectRoutingEngine {
                 } else {
                     DomainResolutionStatus::NxDomain
                 },
-                gateway_status: GatewayPortStatus::Stopped { port },
+                gateway_status: match allocated_port {
+                    Some(port) => GatewayPortStatus::Stopped { port },
+                    None => GatewayPortStatus::Unassigned,
+                },
                 effective_url: "".into(),
-                scenario: "Project Stopped".into(),
-                guidance_tr:
+                scenario: if allocated_port.is_none() {
+                    "Scenario: Loopback Port Unassigned".into()
+                } else {
+                    "Project Stopped".into()
+                },
+                guidance_tr: if allocated_port.is_none() {
+                    "Bu projeye henüz ayrık bir loopback portu tahsis edilmemiştir. Port tahsis etmek için projeyi başlatınız.".into()
+                } else {
                     "Proje durdurulmuş durumda. Tarayıcıda açmak için Başlat butonuna tıklayınız."
-                        .into(),
+                        .into()
+                },
             };
         }
+
+        // Scenario: Unassigned port on running project
+        let Some(port) = allocated_port else {
+            return ProjectRoutingProfile {
+                preferred_domain: preferred_domain.clone(),
+                localhost_domain,
+                loopback_endpoint: "".into(),
+                legacy_domain,
+                allocated_port: None,
+                resolution_status: if domain_resolves { DomainResolutionStatus::Resolved } else { DomainResolutionStatus::NxDomain },
+                gateway_status: GatewayPortStatus::Unassigned,
+                effective_url: "".into(),
+                scenario: "Scenario: Loopback Port Unassigned".into(),
+                guidance_tr: "Bu projeye henüz ayrık bir loopback portu tahsis edilmemiştir. Port tahsis etmek için projeyi durdurup yeniden başlatınız.".into(),
+            };
+        };
 
         // Scenario A: Branded Local Domain Resolved
         if domain_resolves {
@@ -281,9 +307,9 @@ impl ProjectRoutingEngine {
                 localhost_domain,
                 loopback_endpoint,
                 legacy_domain,
-                allocated_port,
+                allocated_port: Some(port),
                 resolution_status: DomainResolutionStatus::Resolved,
-                gateway_status: GatewayPortStatus::Active { port: allocated_port.unwrap_or(18081) },
+                gateway_status: GatewayPortStatus::Active { port },
                 effective_url: format!("http://{preferred_domain}"),
                 scenario: "Scenario A: Branded Local Domain Resolved".into(),
                 guidance_tr: format!("http://{preferred_domain} yerel adı başarıyla çözümlendi ve ağ geçidine yönlendirildi."),
@@ -291,18 +317,17 @@ impl ProjectRoutingEngine {
         }
 
         // Scenario B: DNS-Independent Loopback Fallback (Standard default when no /etc/hosts exists)
-        let effective_port = allocated_port.unwrap_or(8080);
         ProjectRoutingProfile {
             preferred_domain: preferred_domain.clone(),
             localhost_domain,
-            loopback_endpoint: format!("127.0.0.1:{effective_port}"),
+            loopback_endpoint: format!("127.0.0.1:{port}"),
             legacy_domain,
-            allocated_port,
+            allocated_port: Some(port),
             resolution_status: DomainResolutionStatus::NxDomain,
-            gateway_status: GatewayPortStatus::Active { port: effective_port },
-            effective_url: format!("http://127.0.0.1:{effective_port}/"),
+            gateway_status: GatewayPortStatus::Active { port },
+            effective_url: format!("http://127.0.0.1:{port}/"),
             scenario: "Scenario B: DNS-Independent Loopback Fallback".into(),
-            guidance_tr: format!("Yerel {preferred_domain} adı için DNS yapılandırılmamış (NXDOMAIN). Projeniz bağımsız loopback portu (http://127.0.0.1:{effective_port}/) üzerinden açılacaktır."),
+            guidance_tr: format!("Yerel {preferred_domain} adı için DNS yapılandırılmamış (NXDOMAIN). Projeniz bağımsız loopback portu (http://127.0.0.1:{port}/) üzerinden açılacaktır."),
         }
     }
 }
@@ -477,5 +502,17 @@ mod tests {
         );
         assert_eq!(profile_f.effective_url, "");
         assert!(profile_f.scenario.contains("Scenario F"));
+
+        // Scenario Unassigned: No loopback port allocated
+        let profile_unassigned =
+            ProjectRoutingEngine::compute_profile(&proj, None, true, true, true, false, None);
+        assert_eq!(profile_unassigned.effective_url, "");
+        assert_eq!(profile_unassigned.loopback_endpoint, "");
+        assert_eq!(profile_unassigned.allocated_port, None);
+        assert_eq!(
+            profile_unassigned.gateway_status,
+            GatewayPortStatus::Unassigned
+        );
+        assert!(profile_unassigned.scenario.contains("Unassigned"));
     }
 }

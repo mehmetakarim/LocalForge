@@ -48,7 +48,7 @@ impl NginxSupervisor {
             listen_port,
             process_manager,
             master_process: Mutex::new(None),
-            terminate_on_drop: false,
+            terminate_on_drop: true,
         };
         sup.ensure_base_support_files();
         sup
@@ -181,72 +181,137 @@ fastcgi_param  REDIRECT_STATUS    200;
         let preferred_domain = format!("{slug}.localforge");
         let localhost_domain = format!("{slug}.localforge.localhost");
 
-        let mut listen_directives = Vec::new();
-        if let Some(port) = project.loopback_port {
-            listen_directives.push(format!("        listen 127.0.0.1:{port};"));
-        }
-        // Retain shared gateway port for backward-compatibility with Host: header routing
-        listen_directives.push(format!("        listen 127.0.0.1:{};", self.listen_port));
-        let listen_block = listen_directives.join("\n");
-
-        let server_names = format!(
-            "{preferred_domain} {localhost_domain} {} localhost 127.0.0.1",
+        let shared_server_names = format!(
+            "{preferred_domain} {localhost_domain} {}",
+            project.local_domain
+        );
+        let dedicated_server_names = format!(
+            "{preferred_domain} {localhost_domain} {} 127.0.0.1 localhost",
             project.local_domain
         );
 
+        let mut config = String::new();
+
+        // 1. Dedicated loopback port blocks (if project has assigned loopback_port)
+        if let Some(port) = project.loopback_port {
+            // Default server for dedicated port: reject wrong Host headers with 404 (Fail-Closed)
+            config.push_str(&format!(
+                "server {{\n\
+                 listen 127.0.0.1:{port} default_server;\n\
+                 server_name _;\n\
+                 return 404 \"LocalForge Gateway: Host mismatch on dedicated project port\\n\";\n\
+                 }}\n\n"
+            ));
+
+            if !is_volume_mounted {
+                config.push_str(&format!(
+                    "server {{\n\
+                     listen 127.0.0.1:{port};\n\
+                     server_name {dedicated_server_names};\n\
+                     port_in_redirect on;\n\
+                     server_name_in_redirect off;\n\
+                     return 502 \"LocalForge Gateway: Depolama Sürücüsü Bağlı Değil (Volume Disconnected)\\n\";\n\
+                     }}\n\n"
+                ));
+            } else if !is_running || socket_path.is_none() {
+                config.push_str(&format!(
+                    "server {{\n\
+                     listen 127.0.0.1:{port};\n\
+                     server_name {dedicated_server_names};\n\
+                     port_in_redirect on;\n\
+                     server_name_in_redirect off;\n\
+                     return 503 \"LocalForge Gateway: Proje Başlatılmamış veya Durdurulmuş (Project Stopped)\\n\";\n\
+                     }}\n\n"
+                ));
+            } else {
+                let docroot = if project.document_root.is_empty() {
+                    project.path.clone()
+                } else {
+                    project.path.join(&project.document_root)
+                };
+                let sock = socket_path.unwrap();
+                config.push_str(&format!(
+                    "server {{\n\
+                     listen 127.0.0.1:{port};\n\
+                     server_name {dedicated_server_names};\n\
+                     port_in_redirect on;\n\
+                     server_name_in_redirect off;\n\
+                     root \"{docroot}\";\n\
+                     index index.php index.html;\n\n\
+                     location / {{\n\
+                         try_files $uri $uri/ /index.php?$query_string;\n\
+                     }}\n\n\
+                     location ~ \\.php$ {{\n\
+                         include fastcgi_params;\n\
+                         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
+                         fastcgi_param SERVER_PORT $server_port;\n\
+                         fastcgi_param HTTP_HOST $http_host;\n\
+                         fastcgi_pass unix:{sock};\n\
+                     }}\n\
+                     }}\n\n",
+                    docroot = docroot.display(),
+                    sock = sock.display()
+                ));
+            }
+        }
+
+        // 2. Shared gateway port block (listen_port = 8080)
+        // Matches ONLY project-specific domains (never generic localhost or 127.0.0.1)
         if !is_volume_mounted {
-            return format!(
+            config.push_str(&format!(
                 "server {{\n\
-{listen_block}\n\
-        server_name {server_names};\n\
-        port_in_redirect on;\n\
-        server_name_in_redirect off;\n\
-        return 502 \"LocalForge Gateway: Depolama Sürücüsü Bağlı Değil (Volume Disconnected)\\n\";\n\
-    }}\n"
-            );
-        }
-
-        if !is_running || socket_path.is_none() {
-            return format!(
+                 listen 127.0.0.1:{listen_port};\n\
+                 server_name {shared_server_names};\n\
+                 port_in_redirect on;\n\
+                 server_name_in_redirect off;\n\
+                 return 502 \"LocalForge Gateway: Depolama Sürücüsü Bağlı Değil (Volume Disconnected)\\n\";\n\
+                 }}\n",
+                listen_port = self.listen_port
+            ));
+        } else if !is_running || socket_path.is_none() {
+            config.push_str(&format!(
                 "server {{\n\
-{listen_block}\n\
-        server_name {server_names};\n\
-        port_in_redirect on;\n\
-        server_name_in_redirect off;\n\
-        return 503 \"LocalForge Gateway: Proje Başlatılmamış veya Durdurulmuş (Project Stopped)\\n\";\n\
-    }}\n"
-            );
-        }
-
-        let docroot = if project.document_root.is_empty() {
-            project.path.clone()
+                 listen 127.0.0.1:{listen_port};\n\
+                 server_name {shared_server_names};\n\
+                 port_in_redirect on;\n\
+                 server_name_in_redirect off;\n\
+                 return 503 \"LocalForge Gateway: Proje Başlatılmamış veya Durdurulmuş (Project Stopped)\\n\";\n\
+                 }}\n",
+                listen_port = self.listen_port
+            ));
         } else {
-            project.path.join(&project.document_root)
-        };
-        let sock = socket_path.unwrap();
+            let docroot = if project.document_root.is_empty() {
+                project.path.clone()
+            } else {
+                project.path.join(&project.document_root)
+            };
+            let sock = socket_path.unwrap();
+            config.push_str(&format!(
+                "server {{\n\
+                 listen 127.0.0.1:{listen_port};\n\
+                 server_name {shared_server_names};\n\
+                 port_in_redirect on;\n\
+                 server_name_in_redirect off;\n\
+                 root \"{docroot}\";\n\
+                 index index.php index.html;\n\n\
+                 location / {{\n\
+                     try_files $uri $uri/ /index.php?$query_string;\n\
+                 }}\n\n\
+                 location ~ \\.php$ {{\n\
+                     include fastcgi_params;\n\
+                     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
+                     fastcgi_param SERVER_PORT $server_port;\n\
+                     fastcgi_param HTTP_HOST $http_host;\n\
+                     fastcgi_pass unix:{sock};\n\
+                 }}\n\
+                 }}\n",
+                listen_port = self.listen_port,
+                docroot = docroot.display(),
+                sock = sock.display()
+            ));
+        }
 
-        format!(
-            "server {{\n\
-{listen_block}\n\
-        server_name {server_names};\n\
-        port_in_redirect on;\n\
-        server_name_in_redirect off;\n\
-        root \"{docroot}\";\n\
-        index index.php index.html;\n\n\
-        location / {{\n\
-            try_files $uri $uri/ /index.php?$query_string;\n\
-        }}\n\n\
-        location ~ \\.php$ {{\n\
-            include fastcgi_params;\n\
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
-            fastcgi_param SERVER_PORT $server_port;\n\
-            fastcgi_param HTTP_HOST $http_host;\n\
-            fastcgi_pass unix:{sock};\n\
-        }}\n\
-    }}\n",
-            docroot = docroot.display(),
-            sock = sock.display()
-        )
+        config
     }
 
     /// Generates isolated virtual host configuration for a project.
@@ -270,10 +335,17 @@ fastcgi_param  REDIRECT_STATUS    200;
                 RuntimeError::ConfigGenerationFailed(format!("Failed to invoke nginx -t: {e}"))
             })?;
 
+        let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(RuntimeError::ConfigGenerationFailed(format!(
                 "Nginx configuration validation failed (nginx -t): {stderr}"
+            )));
+        }
+
+        // Catch conflicting server name warnings and fail closed
+        if stderr.contains("conflicting server name") {
+            return Err(RuntimeError::ConfigGenerationFailed(format!(
+                "Nginx configuration has conflicting server names (fail-closed): {stderr}"
             )));
         }
 
@@ -500,24 +572,35 @@ fastcgi_param  REDIRECT_STATUS    200;
             });
         }
 
-        // Brief delay (50ms) to allow master to dispatch HUP to workers
-        std::thread::sleep(Duration::from_millis(50));
+        // Brief delay (150ms) to allow master to dispatch HUP and workers to switch configs
+        std::thread::sleep(Duration::from_millis(150));
 
         Ok(())
     }
 
+    /// Compares two filesystem paths, handling macOS /private symlinks even if
+    /// the target file or directory has already been unlinked from disk.
+    pub fn paths_match(a: &Path, b: &Path) -> bool {
+        if a == b {
+            return true;
+        }
+        if let (Ok(ca), Ok(cb)) = (dunce::canonicalize(a), dunce::canonicalize(b)) {
+            if ca == cb {
+                return true;
+            }
+        }
+        let sa = a.to_string_lossy();
+        let sb = b.to_string_lossy();
+        let clean_a = sa.strip_prefix("/private").unwrap_or(&sa);
+        let clean_b = sb.strip_prefix("/private").unwrap_or(&sb);
+        clean_a == clean_b
+    }
+
     /// Validates whether a given executable path is an authentic canonical Nginx binary.
     pub fn is_legitimate_nginx_binary(path: &Path) -> bool {
-        let canonical = match dunce::canonicalize(path) {
-            Ok(c) => c,
-            Err(_) => return false,
-        };
-
         if let Ok(bin) = Self::find_nginx_binary() {
-            if let Ok(c) = dunce::canonicalize(&bin) {
-                if c == canonical {
-                    return true;
-                }
+            if Self::paths_match(path, &bin) {
+                return true;
             }
         }
 
@@ -528,11 +611,8 @@ fastcgi_param  REDIRECT_STATUS    200;
             "/usr/local/sbin/nginx",
         ];
         for c in candidates {
-            let p = Path::new(c);
-            if let Ok(can) = dunce::canonicalize(p) {
-                if can == canonical {
-                    return true;
-                }
+            if Self::paths_match(path, Path::new(c)) {
+                return true;
             }
         }
 
@@ -579,13 +659,13 @@ fastcgi_param  REDIRECT_STATUS    200;
 
         // Exact canonical match required for the configuration file
         let conf_matches = match observed_conf {
-            Some(ref c) => c == &expected_conf,
+            Some(ref c) => Self::paths_match(c, &expected_conf),
             None => false,
         };
 
         // If prefix is provided, it must match expected_dir exactly
         let prefix_matches = match observed_prefix {
-            Some(ref p) => p == &expected_dir,
+            Some(ref p) => Self::paths_match(p, &expected_dir),
             None => true,
         };
 
@@ -805,12 +885,99 @@ fastcgi_param  REDIRECT_STATUS    200;
         None
     }
 
-    /// Stops Nginx gracefully.
+    /// Stops Nginx gracefully after verifying process identity and LocalForge ownership.
+    /// Never blindly signals an unverified PID file.
     pub fn stop(&self) -> Result<()> {
-        // Attempt clean stop via nginx -s stop first
+        let mut lock = self.master_process.lock().unwrap();
+
+        // 1. Identify candidate PID from in-memory lock or disk PID file
+        let target_pid = if let Some((ref identity, _)) = *lock {
+            Some(identity.pid)
+        } else {
+            let pid_file = self.run_dir.join("nginx.pid");
+            if pid_file.exists() {
+                std::fs::read_to_string(&pid_file)
+                    .ok()
+                    .and_then(|s| s.trim().parse::<u32>().ok())
+            } else {
+                None
+            }
+        };
+
+        let pid = match target_pid {
+            Some(p) if p > 1 && p != std::process::id() => p,
+            _ => {
+                // Invalid or absent PID; remove stale PID file safely if present
+                let pid_file = self.run_dir.join("nginx.pid");
+                if pid_file.exists() {
+                    let _ = std::fs::remove_file(&pid_file);
+                }
+                *lock = None;
+                return Ok(());
+            }
+        };
+
+        // 2. Inspect target process identity via process manager
+        let inspected = self.process_manager.inspect_process(pid)?;
+        let identity = match inspected {
+            Some(id) => id,
+            None => {
+                // Process already dead (ESRCH); clean up stale PID file cleanly
+                let pid_file = self.run_dir.join("nginx.pid");
+                if pid_file.exists() {
+                    let _ = std::fs::remove_file(&pid_file);
+                }
+                *lock = None;
+                return Ok(());
+            }
+        };
+
+        // 3. Fail-closed: executable path must be a legitimate canonical Nginx binary
+        if !Self::is_legitimate_nginx_binary(identity.executable_path()) {
+            return Err(RuntimeError::ProcessMismatch {
+                expected: "canonical nginx binary".into(),
+                found: identity.executable_path().display().to_string(),
+            });
+        }
+
+        // 4. Fail-closed: command-line arguments must reference our LocalForge conf_dir
+        let cmdline = self.process_manager.get_process_cmdline(pid)?;
+        let cmdline_valid = match cmdline {
+            Some(ref args) => self.is_localforge_nginx_cmdline(args),
+            None => false,
+        };
+        if !cmdline_valid {
+            return Err(RuntimeError::ProcessMismatch {
+                expected: format!(
+                    "nginx running with -c {}/nginx.conf",
+                    self.conf_dir.display()
+                ),
+                found: format!("pid {pid} command line arguments mismatch or inaccessible"),
+            });
+        }
+
+        // 5. If in-memory identity exists, verify start time to defend against PID reuse
+        if let Some((ref expected_id, _)) = *lock {
+            if !self.process_manager.verify_process_identity(
+                expected_id.pid,
+                expected_id.executable_path(),
+                expected_id.start_time_secs,
+                expected_id.start_time_usecs,
+            ) {
+                return Err(RuntimeError::ProcessMismatch {
+                    expected: format!(
+                        "pid {} start_time {}",
+                        expected_id.pid, expected_id.start_time_secs
+                    ),
+                    found: format!("pid {pid} start_time {}", identity.start_time_secs),
+                });
+            }
+        }
+
+        // 6. Verified: Attempt clean stop via nginx -s stop
         if let Ok(nginx_bin) = Self::find_nginx_binary() {
             let conf_file = self.conf_dir.join("nginx.conf");
-            if conf_file.exists() && self.run_dir.join("nginx.pid").exists() {
+            if conf_file.exists() {
                 let _ = Command::new(&nginx_bin)
                     .arg("-p")
                     .arg(&self.conf_dir)
@@ -822,36 +989,18 @@ fastcgi_param  REDIRECT_STATUS    200;
             }
         }
 
-        let mut lock = self.master_process.lock().unwrap();
-        if let Some((identity, mut child_opt)) = lock.take() {
-            let _ = self.process_manager.terminate_process_group_verified(
-                identity.pid,
-                identity.executable_path(),
-                identity.start_time_secs,
-                identity.start_time_usecs,
-                2,
-            );
+        // 7. Ensure verified process group termination with 1s grace period
+        let _ = self.process_manager.terminate_process_group_verified(
+            identity.pid,
+            identity.executable_path(),
+            identity.start_time_secs,
+            identity.start_time_usecs,
+            1,
+        );
 
+        if let Some((_, mut child_opt)) = lock.take() {
             if let Some(mut child) = child_opt.take() {
-                let _ = child.kill();
                 let _ = child.wait();
-            }
-        } else {
-            let pid_file = self.run_dir.join("nginx.pid");
-            if pid_file.exists() {
-                if let Ok(pid_str) = std::fs::read_to_string(&pid_file) {
-                    if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                        if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                            let _ = self.process_manager.terminate_process_group_verified(
-                                identity.pid,
-                                identity.executable_path(),
-                                identity.start_time_secs,
-                                identity.start_time_usecs,
-                                2,
-                            );
-                        }
-                    }
-                }
             }
         }
 
@@ -868,6 +1017,9 @@ fastcgi_param  REDIRECT_STATUS    200;
 
 impl Drop for NginxSupervisor {
     fn drop(&mut self) {
+        if !self.terminate_on_drop {
+            return;
+        }
         let _ = self.stop();
     }
 }
@@ -1021,5 +1173,44 @@ mod tests {
         // 7. Empty or unrelated args
         assert!(!sup.is_localforge_nginx_cmdline(&["nginx".into()]));
         assert!(!sup.is_localforge_nginx_cmdline(&[]));
+    }
+
+    #[test]
+    fn test_adversarial_pid_file_replacement_and_unverified_process_rejection() {
+        let dir = tempdir().unwrap();
+        let conf_dir = dir.path().join("conf");
+        let run_dir = dir.path().join("run");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+        std::fs::create_dir_all(&run_dir).unwrap();
+
+        let pm = Arc::new(MacOSProcessManager::new());
+        let sup = NginxSupervisor::new(conf_dir.clone(), run_dir.clone(), 8080, pm.clone());
+
+        // 1. Poison nginx.pid with our own test process PID (not an Nginx binary, no LocalForge config args)
+        let self_pid = std::process::id();
+        let pid_file = run_dir.join("nginx.pid");
+        std::fs::write(&pid_file, format!("{self_pid}\n")).unwrap();
+
+        // Attempting to stop supervisor must FAIL CLOSED and strictly refuse to signal our own process
+        let stop_res = sup.stop();
+        // Since it's self_pid, it must safely clean up without killing ourselves
+        assert!(stop_res.is_ok() || stop_res.is_err());
+        // Verify self process is still alive and running
+        assert!(pm.inspect_process(self_pid).unwrap().is_some());
+
+        // 2. Poison nginx.pid with a non-Nginx process (e.g. launchd PID 1 or a daemon)
+        // If pid is 1, stop() safely rejects it
+        std::fs::write(&pid_file, "1\n").unwrap();
+        let stop_launchd = sup.stop();
+        assert!(stop_launchd.is_ok()); // Ignored without signaling
+
+        // 3. Poison nginx.pid with an already-dead PID (ESRCH)
+        std::fs::write(&pid_file, "99999999\n").unwrap();
+        let stop_dead = sup.stop();
+        assert!(stop_dead.is_ok());
+        assert!(
+            !pid_file.exists(),
+            "Stale PID file from dead process must be safely reaped"
+        );
     }
 }

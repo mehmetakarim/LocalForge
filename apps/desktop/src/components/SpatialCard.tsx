@@ -167,7 +167,7 @@ export const SpatialCard: React.FC<SpatialCardProps> = ({
             <span className="truncate">{project.document_root || "public"}</span>
           </div>
           <div className="flex items-center gap-1 font-mono text-[10px] text-[#B7ADDF]">
-            <span>:{project.loopback_port || 8080}</span>
+            <span>{project.loopback_port ? `:${project.loopback_port}` : "Atanmadı"}</span>
           </div>
         </div>
 

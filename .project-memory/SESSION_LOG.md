@@ -818,3 +818,46 @@ This document records the chronological engineering log for all development sess
 - Real user `localforge.db` untouched; host `/etc/hosts` untouched; MariaDB datadir untouched.
 - Dedicated branch `phase-r1/r1-3b-uat-recovery` maintained without merging to `main`.
 - Concluding status: `LOCALFORGE GATE U5.B — ISOLATED IMPLEMENTATION COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`
+
+---
+
+## Session 021 — Phase R1.3B UAT Recovery — Gate U5.B1 Routing Security Hardening & Acceptance Closeout
+
+- **Date**: 2026-10-24
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.B1 — Routing Security Hardening & Acceptance Closeout** (Isolated Code & Test Environments Only)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Baseline Commit**: `55a965b7d3c9bbce975795181aa3f51bd10fd2e1`
+
+### Summary of Activities
+1. **Binding Decisions & Boundary Integrity**:
+   - `Decision PO-U5-01`: `Projetest` strictly preserved on PHP 8.4; zero host SQLite mutations; zero Homebrew modifications.
+   - `Decision PO-U5-02`: MariaDB datadir initialization strictly held; host untouched.
+   - `Decision PO-U5-03/04`: Complete elimination of unsafe port fallback to 8080.
+   - `Decision PO-U5-05`: LocalForge branded local domains preserved with fail-closed security.
+2. **Nginx Process Identity Safety & TOCTOU Defenses (B1-01, P0)**:
+   - Implemented 7-step pre-signal verification in `NginxSupervisor::stop()`: candidate PID $\le 1$ rejection, `proc_pidinfo` identity check, canonical binary verification, LocalForge `conf_dir` command-line argument validation, PID reuse start-time check, safe ESRCH stale PID reaping.
+   - Discovered and resolved macOS `/var/folders` vs `/private/var/folders` path symlink divergence using `paths_match` helper across path comparisons.
+   - Added adversarial PID replacement unit test: `test_adversarial_pid_file_replacement_and_unverified_process_rejection`.
+3. **Removal of Unsafe Port Fallback (B1-02, P0)**:
+   - Backend Rust `ProjectRoutingEngine`: returns `GatewayPortStatus::Unassigned`, empty `loopback_endpoint`, and empty `effective_url` when `loopback_port` is unassigned.
+   - Backend `ProjectRuntimeService`: reports `local_url` as `""` instead of fabricating 8080 when unassigned.
+   - Frontend `browserRouting.ts`: `computeProjectRouting` returns `canOpenBrowser: false`, `portStatus: "unassigned"`, `projectUrl: null` when port is missing/unassigned; validates range strictly `18081..=18999`.
+   - Frontend UI (`SpatialCard`, `ProjectInspector`, `RoutingAlertModal`, `App.tsx`): disables browser opening and direct endpoints on unassigned ports; shows explicit "Port Tahsis Edilmedi" status.
+4. **Nginx Shared-Port Host Isolation & Warning Elimination (B1-03, P1)**:
+   - Shared port 8080 block matches ONLY project-specific domains (`<slug>.localforge`, `<slug>.localforge.localhost`, `<local_domain>`), removing duplicate `localhost` and `127.0.0.1` entries to eliminate all `conflicting server name` warnings.
+   - Dedicated loopback port block includes `default_server` returning HTTP 404 (`Host mismatch on dedicated project port`) for foreign Host headers.
+   - `validate_configuration()` fails closed if `conflicting server name` warning occurs during `nginx -t`.
+5. **SQLite V2 Migration Integrity (B1-04, P1)**:
+   - Added `has_unique_index()` helper querying `PRAGMA index_list`.
+   - Hardened `migrate_to_v2_loopback_ports()`: detects and safely completes interrupted migrations; fails closed if pre-existing duplicate ports exist.
+   - Enforced bounds `(18081..=18999).contains(&port)` in `insert_project` and `update_project_loopback_port`.
+6. **Full Verification Suite (100% Pass)**:
+   - Cargo fmt check: 0 violations.
+   - Cargo clippy (`--workspace -- -D warnings`): 0 warnings.
+   - Rust unit & integration test suite: 100% pass (7 storage, 16 runtime unit, 14 runtime integration, 5 platform, 5 deployment, 3 MCP, 2 desktop lib).
+   - Desktop node test suite: 32/32 tests pass (`npm test --prefix apps/desktop`).
+   - Desktop build (`tsc && vite build`): clean build.
+7. **Deliverable & Closeout**:
+   - Authored `docs/phases/R1_3B_U5B1_ROUTING_SECURITY_CLOSEOUT.md`.
+   - Concluding status: `LOCALFORGE GATE U5.B1 — ROUTING SECURITY HARDENING COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`

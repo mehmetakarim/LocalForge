@@ -52,6 +52,26 @@ fn has_column(conn: &Connection, table: &str, column: &str) -> bool {
     false
 }
 
+fn has_unique_index(conn: &Connection, table: &str, index_name: &str) -> bool {
+    let mut stmt = match conn.prepare(&format!("PRAGMA index_list({table})")) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let Ok(rows) = stmt.query_map([], |row| {
+        let name: String = row.get(1)?;
+        let unique: i64 = row.get(2)?;
+        Ok((name, unique == 1))
+    }) else {
+        return false;
+    };
+    for item in rows.flatten() {
+        if item.0.eq_ignore_ascii_case(index_name) && item.1 {
+            return true;
+        }
+    }
+    false
+}
+
 impl MetadataStore {
     pub fn open(db_path: &Path) -> Result<Self> {
         if let Some(parent) = db_path.parent() {
@@ -147,7 +167,10 @@ impl MetadataStore {
         let mut conn = self.conn.lock().unwrap();
         let current_version = self_get_schema_version_locked(&conn)?;
 
-        if has_column(&conn, "projects", "loopback_port") {
+        let col_exists = has_column(&conn, "projects", "loopback_port");
+        let idx_exists = has_unique_index(&conn, "projects", "idx_projects_loopback_port");
+
+        if col_exists && idx_exists {
             let _ = conn.execute(
                 "INSERT OR IGNORE INTO schema_migrations (version, description, applied_at)
                  VALUES (2, 'Add loopback_port with unique index', datetime('now'));",
@@ -157,30 +180,50 @@ impl MetadataStore {
                 previous_version: current_version,
                 target_version: 2,
                 applied: false,
-                details: "Column loopback_port and index already exist (idempotent no-op).".into(),
+                details: "Column loopback_port and unique index already exist (idempotent no-op)."
+                    .into(),
             });
+        }
+
+        // If column exists but index doesn't (or partial migration), verify data integrity before indexing
+        if col_exists && !idx_exists {
+            let mut check_stmt = conn.prepare(
+                "SELECT loopback_port, COUNT(*) FROM projects WHERE loopback_port IS NOT NULL GROUP BY loopback_port HAVING COUNT(*) > 1"
+            ).map_err(|e| LocalForgeError::DatabaseError(format!("Failed to check for duplicate ports: {e}")))?;
+            let duplicate_exists = check_stmt.exists([]).unwrap_or(false);
+            if duplicate_exists {
+                return Err(LocalForgeError::DatabaseError(
+                    "Cannot apply unique index idx_projects_loopback_port: duplicate loopback_port values exist in projects table (fail-closed schema conflict).".into()
+                ));
+            }
         }
 
         let tx = conn.transaction().map_err(|e| {
             LocalForgeError::DatabaseError(format!("Failed to begin migration transaction: {e}"))
         })?;
 
-        tx.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
-            .map_err(|e| {
-                LocalForgeError::DatabaseError(format!("Failed to add loopback_port column: {e}"))
-            })?;
+        if !col_exists {
+            tx.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                .map_err(|e| {
+                    LocalForgeError::DatabaseError(format!(
+                        "Failed to add loopback_port column: {e}"
+                    ))
+                })?;
+        }
 
-        tx.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_loopback_port
-             ON projects(loopback_port)
-             WHERE loopback_port IS NOT NULL;",
-            [],
-        )
-        .map_err(|e| {
-            LocalForgeError::DatabaseError(format!(
-                "Failed to create unique index on loopback_port: {e}"
-            ))
-        })?;
+        if !idx_exists {
+            tx.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_loopback_port
+                 ON projects(loopback_port)
+                 WHERE loopback_port IS NOT NULL;",
+                [],
+            )
+            .map_err(|e| {
+                LocalForgeError::DatabaseError(format!(
+                    "Failed to create unique index on loopback_port: {e}"
+                ))
+            })?;
+        }
 
         tx.execute(
             "INSERT OR REPLACE INTO schema_migrations (version, description, applied_at)
@@ -258,6 +301,14 @@ impl MetadataStore {
     }
 
     pub fn insert_project(&self, project: &ProjectRecord) -> Result<()> {
+        if let Some(port) = project.loopback_port {
+            if !(18081..=18999).contains(&port) {
+                return Err(LocalForgeError::Validation(format!(
+                    "Port {port} is outside permitted LocalForge loopback range (18081..=18999)."
+                )));
+            }
+        }
+
         let conn = self.conn.lock().unwrap();
         if has_column(&conn, "projects", "loopback_port") {
             conn.execute(
@@ -446,7 +497,8 @@ impl MetadataStore {
     }
 
     /// Persists or clears a project's dedicated loopback port.
-    /// Rejects ports below 1024 or above 65535, and enforces database uniqueness.
+    /// Strictly validates that port falls within permitted unprivileged range (18081..=18999),
+    /// and enforces database uniqueness.
     pub fn update_project_loopback_port(&self, id: &ProjectId, port: Option<u16>) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         if !has_column(&conn, "projects", "loopback_port") {
@@ -456,9 +508,9 @@ impl MetadataStore {
         }
 
         if let Some(p) = port {
-            if p < 1024 {
+            if !(18081..=18999).contains(&p) {
                 return Err(LocalForgeError::Validation(format!(
-                    "Privileged port {p} (<1024) cannot be assigned as unprivileged loopback port."
+                    "Port {p} is outside permitted LocalForge loopback range (18081..=18999)."
                 )));
             }
         }
@@ -631,9 +683,19 @@ mod tests {
         assert_eq!(fetched_with_port.loopback_port, Some(18081));
         assert!(store.is_port_allocated_in_db(18081).unwrap());
 
-        // Rejection of privileged port (< 1024)
-        let priv_res = store.update_project_loopback_port(&proj1.id, Some(80));
-        assert!(priv_res.is_err());
+        // Rejection of ports outside range (18081..=18999)
+        assert!(store
+            .update_project_loopback_port(&proj1.id, Some(80))
+            .is_err());
+        assert!(store
+            .update_project_loopback_port(&proj1.id, Some(8080))
+            .is_err());
+        assert!(store
+            .update_project_loopback_port(&proj1.id, Some(18080))
+            .is_err());
+        assert!(store
+            .update_project_loopback_port(&proj1.id, Some(19000))
+            .is_err());
 
         // Conflict check: second project cannot take port 18081
         let proj2 = ProjectRecord {
@@ -671,5 +733,55 @@ mod tests {
         let after_rb = store.get_project(&proj1.id).unwrap().unwrap();
         assert_eq!(after_rb.name, "Project One");
         assert_eq!(after_rb.loopback_port, None);
+    }
+
+    #[test]
+    fn test_interrupted_migration_recovery_and_duplicate_detection() {
+        let store = MetadataStore::open_in_memory().unwrap();
+
+        // Simulate interrupted migration: column added, but index creation never executed
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                .unwrap();
+            assert!(has_column(&conn, "projects", "loopback_port"));
+            assert!(!has_unique_index(
+                &conn,
+                "projects",
+                "idx_projects_loopback_port"
+            ));
+        }
+
+        // Running migration should recover cleanly by creating the missing unique index
+        let report = store.migrate_to_v2_loopback_ports().unwrap();
+        assert!(report.applied);
+
+        {
+            let conn = store.conn.lock().unwrap();
+            assert!(has_unique_index(
+                &conn,
+                "projects",
+                "idx_projects_loopback_port"
+            ));
+        }
+
+        // Test fail-closed behavior when duplicates exist before indexing
+        let store2 = MetadataStore::open_in_memory().unwrap();
+        {
+            let conn = store2.conn.lock().unwrap();
+            conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                .unwrap();
+            // Insert two rows with identical loopback_port
+            conn.execute(
+                "INSERT INTO projects (id, name, path, volume_uuid, document_root, php_version, local_domain, status, created_at, updated_at, loopback_port)
+                 VALUES ('p1', 'P1', '/path1', 'v1', '', '8.4', 'p1.test', 'stopped', 'now', 'now', 18081),
+                        ('p2', 'P2', '/path2', 'v2', '', '8.4', 'p2.test', 'stopped', 'now', 'now', 18081)",
+                [],
+            ).unwrap();
+        }
+
+        // Migration must fail closed rather than corrupting or discarding data
+        let fail_res = store2.migrate_to_v2_loopback_ports();
+        assert!(fail_res.is_err());
     }
 }
