@@ -6,11 +6,11 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.B2 Final Acceptance Patch — Completed / Awaiting PO Final Acceptance**
+- **Current State**: **Gate U5.E Real Mac Activation Preflight & Migration Plan — Completed / Awaiting PO Activation Approval**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf`
-- **CI Baseline**: Run `40123012479` — SUCCESS (100% Green on macOS Apple Silicon)
+- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf` (Code), `c24f81ef69c10bc6368d57813a07ce1e1a533421` (Docs)
+- **CI Baseline**: Run `40123012479` (Code & Tests) & Run `40123183411` (Docs & Memory) — SUCCESS (100% Green on macOS Apple Silicon)
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
@@ -26,12 +26,16 @@
   - **Gate U5.B (Isolated Loopback Routing)**: COMPLETED (Commit `55a965b`).
   - **Gate U5.B1 (Routing Security Hardening)**: COMPLETED (Commit `032ba2a`, CI `40100159014`).
   - **Gate U5.B2 (Final Process Safety & Routing Acceptance)**: COMPLETED (Commit `55225d1`, CI `40114186966`).
-- **Completed in Gate U5.B2 Final Acceptance Patch**:
-  - `Finding 01 PID Reuse and Signal Delivery Verification (P0)`: Canonical `signal_process_verified` abstraction in `ProcessManager` revalidating UID, path, and microsecond start time (`tv_usec`) immediately before `libc::kill`; clean handling of `libc::ESRCH` and `libc::EPERM`; bounded graceful shutdown (1s); worker group teardown via `terminate_process_group_verified`; post-termination master dead check before removing `nginx.pid`; adversarial tests covering process exit and process replacement.
-  - `Finding 02 Project Identity & HTTP Readiness Verification (P1)`: Added zero-touch `/__localforge_health` endpoint to Nginx vhost returning `{"status":"ready","project_id":"<id>","port":<port>}` with `X-LocalForge-Project-Id` response header; two-stage readiness probe in `verify_browser_readiness`; rejection of Gateway Host Mismatch strings; acceptance of 4xx only after identity proven; complete removal of blind fallback retry with `Host: 127.0.0.1`.
-  - `Finding 03 Strict Multi-PID Listener Ownership Verification (P1)`: Generalized `check_listener_health(port)` scrutinizing all listening PIDs for exact canonical binary, cmdline `-c`/`-p`, and start time; immediate `PortConflict` on foreign or mixed ownership; integrated into Layer 3; adversarial listener tests.
-  - `Test Verification`: 100% test coverage verified across Rust workspace (69/69 tests PASS) and Node desktop suite (33/33 tests PASS). Clippy clean (0 warnings, `-D warnings`). Rust fmt clean (0 diffs). Deliverable report: `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
-- **Next Permitted Action**: Await Product Owner final acceptance of Gate U5.B2 Patch before initiating Gate U5.C. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
+  - **Gate U5.B2 Final Acceptance Patch**: COMPLETED & ACCEPTED (Commit `0954d49`, CI `40123012479`).
+- **Completed in Gate U5.E (Real Mac Activation Preflight & Migration Plan)**:
+  - `Read-Only Real Host Audit`: Verified macOS M1 Darwin 27.0.0, external APFS volume (`7E26530E-5179-414C-81B5-6FBDB429FC65`), Application Support directory, and Schema V1 database (12KB, WAL/SHM). Zero database writes performed.
+  - `Project Records Verification`: Confirmed `r1_acceptance_project` (PHP 8.5, degraded) and `Projetest` (PHP 8.4 preserved, stopped).
+  - `Daemon & Port Audit`: Verified Nginx PID 39566 (port 8080) and PHP-FPM PID 59625; identified ports 18097/18098 occupied by test instances; 916 candidate ports free in `18081..=18999`.
+  - `DNS Resolution Audit`: Verified native RFC 6761 `.localhost` loopback resolution without `/etc/hosts`.
+  - `SQLite WAL Backup Protocol`: Formulated online atomic `.backup` / `VACUUM INTO` procedure flushing WAL frames safely.
+  - `Controlled Activation & Rollback Plan`: Formulated 4-checkpoint migration procedure (V2 migration, port assignment 18081/18082, dual-port vhost), Safari/Chrome acceptance matrix, fail-closed rollback protocol.
+  - Deliverable report: `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md`.
+- **Next Permitted Action**: Await Product Owner explicit activation approval of Gate U5.E before modifying `localforge.db`, assigning ports, or reloading Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---
 

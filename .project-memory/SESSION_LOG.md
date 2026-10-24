@@ -950,3 +950,42 @@ This document records the chronological engineering log for all development sess
 6. **Deliverable & Closeout**:
    - Updated `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
    - Concluding status: `LOCALFORGE U5.B2 FINAL PATCH COMPLETE — AWAITING PRODUCT OWNER ACCEPTANCE.`
+
+
+---
+
+## Session 024 — Phase R1.3B UAT Recovery — Gate U5.E Real Mac Activation Preflight & Migration Plan
+
+- **Date**: 2026-10-24
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.E — Real-Host Read-Only Preflight & Controlled Migration Plan**
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Verified Code Baseline**: Commit `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf`
+- **Verified Documentation Baseline**: Commit `c24f81ef69c10bc6368d57813a07ce1e1a533421`
+- **CI Baseline**: Run `40123012479` (Code & Tests) & Run `40123183411` (Docs & Memory) — SUCCESS
+
+### Summary of Activities
+1. **Binding Decisions & Boundary Integrity**:
+   - Strictly read-only preflight; zero writes executed against persistent `localforge.db`.
+   - `Decision PO-U5-01`: Project `Projetest` verified to retain PHP 8.4; zero automatic migrations.
+   - `Decision PO-U5-02`: Host MariaDB datadir verified completely uninitialized (0 files, 64 bytes).
+   - Zero host network modifications, zero package installations, zero process terminations.
+2. **Real-Host Environment Audit**:
+   - Host platform: macOS Apple Silicon M1 (Darwin 27.0.0, arm64).
+   - Database inventory: `localforge.db` (12,288 B), `localforge.db-shm` (32,768 B), `localforge.db-wal` (8,272 B).
+   - SQLite integrity check: `PRAGMA integrity_check` -> `ok`. Current schema is Schema V1 (10 columns, no loopback_port).
+   - Volume UUID: `7E26530E-5179-414C-81B5-6FBDB429FC65` verified matching APFS external SSD.
+   - Project Records: Record 1 (`r1_acceptance_project`, PHP 8.5, degraded) and Record 2 (`Projetest`, PHP 8.4, stopped) verified on disk.
+   - Daemon Inspection: Active Nginx master PID 39566 on 127.0.0.1:8080 (`nginx -t` successful); active PHP-FPM master PID 59625.
+   - Port Scrutiny: Ports 18097 and 18098 occupied by test Nginx instances; 916 candidate ports (18081..18096, 18099..18999) free.
+   - DNS Resolution: Native `.localhost` RFC 6761 loopback resolution confirmed without `/etc/hosts` changes.
+3. **SQLite Consistency Strategy**:
+   - Documented WAL/SHM backup requirements and established online atomic backup procedure via `.backup` / `VACUUM INTO`.
+   - Outlined verification drill with `PRAGMA integrity_check` and row count validation.
+4. **Controlled Migration & Rollback Sequence**:
+   - Formulated 4-checkpoint migration procedure (backup lock, schema V2 migration, deterministic port assignment [18081/18082], dual-port vhost generation).
+   - Documented real-browser acceptance matrix across Safari and Chrome.
+   - Defined fail-closed rollback procedures.
+5. **Deliverable & Closeout**:
+   - Authored `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md`.
+   - Concluding status: `LOCALFORGE GATE U5.E — PREFLIGHT COMPLETE. AWAITING PRODUCT OWNER ACTIVATION APPROVAL.`

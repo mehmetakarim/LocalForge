@@ -177,13 +177,21 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5B2-03** | Six-Layer Browser Readiness Verification (P1) | High | COMPLETED | Desktop/Backend Eng | Gate U5.B2 Auth | Discrete 6-layer health probe (`verify_browser_readiness`); IPC command in Tauri; UI gate in `App.tsx` preventing broken 502/503 browser launches with Turkish error toasts; unit and integration test coverage |
 | **TASK-R1.3B-U5B2-04** | Final Verification Suite & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B2-01..03 | 66/66 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
 
-### Subphase R1.3B-U5.B2-Patch: U5.B2 Final Acceptance Patch (COMPLETED / AWAITING PO ACCEPTANCE)
+### Subphase R1.3B-U5.B2-Patch: U5.B2 Final Acceptance Patch (COMPLETED / ACCEPTED IN U5.E BASELINE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-PATCH-01** | PID Reuse & Verified Signaling Abstraction (Finding 01, P0) | Critical | COMPLETED | Security Specialist | PO U5.B2 Patch Auth | Canonical `signal_process_verified` abstraction in `ProcessManager` revalidating UID, path, microsecond start time; clean handling of ESRCH/EPERM; bounded graceful wait; post-termination dead verification; adversarial exit/reuse tests |
 | **TASK-R1.3B-PATCH-02** | Identity-Aware Nginx Health & Host Mismatch Rejection (Finding 02, P1) | Critical | COMPLETED | Systems Engineer | PO U5.B2 Patch Auth | Zero-touch `/__localforge_health` endpoint returning JSON `project_id` and header; two-stage readiness probe in `verify_browser_readiness`; rejection of Gateway Host Mismatch strings; acceptance of 4xx only after identity proven; removed blind fallback |
 | **TASK-R1.3B-PATCH-03** | Multi-PID Listener Ownership Scrutiny (Finding 03, P1) | High | COMPLETED | Senior Rust Eng | PO U5.B2 Patch Auth | Generalized `check_listener_health(port)` scrutinizing all listening PIDs for exact binary, cmdline `-c`/`-p`, and start time; immediate `PortConflict` on foreign or mixed ownership; integrated into Layer 3; adversarial listener tests |
 | **TASK-R1.3B-PATCH-04** | Master Patch Verification Suite & Closeout Report | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-PATCH-01..03 | 69/69 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; updated `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
+
+### Subphase R1.3B-U5.E: Real Mac Activation Preflight & Migration Plan (COMPLETED / AWAITING PO ACTIVATION APPROVAL)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5E-01** | Real-Host Environment & Database Preflight (Read-Only) | Critical | COMPLETED | Systems Engineer | PO Gate U5.E Auth | Read-only inspection of macOS M1 environment, Application Support, Schema V1 database (12KB, WAL/SHM), and 2 project records; APFS volume UUID verification (`7E26530E-5179-414C-81B5-6FBDB429FC65`) |
+| **TASK-R1.3B-U5E-02** | SQLite WAL/SHM Backup & Consistency Protocol | Critical | COMPLETED | Database Architect | Gate U5.E Auth | Established online atomic `.backup` procedure flushing WAL frames safely; verification drill with `integrity_check` and row count checks |
+| **TASK-R1.3B-U5E-03** | Runtime Daemon & Port Range 18081..18999 Preflight | High | COMPLETED | Systems Engineer | Gate U5.E Auth | Audited Nginx PID 39566 (port 8080) and PHP-FPM PID 59625; identified test Nginx instances on ports 18097/18098; confirmed 916 available candidate ports |
+| **TASK-R1.3B-U5E-04** | Controlled Activation, Browser Matrix & Rollback Plan | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5E-01..03 | Formulated step-by-step activation procedure (Schema V2 migration, port assignment 18081/18082, dual-port vhost), Safari/Chrome acceptance matrix, fail-closed rollback protocol; authored `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md` |
 
 ---
 
