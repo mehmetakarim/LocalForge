@@ -6,11 +6,11 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.E Real Mac Activation Preflight & Migration Plan — Completed / Awaiting PO Activation Approval**
+- **Current State**: **Gate U5.E Activation Runbook Reconciled — Completed / Awaiting PO Explicit Activation Approval**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf` (Code), `c24f81ef69c10bc6368d57813a07ce1e1a533421` (Docs)
-- **CI Baseline**: Run `40123012479` (Code & Tests) & Run `40123183411` (Docs & Memory) — SUCCESS (100% Green on macOS Apple Silicon)
+- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf` (Code), `86cb93b2a0c49741e4da250495eb5a6e70908866` (Docs)
+- **CI Baseline**: Run `40123012479` (Code & Tests) & Run `40140575584` (Preflight & Plan) — SUCCESS (100% Green on macOS Apple Silicon)
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
