@@ -1072,6 +1072,14 @@ fn test_browser_readiness_verification_across_layers() {
     drop(dummy_listener);
 
     // 4. Legitimate project startup and readiness verification
+    let fpm_exists = PhpFpmSupervisor::find_php_fpm_binary("any").is_ok();
+    let nginx_exists = NginxSupervisor::find_nginx_binary().is_ok();
+
+    if !fpm_exists || !nginx_exists {
+        eprintln!("Skipping live daemon readiness portion: php-fpm or nginx missing on host");
+        return;
+    }
+
     let site_dir = dir.path().join("real_site");
     std::fs::create_dir_all(&site_dir).unwrap();
     std::fs::write(site_dir.join("index.php"), "<?php echo 'READINESS_OK'; ?>").unwrap();
