@@ -3,7 +3,8 @@
 
 **Gate:** U5.B2 — Final Process Safety, Identity & Routing Acceptance  
 **Branch:** `phase-r1/r1-3b-uat-recovery`  
-**Base Commit:** `55225d168f9e95ea3688d744663b2b154d94504d`  
+**Base Commit:** `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf`  
+**CI Baseline:** Run `40123012479` — SUCCESS (100% Green on macOS Apple Silicon)  
 **Status:** IMPLEMENTATION & PATCH COMPLETE — 100% VERIFICATION PASSED  
 **Author:** Antigravity (Lead Architect)  
 **Date:** 2026-10-24  

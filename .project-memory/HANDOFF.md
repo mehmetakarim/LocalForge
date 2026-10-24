@@ -9,8 +9,8 @@
 - **Current State**: **Gate U5.B2 Final Acceptance Patch — Completed / Awaiting PO Final Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `55225d168f9e95ea3688d744663b2b154d94504d`
-- **CI Baseline**: Run `40114186966` — SUCCESS
+- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf`
+- **CI Baseline**: Run `40123012479` — SUCCESS (100% Green on macOS Apple Silicon)
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
