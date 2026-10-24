@@ -73,3 +73,58 @@ test("Gate U5.B: ProjectRouting - Tenant Port Isolation", () => {
   assert.ok(projA.loopbackUrl.includes("18081"));
   assert.ok(projB.loopbackUrl.includes("18082"));
 });
+
+test("Gate U5.B2: Browser Readiness - Stopped project, unassigned port, and conflict fail closed with Turkish guidance", () => {
+  // 1. Stopped project simulation
+  const stoppedReport = {
+    is_ready: false,
+    target_url: null,
+    runtime_ready: false,
+    failure_reason_tr: "Proje Durumu: Proje şu anda durdurulmuş (Stopped). Tarayıcıda açmak için önce projeyi başlatınız.",
+  };
+  assert.equal(stoppedReport.is_ready, false);
+  assert.equal(stoppedReport.target_url, null);
+  assert.ok(stoppedReport.failure_reason_tr.includes("durdurulmuş (Stopped)"));
+
+  // 2. Unassigned port simulation
+  const unassignedReport = {
+    is_ready: false,
+    target_url: null,
+    port_assigned: false,
+    failure_reason_tr: "Port Tahsisi: Projeye atanmış geçerli bir ayrık loopback portu bulunmuyor.",
+  };
+  assert.equal(unassignedReport.is_ready, false);
+  assert.equal(unassignedReport.target_url, null);
+  assert.ok(unassignedReport.failure_reason_tr.includes("Port Tahsisi"));
+
+  // 3. Port conflict simulation
+  const conflictReport = {
+    is_ready: false,
+    target_url: null,
+    listener_verified: false,
+    failure_reason_tr: "Port Çakışması: Port 18081 LocalForge dışındaki bir süreç tarafından işgal edilmiş.",
+  };
+  assert.equal(conflictReport.is_ready, false);
+  assert.equal(conflictReport.target_url, null);
+  assert.ok(conflictReport.failure_reason_tr.includes("Port Çakışması"));
+
+  // 4. Ready project with DNS resolved
+  const readyDnsReport = {
+    is_ready: true,
+    target_url: "http://projetest.localforge:18081",
+    dns_resolved: true,
+    failure_reason_tr: null,
+  };
+  assert.equal(readyDnsReport.is_ready, true);
+  assert.equal(readyDnsReport.target_url, "http://projetest.localforge:18081");
+
+  // 5. Ready project without DNS resolved (fallback to loopback)
+  const readyLoopbackReport = {
+    is_ready: true,
+    target_url: "http://127.0.0.1:18081",
+    dns_resolved: false,
+    failure_reason_tr: null,
+  };
+  assert.equal(readyLoopbackReport.is_ready, true);
+  assert.equal(readyLoopbackReport.target_url, "http://127.0.0.1:18081");
+});

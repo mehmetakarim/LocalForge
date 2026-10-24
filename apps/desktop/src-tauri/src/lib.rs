@@ -395,6 +395,18 @@ fn check_domain_resolution(domain: String) -> Result<bool, String> {
     }
 }
 
+#[tauri::command]
+fn verify_browser_readiness(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<localforge_core::BrowserReadinessReport, String> {
+    let project_id = ProjectId::from_string(id);
+    state
+        .runtime_service
+        .verify_browser_readiness(&project_id)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base = localforge_runtime::resolve_application_support_dir()
@@ -471,7 +483,8 @@ pub fn run() {
             stop_service,
             get_runtime_overview,
             check_domain_resolution,
-            get_project_routing
+            get_project_routing,
+            verify_browser_readiness
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalForge application");

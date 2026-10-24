@@ -861,3 +861,46 @@ This document records the chronological engineering log for all development sess
 7. **Deliverable & Closeout**:
    - Authored `docs/phases/R1_3B_U5B1_ROUTING_SECURITY_CLOSEOUT.md`.
    - Concluding status: `LOCALFORGE GATE U5.B1 — ROUTING SECURITY HARDENING COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`
+
+---
+
+## Session 022 — Phase R1.3B UAT Recovery — Gate U5.B2 Final Process Safety & Routing Acceptance
+
+- **Date**: 2026-10-24
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.B2 — Final Process Safety & Routing Acceptance** (Narrowly Scoped Security Closeout)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Baseline Commit**: `032ba2a036bb059902cdbdcf20b24508afce6b34`
+
+### Summary of Activities
+1. **Binding Decisions & Boundary Integrity**:
+   - `Decision PO-U5-01`: `Projetest` strictly preserved on PHP 8.4; zero host SQLite mutations; zero Homebrew modifications.
+   - `Decision PO-U5-02`: MariaDB datadir initialization strictly held; host untouched.
+   - `Decision PO-U5-03/04`: Complete elimination of unsafe port fallback; port range `18081..=18999` strictly enforced.
+   - `Decision PO-U5-05`: LocalForge branded local domains preserved with fail-closed security.
+2. **Nginx PID File TOCTOU Elimination (Finding 01, P0)**:
+   - Completely eradicated unsafe `nginx -s stop` command from `NginxSupervisor::stop()`, eliminating vulnerability where Nginx independently rereads disk PID file.
+   - Direct signaling via POSIX `libc::kill(identity.pid, SIGQUIT)` followed by 100ms grace period and verified process group teardown (`terminate_process_group_verified`).
+   - Added support in `is_localforge_nginx_cmdline` for macOS `ngx_setproctitle` rewritten proctitles (`"nginx: master process ..."`), safely parsing flags with spaces.
+   - Authored and verified adversarial test `test_adversarial_pid_file_replacement_after_verification_does_not_signal_replacement`.
+3. **SQLite Index Definition Integrity Verification (Finding 02, P1)**:
+   - Defined `IndexValidationStatus { Missing, Valid, Incompatible(String) }`.
+   - Implemented `validate_loopback_port_index` inspecting `PRAGMA index_list`, `PRAGMA index_info`, and `sqlite_master` DDL for column name (`loopback_port`), uniqueness, single-column constraint, and partial predicate (`WHERE loopback_port IS NOT NULL`).
+   - Enforced fail-closed behavior in `migrate_to_v2_loopback_ports()` on incompatible index definitions without modifying data.
+   - Added unit test `test_incompatible_index_definitions_fail_closed_without_modifying_data` covering wrong column, non-unique, missing WHERE clause, and multi-column index definitions.
+4. **Six-Layer Browser Readiness Verification (Finding 03, P1)**:
+   - Added `BrowserReadinessReport` in `crates/core/src/types.rs`.
+   - Implemented `verify_browser_readiness` in `ProjectRuntimeService` verifying 6 discrete layers: (1) DNS resolution, (2) Assigned project port, (3) Verified LocalForge listener ownership, (4) Nginx/vhost configuration, (5) Project runtime readiness (Running, PHP-FPM pool & socket alive), (6) HTTP response (200/redirects, not 502/503).
+   - Added integration test `test_browser_readiness_verification_across_layers` in `runtime_integration_test.rs`.
+   - Exposed `verify_browser_readiness` in Tauri IPC command (`apps/desktop/src-tauri/src/lib.rs`).
+   - Wired `handleOpenBrowser()` in `apps/desktop/src/App.tsx` to verify readiness before launching browser, displaying descriptive Turkish error toasts if blocked.
+   - Added unit tests in `apps/desktop/test/r1_3b_u5b_routing.test.mjs`.
+5. **Full Verification Suite (100% Pass)**:
+   - Cargo fmt check: 0 violations.
+   - Cargo clippy (`--workspace -- -D warnings`): 0 warnings.
+   - Cargo workspace test suite (`cargo test --workspace -- --test-threads=1`): 66 passed, 0 failed (%100 PASS).
+   - Desktop node test suite: 33/33 tests pass (`npm test --prefix apps/desktop`).
+   - Desktop build (`tsc && vite build`): clean build.
+6. **Deliverable & Closeout**:
+   - Authored `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
+   - Concluding status: `LOCALFORGE GATE U5.B2 — AWAITING PRODUCT OWNER FINAL SECURITY ACCEPTANCE.`

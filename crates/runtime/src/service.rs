@@ -3,7 +3,7 @@ use crate::health::probe_http_health;
 use crate::mariadb::{DatabaseHealthStatus, MariaDbSupervisor};
 use crate::nginx::NginxSupervisor;
 use crate::php::PhpFpmSupervisor;
-use localforge_core::{ProjectId, ProjectStatus};
+use localforge_core::{BrowserReadinessReport, ProjectId, ProjectStatus};
 use localforge_platform::{ProcessManager, VolumeManager};
 use localforge_storage::{MetadataStore, VolumeBarrier};
 use serde::{Deserialize, Serialize};
@@ -435,6 +435,219 @@ impl ProjectRuntimeService {
             false, // Domain resolution checked separately by client/host probe
             None,
         ))
+    }
+
+    /// Evaluates the 6 discrete readiness layers required before safely opening an external browser:
+    /// 1. DNS resolution for .localforge domain
+    /// 2. Assigned dedicated project loopback port (18081..=18999)
+    /// 3. Verified LocalForge listener ownership on port
+    /// 4. Nginx / vhost configuration existence and syntax
+    /// 5. Project runtime readiness (PHP-FPM pool & socket alive)
+    /// 6. Correct project HTTP response (200/redirects, not 502/503)
+    pub fn verify_browser_readiness(
+        &self,
+        project_id: &ProjectId,
+    ) -> Result<BrowserReadinessReport> {
+        let store = self.metadata_store();
+        let project = store
+            .get_project(project_id)?
+            .ok_or_else(|| RuntimeError::ProjectNotFound(project_id.0.clone()))?;
+
+        let slug = crate::routing::ProjectRoutingEngine::slugify(&project.name);
+        let preferred_domain = format!("{slug}.localforge");
+
+        let mut layer_failures = Vec::new();
+
+        // Layer 1: DNS Resolution
+        let dns_resolved = {
+            use std::net::ToSocketAddrs;
+            let target = format!("{preferred_domain}:80");
+            target
+                .to_socket_addrs()
+                .map(|mut addrs| addrs.any(|a| a.ip().is_loopback()))
+                .unwrap_or(false)
+        };
+        if !dns_resolved {
+            layer_failures.push(format!(
+                "DNS Çözümleme: '{preferred_domain}' yerel alan adı çözümlenemiyor (mDNS / .localforge çözücü aktif değil)."
+            ));
+        }
+
+        // Layer 2: Assigned Project Port
+        let port_assigned = match project.loopback_port {
+            Some(p) => (18081..=18999).contains(&p),
+            None => false,
+        };
+        if !port_assigned {
+            layer_failures.push(
+                "Port Tahsisi: Projeye atanmış geçerli bir ayrık loopback portu bulunmuyor (18081..=18999 aralığında olmalıdır).".into()
+            );
+        }
+
+        // Layer 3: Verified LocalForge Listener Ownership
+        let mut listener_verified = false;
+        if let Some(port) = project.loopback_port {
+            if port_assigned {
+                match self.process_manager.find_listening_pids(port) {
+                    Ok(pids) if !pids.is_empty() => {
+                        let mut has_verified_nginx = false;
+                        let mut foreign_pid = None;
+                        for &pid in &pids {
+                            if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
+                                if NginxSupervisor::is_legitimate_nginx_binary(
+                                    identity.executable_path(),
+                                ) {
+                                    has_verified_nginx = true;
+                                    break;
+                                } else {
+                                    foreign_pid = Some(pid);
+                                }
+                            }
+                        }
+                        if has_verified_nginx {
+                            listener_verified = true;
+                        } else {
+                            layer_failures.push(format!(
+                                "Port Çakışması: Port {port} LocalForge dışındaki bir süreç (PID {:?}) tarafından işgal edilmiş.",
+                                foreign_pid.unwrap_or(pids[0])
+                            ));
+                        }
+                    }
+                    Ok(_) => {
+                        layer_failures.push(format!(
+                            "Ağ Dinleyicisi: Port {port} üzerinde dinleyen aktif bir Nginx ağ geçidi bulunmuyor."
+                        ));
+                    }
+                    Err(e) => {
+                        layer_failures.push(format!("Ağ Dinleyicisi Denetimi Başarısız: {e}"));
+                    }
+                }
+            }
+        }
+
+        // Layer 4: Nginx / VHost Configuration
+        let vhost_configured = {
+            let conf_file = self
+                .nginx_supervisor
+                .conf_dir()
+                .join("conf.d")
+                .join(format!("{}.conf", project.id.0));
+            if conf_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&conf_file) {
+                    content.contains(&project.local_domain)
+                        && project
+                            .loopback_port
+                            .is_some_and(|p| content.contains(&format!("listen 127.0.0.1:{p}")))
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+        if !vhost_configured {
+            layer_failures.push(
+                "VirtualHost Yapılandırması: Nginx sanal ana bilgisayar yapılandırması mevcut değil veya port eşleşmiyor.".into()
+            );
+        }
+
+        // Layer 5: Project Runtime Readiness
+        let is_running = project.status == ProjectStatus::Running;
+        let fpm_alive = self.php_supervisor.is_pool_alive(&project.id);
+        let sock_path = self.php_supervisor.socket_path(&project.id);
+        let socket_alive = crate::health::is_unix_socket_alive(&sock_path);
+
+        let runtime_ready = is_running && fpm_alive && socket_alive;
+        if !runtime_ready {
+            if project.status == ProjectStatus::Stopped {
+                layer_failures.push(
+                    "Proje Durumu: Proje şu anda durdurulmuş (Stopped). Tarayıcıda açmak için önce projeyi başlatınız.".into()
+                );
+            } else if !fpm_alive || !socket_alive {
+                layer_failures.push(
+                    "Çalışma Zamanı: PHP-FPM servis havuzu veya FastCGI soketi aktif değil.".into(),
+                );
+            } else {
+                layer_failures.push(format!(
+                    "Proje Durumu: Proje çalışma zamanı hazır değil (Mevcut durum: {}).",
+                    project.status
+                ));
+            }
+        }
+
+        // Layer 6: Correct Project HTTP Response Probe
+        let mut http_status = None;
+        let mut http_probe_ok = false;
+        if port_assigned && listener_verified && runtime_ready {
+            let port = project.loopback_port.unwrap();
+            let probe_res = probe_http_health(port, &project.local_domain, "/");
+            let probe_res = if probe_res.is_err() {
+                probe_http_health(port, "127.0.0.1", "/")
+            } else {
+                probe_res
+            };
+
+            match probe_res {
+                Ok((code, body)) => {
+                    http_status = Some(code);
+                    if (200..=399).contains(&code) || code == 404 || code == 403 {
+                        http_probe_ok = true;
+                    } else if code == 502 {
+                        layer_failures.push(format!(
+                            "HTTP Yanıtı: Nginx 502 Bad Gateway döndürdü (PHP-FPM upstream bağlantısı kurulamıyor). Detay: {body}"
+                        ));
+                    } else if code == 503 {
+                        layer_failures.push(
+                            "HTTP Yanıtı: Nginx 503 Service Unavailable döndürdü (Proje durdurulmuş veya soket yanıt vermiyor).".into()
+                        );
+                    } else {
+                        layer_failures.push(format!(
+                            "HTTP Yanıtı: Sunucu beklenmeyen hata kodu döndürdü (HTTP {code})."
+                        ));
+                    }
+                }
+                Err(e) => {
+                    layer_failures.push(format!("HTTP Sağlık Probu Başarısız: {e}"));
+                }
+            }
+        }
+
+        let is_ready = port_assigned
+            && listener_verified
+            && vhost_configured
+            && runtime_ready
+            && http_probe_ok;
+
+        let target_url = if is_ready {
+            let port = project.loopback_port.unwrap();
+            if dns_resolved {
+                Some(format!("http://{preferred_domain}:{port}"))
+            } else {
+                Some(format!("http://127.0.0.1:{port}"))
+            }
+        } else {
+            None
+        };
+
+        let failure_reason_tr = if is_ready {
+            None
+        } else {
+            Some(layer_failures.join(" | "))
+        };
+
+        Ok(BrowserReadinessReport {
+            is_ready,
+            target_url,
+            dns_resolved,
+            port_assigned,
+            port: project.loopback_port,
+            listener_verified,
+            vhost_configured,
+            runtime_ready,
+            http_status,
+            failure_reason_tr,
+            layer_failures,
+        })
     }
 
     /// Returns verified runtime health status for a project.

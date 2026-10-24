@@ -54,6 +54,10 @@ impl NginxSupervisor {
         sup
     }
 
+    pub fn conf_dir(&self) -> &Path {
+        &self.conf_dir
+    }
+
     /// Discovers Nginx binary on macOS.
     pub fn find_nginx_binary() -> Result<PathBuf> {
         let candidates = vec![
@@ -632,27 +636,60 @@ fastcgi_param  REDIRECT_STATUS    200;
         let mut observed_conf: Option<PathBuf> = None;
         let mut observed_prefix: Option<PathBuf> = None;
 
-        let mut iter = args.iter().peekable();
-        while let Some(arg) = iter.next() {
-            if arg == "-c" {
-                if let Some(next) = iter.next() {
-                    let p = PathBuf::from(next);
+        // Check if Nginx rewrote its argv[0] into a single proctitle string (via ngx_setproctitle)
+        // e.g. "nginx: master process /opt/homebrew/bin/nginx -p /dir -c /dir/nginx.conf"
+        for arg in args {
+            if arg.starts_with("nginx: master process") || arg.contains(" -c ") {
+                if let Some(idx_c) = arg.find(" -c ") {
+                    let after_c = &arg[idx_c + 4..];
+                    let conf_str = if let Some(next_flag) = after_c.find(" -") {
+                        &after_c[..next_flag]
+                    } else {
+                        after_c
+                    }
+                    .trim();
+                    let p = PathBuf::from(conf_str);
                     observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
                 }
-            } else if let Some(stripped) = arg.strip_prefix("-c") {
-                if !stripped.is_empty() {
-                    let p = PathBuf::from(stripped);
-                    observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
-                }
-            } else if arg == "-p" {
-                if let Some(next) = iter.next() {
-                    let p = PathBuf::from(next);
+
+                if let Some(idx_p) = arg.find(" -p ") {
+                    let after_p = &arg[idx_p + 4..];
+                    let prefix_str = if let Some(next_flag) = after_p.find(" -") {
+                        &after_p[..next_flag]
+                    } else {
+                        after_p
+                    }
+                    .trim();
+                    let p = PathBuf::from(prefix_str);
                     observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
                 }
-            } else if let Some(stripped) = arg.strip_prefix("-p") {
-                if !stripped.is_empty() {
-                    let p = PathBuf::from(stripped);
-                    observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
+                break;
+            }
+        }
+
+        if observed_conf.is_none() {
+            let mut iter = args.iter().peekable();
+            while let Some(arg) = iter.next() {
+                if arg == "-c" {
+                    if let Some(next) = iter.next() {
+                        let p = PathBuf::from(next);
+                        observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
+                    }
+                } else if let Some(stripped) = arg.strip_prefix("-c") {
+                    if !stripped.is_empty() {
+                        let p = PathBuf::from(stripped);
+                        observed_conf = Some(dunce::canonicalize(&p).unwrap_or(p));
+                    }
+                } else if arg == "-p" {
+                    if let Some(next) = iter.next() {
+                        let p = PathBuf::from(next);
+                        observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
+                    }
+                } else if let Some(stripped) = arg.strip_prefix("-p") {
+                    if !stripped.is_empty() {
+                        let p = PathBuf::from(stripped);
+                        observed_prefix = Some(dunce::canonicalize(&p).unwrap_or(p));
+                    }
                 }
             }
         }
@@ -974,20 +1011,16 @@ fastcgi_param  REDIRECT_STATUS    200;
             }
         }
 
-        // 6. Verified: Attempt clean stop via nginx -s stop
-        if let Ok(nginx_bin) = Self::find_nginx_binary() {
-            let conf_file = self.conf_dir.join("nginx.conf");
-            if conf_file.exists() {
-                let _ = Command::new(&nginx_bin)
-                    .arg("-p")
-                    .arg(&self.conf_dir)
-                    .arg("-c")
-                    .arg(&conf_file)
-                    .arg("-s")
-                    .arg("stop")
-                    .status();
-            }
+        // 6. Verified Graceful Shutdown:
+        // Send SIGQUIT (Nginx graceful stop) directly to the verified master PID.
+        // We strictly DO NOT execute `nginx -s stop`, because Nginx's external CLI rereads
+        // the mutable PID file from disk, which introduces a critical TOCTOU signal vulnerability.
+        unsafe {
+            let _ = libc::kill(identity.pid as libc::pid_t, libc::SIGQUIT);
         }
+
+        // Brief delay (100ms) for workers to drain active connections and master to exit cleanly
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
         // 7. Ensure verified process group termination with 1s grace period
         let _ = self.process_manager.terminate_process_group_verified(
@@ -1173,6 +1206,18 @@ mod tests {
         // 7. Empty or unrelated args
         assert!(!sup.is_localforge_nginx_cmdline(&["nginx".into()]));
         assert!(!sup.is_localforge_nginx_cmdline(&[]));
+
+        // 8. macOS Nginx rewritten proctitle (ngx_setproctitle where argv[0] contains full command string)
+        let proctitle_args = vec![
+            format!("nginx: master process /opt/homebrew/bin/nginx -p {dir_str} -c {conf_str}"),
+            "".into(),
+            "".into(),
+            "".into(),
+        ];
+        assert!(
+            sup.is_localforge_nginx_cmdline(&proctitle_args),
+            "Nginx proctitle rewritten argv must be correctly parsed and verified"
+        );
     }
 
     #[test]
@@ -1211,6 +1256,60 @@ mod tests {
         assert!(
             !pid_file.exists(),
             "Stale PID file from dead process must be safely reaped"
+        );
+    }
+
+    #[test]
+    fn test_adversarial_pid_file_replacement_after_verification_does_not_signal_replacement() {
+        let dir = tempdir().unwrap();
+        let conf_dir = dir.path().join("conf");
+        let run_dir = dir.path().join("run");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+        std::fs::create_dir_all(&run_dir).unwrap();
+
+        let pm = Arc::new(MacOSProcessManager::new());
+        let test_port = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let p = l.local_addr().unwrap().port();
+            drop(l);
+            p
+        };
+        let sup = NginxSupervisor::new(conf_dir.clone(), run_dir.clone(), test_port, pm.clone());
+
+        // Spawn real Nginx
+        let spawn_res = sup.ensure_running_and_reloaded();
+        if spawn_res.is_err() {
+            // If Nginx binary is not available or port cannot be bound in CI environment, skip gracefully
+            return;
+        }
+
+        let pid_file = run_dir.join("nginx.pid");
+        assert!(pid_file.exists());
+        let real_pid = sup
+            .get_gateway_identity()
+            .expect("Master identity must exist")
+            .pid;
+
+        // Adversarial tampering: Overwrite nginx.pid with launchd PID (1)
+        // In the vulnerable code, `nginx -s stop` would reread nginx.pid and attempt to signal PID 1!
+        std::fs::write(&pid_file, "1\n").unwrap();
+
+        // Stop supervisor
+        let stop_res = sup.stop();
+        assert!(
+            stop_res.is_ok(),
+            "Supervisor stop must succeed cleanly: {stop_res:?}"
+        );
+
+        // Real Nginx process must be dead
+        assert!(
+            pm.inspect_process(real_pid).unwrap().is_none(),
+            "Real Nginx process must be terminated"
+        );
+        // Port must be freed
+        assert!(
+            is_port_available(test_port),
+            "Port must be freed after stop"
         );
     }
 }

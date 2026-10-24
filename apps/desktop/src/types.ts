@@ -70,3 +70,17 @@ export interface RuntimeOverview {
 }
 
 export type ViewMode = "studio" | "projects" | "services" | "storage" | "deployments" | "mcp" | "settings";
+
+export interface BrowserReadinessReport {
+  is_ready: boolean;
+  target_url: string | null;
+  dns_resolved: boolean;
+  port_assigned: boolean;
+  port: number | null;
+  listener_verified: boolean;
+  vhost_configured: boolean;
+  runtime_ready: boolean;
+  http_status: number | null;
+  failure_reason_tr: string | null;
+  layer_failures: string[];
+}

@@ -956,3 +956,117 @@ fn test_r1_3b_live_domain_routing_acceptance_and_isolation() {
     let _ = service.stop_project(&proj_b.id);
     let _ = service.stop_gateway();
 }
+
+#[test]
+fn test_browser_readiness_verification_across_layers() {
+    let dir = tempdir().unwrap();
+    let runtime_base = dir.path().join("runtime");
+    let store = Arc::new(MetadataStore::open_in_memory().unwrap());
+    let _ = store.migrate_to_v2_loopback_ports().unwrap();
+
+    let vm = Arc::new(MacOSVolumeManager::new());
+    let vb = Arc::new(VolumeBarrier::new(vm.clone()));
+    let pm = Arc::new(MacOSProcessManager::new());
+
+    let test_port = {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let p = l.local_addr().unwrap().port();
+        drop(l);
+        p
+    };
+
+    let service = ProjectRuntimeService::create_default(
+        runtime_base,
+        store.clone(),
+        vm,
+        vb,
+        pm.clone(),
+        test_port,
+    );
+
+    // 1. Unassigned port project
+    let proj_unassigned = ProjectRecord {
+        id: ProjectId::from_string("proj_unassigned"),
+        name: "Unassigned Project".into(),
+        path: dir.path().join("unassigned"),
+        volume_uuid: VolumeId::new("VOL-1"),
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "unassigned.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-24T00:00:00Z".into(),
+        updated_at: "2026-10-24T00:00:00Z".into(),
+        loopback_port: None,
+    };
+    store.insert_project(&proj_unassigned).unwrap();
+
+    let report_unassigned = service
+        .verify_browser_readiness(&proj_unassigned.id)
+        .unwrap();
+    assert!(
+        !report_unassigned.is_ready,
+        "Unassigned project must not be ready"
+    );
+    assert!(!report_unassigned.port_assigned);
+    assert_eq!(report_unassigned.target_url, None);
+    assert!(report_unassigned
+        .failure_reason_tr
+        .unwrap()
+        .contains("Port Tahsisi"));
+
+    // 2. Stopped project (with port assigned)
+    let proj_stopped = ProjectRecord {
+        id: ProjectId::from_string("proj_stopped"),
+        name: "Stopped Project".into(),
+        path: dir.path().join("stopped"),
+        volume_uuid: VolumeId::new("VOL-2"),
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "stopped.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-24T00:00:00Z".into(),
+        updated_at: "2026-10-24T00:00:00Z".into(),
+        loopback_port: Some(18090),
+    };
+    store.insert_project(&proj_stopped).unwrap();
+
+    let report_stopped = service.verify_browser_readiness(&proj_stopped.id).unwrap();
+    assert!(
+        !report_stopped.is_ready,
+        "Stopped project must not be ready"
+    );
+    assert!(report_stopped.port_assigned);
+    assert!(!report_stopped.runtime_ready);
+    assert_eq!(report_stopped.target_url, None);
+    assert!(report_stopped
+        .failure_reason_tr
+        .unwrap()
+        .contains("Proje Durumu: Proje şu anda durdurulmuş (Stopped)"));
+
+    // 3. Port conflict scenario (simulate port occupied by an external dummy TCP listener)
+    let occupied_port = 18091;
+    let dummy_listener = std::net::TcpListener::bind(format!("127.0.0.1:{occupied_port}")).unwrap();
+    let proj_conflict = ProjectRecord {
+        id: ProjectId::from_string("proj_conflict"),
+        name: "Conflict Project".into(),
+        path: dir.path().join("conflict"),
+        volume_uuid: VolumeId::new("VOL-3"),
+        document_root: "".into(),
+        php_version: "8.4".into(),
+        local_domain: "conflict.test".into(),
+        status: ProjectStatus::Running,
+        created_at: "2026-10-24T00:00:00Z".into(),
+        updated_at: "2026-10-24T00:00:00Z".into(),
+        loopback_port: Some(occupied_port),
+    };
+    store.insert_project(&proj_conflict).unwrap();
+
+    let report_conflict = service.verify_browser_readiness(&proj_conflict.id).unwrap();
+    assert!(
+        !report_conflict.is_ready,
+        "Conflict project must not be ready"
+    );
+    assert!(!report_conflict.listener_verified);
+    assert_eq!(report_conflict.target_url, None);
+    drop(dummy_listener);
+}

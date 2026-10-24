@@ -141,3 +141,20 @@ pub struct ProjectRoutingProfile {
     pub scenario: String,
     pub guidance_tr: String,
 }
+
+/// Detailed multi-layer browser readiness report evaluating end-to-end routing integrity
+/// across all 6 architectural layers before launching an external browser.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowserReadinessReport {
+    pub is_ready: bool,
+    pub target_url: Option<String>,
+    pub dns_resolved: bool,
+    pub port_assigned: bool,
+    pub port: Option<u16>,
+    pub listener_verified: bool,
+    pub vhost_configured: bool,
+    pub runtime_ready: bool,
+    pub http_status: Option<u16>,
+    pub failure_reason_tr: Option<String>,
+    pub layer_failures: Vec<String>,
+}

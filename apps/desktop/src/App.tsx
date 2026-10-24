@@ -17,7 +17,7 @@ import { ImportProjectModal } from "./components/ImportProjectModal";
 import { RoutingAlertModal } from "./components/RoutingAlertModal";
 import { WelcomeSplash } from "./components/WelcomeSplash";
 import { ErrorState } from "./components/ErrorState";
-import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode } from "./types";
+import { ProjectRecord, VolumeInfo, RuntimeOverview, ViewMode, BrowserReadinessReport } from "./types";
 import { getVisualFixture } from "./fixtures/visualFixtures";
 import { computeProjectRouting } from "./utils/browserRouting";
 
@@ -210,44 +210,51 @@ export const App: React.FC = () => {
   };
 
   const handleOpenBrowser = async (project: ProjectRecord) => {
-    const port = runtime?.nginx_port || 8080;
-    const routing = computeProjectRouting(
-      project.local_domain,
-      port,
-      project.name,
-      project.loopback_port
-    );
-
-    if (!routing.canOpenBrowser || !routing.loopbackUrl) {
-      setErrorMsg(
-        routing.portStatus === "unassigned"
-          ? `"${project.name}" projesine henüz ayrık bir loopback portu tahsis edilmemiştir. Port tahsis etmek için önce projeyi başlatınız.`
-          : `"${project.name}" projesinin port numarası (${project.loopback_port}) geçersiz (18081..18999 aralığında olmalıdır).`
-      );
-      return;
-    }
-
-    const slug = project.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    const preferredDomain = `${slug}.localforge`;
-
-    let isResolvable = false;
     try {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-        isResolvable = await invoke<boolean>("check_domain_resolution", {
-          domain: preferredDomain,
+        const report = await invoke<BrowserReadinessReport>("verify_browser_readiness", {
+          id: project.id,
         });
-      } else {
-        isResolvable = false;
-      }
-    } catch (err) {
-      console.error("Domain resolution check failed:", err);
-      isResolvable = false;
-    }
 
-    if (isResolvable && routing.preferredUrl) {
-      window.open(routing.preferredUrl, "_blank");
-    } else {
-      window.open(routing.loopbackUrl, "_blank");
+        if (report.is_ready && report.target_url) {
+          window.open(report.target_url, "_blank");
+        } else {
+          setErrorMsg(
+            report.failure_reason_tr ||
+              `"${project.name}" projesinin yönlendirme katmanları henüz hazır değil. Lütfen önce projeyi başlatınız.`
+          );
+        }
+      } else {
+        // Fallback for mock/test/fixture environment
+        if (project.status !== "running") {
+          setErrorMsg(
+            `"${project.name}" projesi şu anda durdurulmuş (Stopped). Tarayıcıda açmak için önce projeyi başlatınız.`
+          );
+          return;
+        }
+
+        const port = runtime?.nginx_port || 8080;
+        const routing = computeProjectRouting(
+          project.local_domain,
+          port,
+          project.name,
+          project.loopback_port
+        );
+
+        if (!routing.canOpenBrowser || !routing.loopbackUrl) {
+          setErrorMsg(
+            routing.portStatus === "unassigned"
+              ? `"${project.name}" projesine henüz ayrık bir loopback portu tahsis edilmemiştir. Port tahsis etmek için önce projeyi başlatınız.`
+              : `"${project.name}" projesinin port numarası (${project.loopback_port}) geçersiz (18081..18999 aralığında olmalıdır).`
+          );
+          return;
+        }
+
+        window.open(routing.loopbackUrl, "_blank");
+      }
+    } catch (err: any) {
+      console.error("Tarayıcı hazırlık denetimi başarısız:", err);
+      setErrorMsg(`Tarayıcı hazırlık denetimi başarısız: ${err?.message || String(err)}`);
     }
   };
 

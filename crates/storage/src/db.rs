@@ -52,24 +52,104 @@ fn has_column(conn: &Connection, table: &str, column: &str) -> bool {
     false
 }
 
-fn has_unique_index(conn: &Connection, table: &str, index_name: &str) -> bool {
-    let mut stmt = match conn.prepare(&format!("PRAGMA index_list({table})")) {
-        Ok(s) => s,
-        Err(_) => return false,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexValidationStatus {
+    /// Index does not exist.
+    Missing,
+    /// Index exists, is UNIQUE, partial (WHERE loopback_port IS NOT NULL), and indexes exactly [loopback_port].
+    Valid,
+    /// Index exists but has conflicting or incompatible schema definition.
+    Incompatible(String),
+}
+
+/// Fully validates the schema definition of the `idx_projects_loopback_port` index.
+/// Checks uniqueness, partial predicate existence, indexed column name, and DDL integrity.
+pub fn validate_loopback_port_index(conn: &Connection) -> Result<IndexValidationStatus> {
+    let mut stmt = conn
+        .prepare("PRAGMA index_list('projects')")
+        .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
+
+    let index_entries: Vec<(String, i64, i64)> = stmt
+        .query_map([], |row| {
+            let name: String = row.get(1)?;
+            let unique: i64 = row.get(2)?;
+            let partial: i64 = row.get(4)?;
+            Ok((name, unique, partial))
+        })
+        .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let target_entry = index_entries
+        .into_iter()
+        .find(|(name, _, _)| name.eq_ignore_ascii_case("idx_projects_loopback_port"));
+
+    let Some((index_name, unique, partial)) = target_entry else {
+        return Ok(IndexValidationStatus::Missing);
     };
-    let Ok(rows) = stmt.query_map([], |row| {
-        let name: String = row.get(1)?;
-        let unique: i64 = row.get(2)?;
-        Ok((name, unique == 1))
-    }) else {
-        return false;
-    };
-    for item in rows.flatten() {
-        if item.0.eq_ignore_ascii_case(index_name) && item.1 {
-            return true;
-        }
+
+    if unique != 1 {
+        return Ok(IndexValidationStatus::Incompatible(format!(
+            "Index '{index_name}' is not UNIQUE (unique={unique})"
+        )));
     }
-    false
+
+    if partial != 1 {
+        return Ok(IndexValidationStatus::Incompatible(format!(
+            "Index '{index_name}' is not partial (partial={partial}, missing WHERE clause)"
+        )));
+    }
+
+    // Inspect indexed columns
+    let mut info_stmt = conn
+        .prepare(&format!("PRAGMA index_info('{index_name}')"))
+        .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
+
+    let columns: Vec<String> = info_stmt
+        .query_map([], |row| row.get::<_, String>(2))
+        .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if columns.as_slice() != ["loopback_port"] {
+        return Ok(IndexValidationStatus::Incompatible(format!(
+            "Index '{index_name}' indexes columns {columns:?}, expected exactly ['loopback_port']"
+        )));
+    }
+
+    // Inspect DDL in sqlite_master
+    let mut master_stmt = conn
+        .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name=?1")
+        .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
+
+    let ddl_sql: Option<String> = master_stmt
+        .query_row([&index_name], |row| row.get(0))
+        .unwrap_or(None);
+
+    if let Some(sql) = ddl_sql {
+        let norm = sql.to_ascii_lowercase();
+        if !norm.contains("where")
+            || !norm.contains("loopback_port")
+            || !norm.contains("is not null")
+        {
+            return Ok(IndexValidationStatus::Incompatible(format!(
+                "Index '{index_name}' definition lacks valid 'WHERE loopback_port IS NOT NULL' predicate: {sql}"
+            )));
+        }
+    } else {
+        return Ok(IndexValidationStatus::Incompatible(format!(
+            "Index '{index_name}' definition not found in sqlite_master"
+        )));
+    }
+
+    Ok(IndexValidationStatus::Valid)
+}
+
+pub fn has_unique_index(conn: &Connection, _table: &str, _index_name: &str) -> bool {
+    matches!(
+        validate_loopback_port_index(conn),
+        Ok(IndexValidationStatus::Valid)
+    )
 }
 
 impl MetadataStore {
@@ -168,25 +248,35 @@ impl MetadataStore {
         let current_version = self_get_schema_version_locked(&conn)?;
 
         let col_exists = has_column(&conn, "projects", "loopback_port");
-        let idx_exists = has_unique_index(&conn, "projects", "idx_projects_loopback_port");
+        let idx_status = validate_loopback_port_index(&conn)?;
 
-        if col_exists && idx_exists {
-            let _ = conn.execute(
-                "INSERT OR IGNORE INTO schema_migrations (version, description, applied_at)
-                 VALUES (2, 'Add loopback_port with unique index', datetime('now'));",
-                [],
-            );
-            return Ok(MigrationReport {
-                previous_version: current_version,
-                target_version: 2,
-                applied: false,
-                details: "Column loopback_port and unique index already exist (idempotent no-op)."
-                    .into(),
-            });
+        match idx_status {
+            IndexValidationStatus::Incompatible(reason) => {
+                return Err(LocalForgeError::DatabaseError(format!(
+                    "Incompatible index schema detected: {reason}. Migration failed closed without modifying data."
+                )));
+            }
+            IndexValidationStatus::Valid => {
+                if col_exists {
+                    let _ = conn.execute(
+                        "INSERT OR IGNORE INTO schema_migrations (version, description, applied_at)
+                         VALUES (2, 'Add loopback_port with unique index', datetime('now'));",
+                        [],
+                    );
+                    return Ok(MigrationReport {
+                        previous_version: current_version,
+                        target_version: 2,
+                        applied: false,
+                        details: "Column loopback_port and unique index already exist (idempotent no-op)."
+                            .into(),
+                    });
+                }
+            }
+            IndexValidationStatus::Missing => {}
         }
 
         // If column exists but index doesn't (or partial migration), verify data integrity before indexing
-        if col_exists && !idx_exists {
+        if col_exists {
             let mut check_stmt = conn.prepare(
                 "SELECT loopback_port, COUNT(*) FROM projects WHERE loopback_port IS NOT NULL GROUP BY loopback_port HAVING COUNT(*) > 1"
             ).map_err(|e| LocalForgeError::DatabaseError(format!("Failed to check for duplicate ports: {e}")))?;
@@ -211,7 +301,7 @@ impl MetadataStore {
                 })?;
         }
 
-        if !idx_exists {
+        if idx_status == IndexValidationStatus::Missing {
             tx.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_loopback_port
                  ON projects(loopback_port)
@@ -783,5 +873,110 @@ mod tests {
         // Migration must fail closed rather than corrupting or discarding data
         let fail_res = store2.migrate_to_v2_loopback_ports();
         assert!(fail_res.is_err());
+    }
+
+    #[test]
+    fn test_incompatible_index_definitions_fail_closed_without_modifying_data() {
+        // Scenario A: Index on wrong column (e.g. indexed on 'name' instead of 'loopback_port')
+        {
+            let store = MetadataStore::open_in_memory().unwrap();
+            {
+                let conn = store.conn.lock().unwrap();
+                conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                    .unwrap();
+                conn.execute(
+                    "CREATE UNIQUE INDEX idx_projects_loopback_port ON projects(name) WHERE loopback_port IS NOT NULL;",
+                    [],
+                )
+                .unwrap();
+                let status = validate_loopback_port_index(&conn).unwrap();
+                assert!(matches!(status, IndexValidationStatus::Incompatible(_)));
+            }
+            let res = store.migrate_to_v2_loopback_ports();
+            assert!(
+                res.is_err(),
+                "Migration must fail closed on wrong-column index definition"
+            );
+            assert_eq!(
+                store.get_schema_version().unwrap(),
+                1,
+                "Schema version must not advance"
+            );
+        }
+
+        // Scenario B: Non-unique index
+        {
+            let store = MetadataStore::open_in_memory().unwrap();
+            {
+                let conn = store.conn.lock().unwrap();
+                conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                    .unwrap();
+                conn.execute(
+                    "CREATE INDEX idx_projects_loopback_port ON projects(loopback_port) WHERE loopback_port IS NOT NULL;",
+                    [],
+                )
+                .unwrap();
+                let status = validate_loopback_port_index(&conn).unwrap();
+                assert!(
+                    matches!(status, IndexValidationStatus::Incompatible(ref msg) if msg.contains("not UNIQUE"))
+                );
+            }
+            let res = store.migrate_to_v2_loopback_ports();
+            assert!(
+                res.is_err(),
+                "Migration must fail closed on non-unique index"
+            );
+            assert_eq!(store.get_schema_version().unwrap(), 1);
+        }
+
+        // Scenario C: Non-partial index (missing WHERE predicate)
+        {
+            let store = MetadataStore::open_in_memory().unwrap();
+            {
+                let conn = store.conn.lock().unwrap();
+                conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                    .unwrap();
+                conn.execute(
+                    "CREATE UNIQUE INDEX idx_projects_loopback_port ON projects(loopback_port);",
+                    [],
+                )
+                .unwrap();
+                let status = validate_loopback_port_index(&conn).unwrap();
+                assert!(
+                    matches!(status, IndexValidationStatus::Incompatible(ref msg) if msg.contains("not partial"))
+                );
+            }
+            let res = store.migrate_to_v2_loopback_ports();
+            assert!(
+                res.is_err(),
+                "Migration must fail closed on non-partial index missing WHERE clause"
+            );
+            assert_eq!(store.get_schema_version().unwrap(), 1);
+        }
+
+        // Scenario D: Multi-column index
+        {
+            let store = MetadataStore::open_in_memory().unwrap();
+            {
+                let conn = store.conn.lock().unwrap();
+                conn.execute("ALTER TABLE projects ADD COLUMN loopback_port INTEGER;", [])
+                    .unwrap();
+                conn.execute(
+                    "CREATE UNIQUE INDEX idx_projects_loopback_port ON projects(loopback_port, name) WHERE loopback_port IS NOT NULL;",
+                    [],
+                )
+                .unwrap();
+                let status = validate_loopback_port_index(&conn).unwrap();
+                assert!(
+                    matches!(status, IndexValidationStatus::Incompatible(ref msg) if msg.contains("indexes columns"))
+                );
+            }
+            let res = store.migrate_to_v2_loopback_ports();
+            assert!(
+                res.is_err(),
+                "Migration must fail closed on multi-column index"
+            );
+            assert_eq!(store.get_schema_version().unwrap(), 1);
+        }
     }
 }

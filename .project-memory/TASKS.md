@@ -160,7 +160,7 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5B-05** | Desktop UI & Tauri IPC Routing Integration | High | COMPLETED | Desktop Lead | TASK-R1.3B-U5B-04 | `ProjectInspector` routing display with 1-click copy, `SpatialCard` preferred domain + port, direct unblocked browser open in `App.tsx` |
 | **TASK-R1.3B-U5B-06** | Test Suite Verification & Master Report | Critical | COMPLETED | QA Lead | TASK-R1.3B-U5B-01..05 | Rust workspace tests + 30 frontend tests PASS; master implementation report `docs/phases/R1_3B_U5B_LOOPBACK_IMPLEMENTATION_REPORT.md` |
 
-### Subphase R1.3B-U5.B1: Routing Security Hardening & Acceptance Closeout (COMPLETED / AWAITING PO ACCEPTANCE)
+### Subphase R1.3B-U5.B1: Routing Security Hardening & Acceptance Closeout (COMPLETED / ACCEPTED IN U5.B2 BASELINE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-U5B1-01** | Nginx Process Identity Safety & Pre-Signal Verification (P0) | Critical | COMPLETED | Security Specialist | Gate U5.B1 Auth | 7-step pre-signal verification; canonical binary path & cmdline check; PID reuse start-time protection; safe ESRCH stale PID reaping; `paths_match` macOS /private symlink normalization; adversarial PID replacement tests |
@@ -168,6 +168,14 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5B1-03** | Nginx Shared-Port Host Isolation & Duplicate Name Elimination (P1) | High | COMPLETED | Systems Engineer | Gate U5.B1 Auth | Dedicated port default server 404 mismatch; shared 8080 block matches only project domains; removed generic localhost/127.0.0.1 from 8080 vhosts; `nginx -t` conflicting server name fail-closed validation |
 | **TASK-R1.3B-U5B1-04** | SQLite V2 Migration Integrity & Fault Tolerance (P1) | High | COMPLETED | Database Architect | Gate U5.B1 Auth | Interrupted migration recovery via `has_unique_index()`; pre-existing duplicate port fail-closed detection; port bounds constraints in DB operations |
 | **TASK-R1.3B-U5B1-05** | Master Test Verification & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B1-01..04 | 14/14 runtime integration tests PASS; 16/16 runtime unit tests PASS; 7/7 storage tests PASS; 32/32 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B1_ROUTING_SECURITY_CLOSEOUT.md` |
+
+### Subphase R1.3B-U5.B2: Final Process Safety & Routing Acceptance (COMPLETED / AWAITING PO FINAL ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5B2-01** | Nginx PID File TOCTOU Elimination (P0) | Critical | COMPLETED | Security Specialist | Gate U5.B2 Auth | Completely eliminated `nginx -s stop` command; direct POSIX `SIGQUIT` signaling on verified PID; verified process group teardown; macOS Nginx proctitle support; adversarial PID replacement test after verification |
+| **TASK-R1.3B-U5B2-02** | SQLite Index Definition Integrity Verification (P1) | High | COMPLETED | Database Architect | Gate U5.B2 Auth | Multi-vector index validation (`validate_loopback_port_index`) checking column, partial predicate, uniqueness; fail-closed defense against incompatible indexes; comprehensive unit test suite |
+| **TASK-R1.3B-U5B2-03** | Six-Layer Browser Readiness Verification (P1) | High | COMPLETED | Desktop/Backend Eng | Gate U5.B2 Auth | Discrete 6-layer health probe (`verify_browser_readiness`); IPC command in Tauri; UI gate in `App.tsx` preventing broken 502/503 browser launches with Turkish error toasts; unit and integration test coverage |
+| **TASK-R1.3B-U5B2-04** | Final Verification Suite & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B2-01..03 | 66/66 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
 
 ---
 
