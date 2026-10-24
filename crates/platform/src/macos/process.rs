@@ -625,7 +625,7 @@ mod tests {
             res.is_ok(),
             "Must successfully deliver signal to verified child"
         );
-        assert_eq!(res.unwrap(), true);
+        assert!(res.unwrap());
 
         // Wait for child to exit
         let _ = child.wait();
@@ -639,6 +639,6 @@ mod tests {
             libc::SIGTERM,
         );
         assert!(res_dead.is_ok(), "Exited process must return Ok(false)");
-        assert_eq!(res_dead.unwrap(), false);
+        assert!(!res_dead.unwrap());
     }
 }
