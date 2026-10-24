@@ -489,7 +489,7 @@ impl ProjectRuntimeService {
         if let Some(port) = project.loopback_port {
             if port_assigned {
                 match self.nginx_supervisor.check_listener_health(port) {
-                    crate::nginx::GatewayHealth::Running { pid: _, .. } => {
+                    crate::nginx::GatewayHealth::Running { .. } => {
                         listener_verified = true;
                     }
                     crate::nginx::GatewayHealth::PortConflict {
