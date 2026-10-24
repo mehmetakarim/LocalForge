@@ -991,4 +991,58 @@ This document records the chronological engineering log for all development sess
 6. **Deliverable & Closeout**:
    - Fully revised `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md`.
    - Concluding status: `LOCALFORGE GATE U5.E — ACTIVATION RUNBOOK RECONCILED. AWAITING PRODUCT OWNER EXPLICIT ACTIVATION APPROVAL.`
-   - Concluding status: `LOCALFORGE GATE U5.E — PREFLIGHT COMPLETE. AWAITING PRODUCT OWNER ACTIVATION APPROVAL.`
+
+---
+
+## Session 025 — Phase R1.3B UAT Recovery — Gate U5.F Final Execution Proposal Correction
+
+- **Date**: 2026-10-25
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.F Execution Proposal Correction** (Controlled Real Mac Routing Activation Proposal Only; Execution Strictly on Hold)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Verified Code Baseline**: Commit `a2efcbb302c0ba30b2872b946ce7c4dcf43d6e79`
+- **CI Baseline**: Run `40141502541` — SUCCESS
+
+### Summary of Activities
+1. **Execution Hold & Strict Compliance**:
+   - Acknowledged Product Owner Decision: Architecture accepted; execution strictly NOT authorized.
+   - Maintained strict phase boundaries: zero SQLite database modifications, zero package installations, zero MariaDB initializations, zero DNS changes.
+   - Maintained `PO-U5-01`: `Projetest` strictly pinned to PHP 8.4 (no migration to 8.5).
+   - Maintained `PO-U5-02`: Host MariaDB datadir strictly uninitialized.
+2. **Finding 01 — SQLite Backup Preconditions & Directory Permissions**:
+   - Corrected backup procedure: Application Support directory canonical resolution (`/Users/mehmetakar/Library/Application Support/LocalForge`) and UID 501 verification.
+   - Created ownership-restricted private directory with explicit permissions: `mkdir -m 700 -p "$BACKUP_DIR"`.
+   - Restricted backup file permissions to `0600` (`chmod 600`).
+   - Enforced SQLite Online Backup API (`sqlite3 -readonly ... ".backup '...'"`).
+   - Verified backup integrity (`PRAGMA integrity_check`), exact project records (count = 2, exact IDs and PHP versions), and Schema V1 confirmation (`loopback_port` absent).
+   - Computed SHA-256 checksum and stored manifest with `0600` permissions.
+   - Enforced fail-closed abort if any verification fails.
+3. **Finding 02 — Single Canonical Migration Mechanism**:
+   - Completely eliminated interchangeable manual SQL script/transaction execution alternatives.
+   - Standardized strictly on the existing tested Rust implementation `MetadataStore::migrate_to_v2_loopback_ports()` and `MetadataStore::update_project_loopback_port()`.
+   - Documented all architectural guarantees: transaction boundaries, schema migration version 2 tracking, exact project ID preservation, PHP 8.4 pinning, volume UUID preservation, unique partial index `idx_projects_loopback_port`, and fail-closed validation.
+   - Specified exact executable command for invocation.
+4. **Finding 03 — Host-Header Aware HTTP Identity Probes**:
+   - Updated probe commands to supply explicit expected Host header:
+     - `curl -sS -i -H "Host: r1-acceptance-project.localforge" http://127.0.0.1:18081/__localforge_health`
+     - `curl -sS -i -H "Host: projetest.localforge" http://127.0.0.1:18082/__localforge_health`
+   - Verified returned `X-LocalForge-Project-ID` and JSON payload.
+   - Prohibited treating generic HTTP 404 or default gateway error pages as healthy.
+5. **Finding 04 — Stopped Project Semantics for Projetest (PHP 8.4)**:
+   - Explicitly documented that `Projetest` remains in `stopped` state.
+   - Assigned dedicated port `18082` and generated vhost configuration.
+   - Validated that `/__localforge_health` returns 200 OK (proving vhost isolation).
+   - Formally established that root request `http://127.0.0.1:18082/` returning `503 Service Unavailable` is legitimate, honest, and accepted until PHP 8.4 keg-only is provisioned in Gate U5.C.
+   - Enforced strict isolation: zero cross-project routing to PHP 8.5.
+6. **Finding 05 — Rollback, Execution Ownership & Process Safety**:
+   - Designated single authorized operator: Antigravity Lead Agent under UID 501 (`mehmetakar`).
+   - Enforced pre-execution quiescence checks (`pgrep -il localforge`, `lsof`).
+   - Backed up entire `conf.d/` directory alongside SQLite atomic backup.
+   - Implemented dynamic process identity resolution for Nginx master PID with kernel-level validation (`proc_pidpath`, `proc_pidinfo`) prior to sending `SIGHUP`.
+   - Established two-phase rollback: restore Nginx vhosts first + reload SIGHUP, then non-destructive quarantine (`quarantine_<timestamp>/`) + atomic database copy.
+   - Documented escalation and recovery behavior in case of rollback failure.
+   - Guaranteed zero signaling or termination of unrelated processes (PIDs 4010, 63508 on 18097/18098 preserved).
+7. **Deliverables & Closeout**:
+   - Authored `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`.
+   - Updated `.project-memory/` suite (`SESSION_LOG.md`, `PROJECT_STATE.md`, `TASKS.md`, `HANDOFF.md`, `docs/tasks.md`).
+   - Concluding status: `LOCALFORGE GATE U5.F — FINAL EXECUTION PROPOSAL READY. AWAITING PRODUCT OWNER EXPLICIT ACTIVATION AUTHORIZATION.`

@@ -6,36 +6,23 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.E Activation Runbook Reconciled — Completed / Awaiting PO Explicit Activation Approval**
+- **Current State**: **Gate U5.F Final Execution Proposal Corrected — Proposal Ready / Execution Strictly on Hold / Awaiting PO Explicit Activation Authorization**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `0954d49d799015eb6f8df7cf2d5bcf0e976bcecf` (Code), `86cb93b2a0c49741e4da250495eb5a6e70908866` (Docs)
-- **CI Baseline**: Run `40123012479` (Code & Tests) & Run `40140575584` (Preflight & Plan) — SUCCESS (100% Green on macOS Apple Silicon)
+- **Baseline Commit**: `a2efcbb302c0ba30b2872b946ce7c4dcf43d6e79`
+- **CI Baseline**: Run `40141502541` — SUCCESS (100% Green on macOS Apple Silicon)
 - **Previous Milestone Status**:
-  - **Phase R1.2B**: ACCEPTED by Product Owner.
-  - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
-  - **Phase R1.3A-V Stage B**: ACCEPTED by Product Owner.
-  - **Phase R1.3A-V1 Final Acceptance Patch**: ACCEPTED by Product Owner.
-  - **Phase R1.3B Brand Integration Stage A**: APPROVED by Product Owner (Baseline: `9c9d720b46c9676f5023f40f1660c92dc90dad5d`, CI: `39499020338`).
-  - **Phase R1.3B Stage B Implementation**: COMPLETED on dedicated branch `phase-r1/r1-3b-brand-implementation`.
-  - **Phase R1.3B Final Acceptance Remediation**: COMPLETED (Commit `47fb5461557a1c2ceae90cb3d3259ced0b57c14f`, CI `39561526282` Green).
-  - **Phase R1.3B Final Acceptance Closeout**: COMPLETED (Commit `f6302479efcbebf907837f176d68962acf208e4f`).
-  - **Phase R1.3B UAT Failure Recovery (Gates 2A–4)**: COMPLETED (Commit `8516983`).
-  - **Gate U5 (Design & Read-Only Preflight)**: COMPLETED (Commit `4e2d762`).
-  - **Gate U5.A (Architecture Safety Reconciliation)**: COMPLETED (Commit `d96fd55`).
-  - **Gate U5.B (Isolated Loopback Routing)**: COMPLETED (Commit `55a965b`).
-  - **Gate U5.B1 (Routing Security Hardening)**: COMPLETED (Commit `032ba2a`, CI `40100159014`).
-  - **Gate U5.B2 (Final Process Safety & Routing Acceptance)**: COMPLETED (Commit `55225d1`, CI `40114186966`).
   - **Gate U5.B2 Final Acceptance Patch**: COMPLETED & ACCEPTED (Commit `0954d49`, CI `40123012479`).
-- **Completed in Gate U5.E (Real Mac Activation Preflight & Migration Plan)**:
-  - `Read-Only Real Host Audit`: Verified macOS M1 Darwin 27.0.0, external APFS volume (`7E26530E-5179-414C-81B5-6FBDB429FC65`), Application Support directory, and Schema V1 database (12KB, WAL/SHM). Zero database writes performed.
-  - `Project Records Verification`: Confirmed `r1_acceptance_project` (PHP 8.5, degraded) and `Projetest` (PHP 8.4 preserved, stopped).
-  - `Daemon & Port Audit`: Verified Nginx PID 39566 (port 8080) and PHP-FPM PID 59625; identified ports 18097/18098 occupied by test instances; 916 candidate ports free in `18081..=18999`.
-  - `DNS Resolution Audit`: Verified native RFC 6761 `.localhost` loopback resolution without `/etc/hosts`.
-  - `SQLite WAL Backup Protocol`: Formulated online atomic `.backup` / `VACUUM INTO` procedure flushing WAL frames safely.
-  - `Controlled Activation & Rollback Plan`: Formulated 4-checkpoint migration procedure (V2 migration, port assignment 18081/18082, dual-port vhost), Safari/Chrome acceptance matrix, fail-closed rollback protocol.
-  - Deliverable report: `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md`.
-- **Next Permitted Action**: Await Product Owner explicit activation approval of Gate U5.E before modifying `localforge.db`, assigning ports, or reloading Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
+  - **Gate U5.E Activation Runbook Reconciliation**: COMPLETED & ACCEPTED (Commit `a2efcbb`, CI `40141502541`).
+- **Completed in Gate U5.F (Proposal Correction)**:
+  - Addressed all 5 Product Owner findings without mutating the real host environment:
+    1. `Finding 01 (Backup Command)`: Canonical Application Support directory resolution, UID 501 verification, private backup dir (`mkdir -m 700`), atomic `.backup` file (`0600`), SHA-256 manifest (`0600`), and fail-closed stop conditions.
+    2. `Finding 02 (Single Canonical Migration)`: Eliminated manual SQL scripts; standardized strictly on `MetadataStore::migrate_to_v2_loopback_ports()`, schema version 2 tracking, and `update_project_loopback_port()`.
+    3. `Finding 03 (Host-Header Aware Probes)`: Specified explicit Host headers for `/__localforge_health` (`r1-acceptance-project.localforge` and `projetest.localforge`) and verified returned project IDs.
+    4. `Finding 04 (Stopped Project Semantics)`: Formally established that `Projetest` remains in `stopped` state on dedicated port `18082` with legitimate 503 response until PHP 8.4 is provisioned.
+    5. `Finding 05 (Rollback & Process Safety)`: Designated Antigravity Lead Agent as single operator (UID 501); quiescence checks; full Nginx config backup; reverse rollback ordering; dynamic kernel-verified process signaling; foreign daemons preserved.
+  - Deliverable document: `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`.
+- **Next Permitted Action**: Await explicit Product Owner activation authorization specifically for Gate U5.F execution before making ANY persistent modifications to `localforge.db`, writing vhosts, or signaling Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---
 

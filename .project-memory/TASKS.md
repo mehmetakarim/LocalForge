@@ -185,13 +185,22 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-PATCH-03** | Multi-PID Listener Ownership Scrutiny (Finding 03, P1) | High | COMPLETED | Senior Rust Eng | PO U5.B2 Patch Auth | Generalized `check_listener_health(port)` scrutinizing all listening PIDs for exact binary, cmdline `-c`/`-p`, and start time; immediate `PortConflict` on foreign or mixed ownership; integrated into Layer 3; adversarial listener tests |
 | **TASK-R1.3B-PATCH-04** | Master Patch Verification Suite & Closeout Report | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-PATCH-01..03 | 69/69 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; updated `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
 
-### Subphase R1.3B-U5.E: Real Mac Activation Runbook Reconciliation (COMPLETED / AWAITING PO EXPLICIT ACTIVATION APPROVAL)
+### Subphase R1.3B-U5.E: Real Mac Activation Runbook Reconciliation (COMPLETED / ACCEPTED IN U5.F BASELINE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-U5E-01** | Real-Host Environment & Database Preflight (Read-Only) | Critical | COMPLETED | Systems Engineer | PO Gate U5.E Auth | Read-only inspection of macOS M1 environment, Application Support, Schema V1 database (12KB, WAL/SHM), and 2 project records; APFS volume UUID verification (`7E26530E-5179-414C-81B5-6FBDB429FC65`) |
 | **TASK-R1.3B-U5E-02** | SQLite WAL/SHM Backup & Consistency Protocol | Critical | COMPLETED | Database Architect | Gate U5.E Auth | Established online atomic `.backup` procedure flushing WAL frames safely; verification drill with `integrity_check` and row count checks |
 | **TASK-R1.3B-U5E-03** | Runtime Daemon & Port Range 18081..18999 Preflight | High | COMPLETED | Systems Engineer | Gate U5.E Auth | Audited Nginx PID 39566 (port 8080) and PHP-FPM PID 59625; identified test Nginx instances on ports 18097/18098; confirmed 916 available candidate ports |
 | **TASK-R1.3B-U5E-04** | Activation Runbook Reconciliation & Disposable Drill | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5E-01..03 | Executed `/tmp/localforge_disposable_drill/run_drill.sh` proving end-to-end backup, migration, quarantine, and rollback; reconciled activation runbook covering dynamic process identity, DNS-safe slugification, and honest runtime outcomes; authored `docs/phases/R1_3B_U5E_REAL_MAC_ACTIVATION_PREFLIGHT.md` |
+
+### Subphase R1.3B-U5.F: Controlled Real Mac Routing Activation (EXECUTION ON HOLD / PROPOSAL CORRECTED)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-U5F-01** | SQLite Backup Preconditions & Permission Hardening | Critical | COMPLETED (PROPOSAL) | Database Architect | PO Gate U5.F Findings | Canonical App Support path resolution, UID 501 ownership verification, private backup dir (`0700`), atomic `.backup` file (`0600`), SHA-256 manifest (`0600`), and fail-closed stop gates |
+| **TASK-R1.3B-U5F-02** | Single Canonical Migration Specification | Critical | COMPLETED (PROPOSAL) | Principal Architect | PO Gate U5.F Findings | Eliminated manual SQL execution paths; standardized strictly on `MetadataStore::migrate_to_v2_loopback_ports()`, schema version 2 tracking, and `update_project_loopback_port()` |
+| **TASK-R1.3B-U5F-03** | Host-Header Aware HTTP Identity Probes & Matrix | Critical | COMPLETED (PROPOSAL) | Systems Engineer | PO Gate U5.F Findings | Host-header aware probes for `r1-acceptance-project.localforge` (200 OK) and `projetest.localforge` (200 OK health, 503 root stopped); explicit project ID validation |
+| **TASK-R1.3B-U5F-04** | Rollback Ordering, Process Identity & Safety Bounds | Critical | COMPLETED (PROPOSAL) | Security Specialist | PO Gate U5.F Findings | Antigravity Lead Agent single operator (UID 501); quiescence checks; full Nginx config backup; reverse rollback ordering (Nginx vhosts first, non-destructive DB quarantine second) |
+| **TASK-R1.3B-U5F-05** | Final Execution Proposal Deliverable & Hold Gate | Critical | COMPLETED (PROPOSAL) | Lead Architect / QA | TASK-R1.3B-U5F-01..04 | Authored `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`; documented all 5 findings; hold status maintained awaiting explicit PO activation authorization |
 
 ---
 
