@@ -169,13 +169,21 @@ This is the canonical task backlog. Tasks have stable identifiers, priorities, e
 | **TASK-R1.3B-U5B1-04** | SQLite V2 Migration Integrity & Fault Tolerance (P1) | High | COMPLETED | Database Architect | Gate U5.B1 Auth | Interrupted migration recovery via `has_unique_index()`; pre-existing duplicate port fail-closed detection; port bounds constraints in DB operations |
 | **TASK-R1.3B-U5B1-05** | Master Test Verification & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B1-01..04 | 14/14 runtime integration tests PASS; 16/16 runtime unit tests PASS; 7/7 storage tests PASS; 32/32 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B1_ROUTING_SECURITY_CLOSEOUT.md` |
 
-### Subphase R1.3B-U5.B2: Final Process Safety & Routing Acceptance (COMPLETED / AWAITING PO FINAL ACCEPTANCE)
+### Subphase R1.3B-U5.B2: Final Process Safety & Routing Acceptance (COMPLETED / ACCEPTED IN PATCH BASELINE)
 | Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
 |---|---|---|---|---|---|---|
 | **TASK-R1.3B-U5B2-01** | Nginx PID File TOCTOU Elimination (P0) | Critical | COMPLETED | Security Specialist | Gate U5.B2 Auth | Completely eliminated `nginx -s stop` command; direct POSIX `SIGQUIT` signaling on verified PID; verified process group teardown; macOS Nginx proctitle support; adversarial PID replacement test after verification |
 | **TASK-R1.3B-U5B2-02** | SQLite Index Definition Integrity Verification (P1) | High | COMPLETED | Database Architect | Gate U5.B2 Auth | Multi-vector index validation (`validate_loopback_port_index`) checking column, partial predicate, uniqueness; fail-closed defense against incompatible indexes; comprehensive unit test suite |
 | **TASK-R1.3B-U5B2-03** | Six-Layer Browser Readiness Verification (P1) | High | COMPLETED | Desktop/Backend Eng | Gate U5.B2 Auth | Discrete 6-layer health probe (`verify_browser_readiness`); IPC command in Tauri; UI gate in `App.tsx` preventing broken 502/503 browser launches with Turkish error toasts; unit and integration test coverage |
 | **TASK-R1.3B-U5B2-04** | Final Verification Suite & Closeout Deliverable | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-U5B2-01..03 | 66/66 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; authored `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
+
+### Subphase R1.3B-U5.B2-Patch: U5.B2 Final Acceptance Patch (COMPLETED / AWAITING PO ACCEPTANCE)
+| Task ID | Title | Priority | Status | Assigned Role | Dependencies | Deliverables |
+|---|---|---|---|---|---|---|
+| **TASK-R1.3B-PATCH-01** | PID Reuse & Verified Signaling Abstraction (Finding 01, P0) | Critical | COMPLETED | Security Specialist | PO U5.B2 Patch Auth | Canonical `signal_process_verified` abstraction in `ProcessManager` revalidating UID, path, microsecond start time; clean handling of ESRCH/EPERM; bounded graceful wait; post-termination dead verification; adversarial exit/reuse tests |
+| **TASK-R1.3B-PATCH-02** | Identity-Aware Nginx Health & Host Mismatch Rejection (Finding 02, P1) | Critical | COMPLETED | Systems Engineer | PO U5.B2 Patch Auth | Zero-touch `/__localforge_health` endpoint returning JSON `project_id` and header; two-stage readiness probe in `verify_browser_readiness`; rejection of Gateway Host Mismatch strings; acceptance of 4xx only after identity proven; removed blind fallback |
+| **TASK-R1.3B-PATCH-03** | Multi-PID Listener Ownership Scrutiny (Finding 03, P1) | High | COMPLETED | Senior Rust Eng | PO U5.B2 Patch Auth | Generalized `check_listener_health(port)` scrutinizing all listening PIDs for exact binary, cmdline `-c`/`-p`, and start time; immediate `PortConflict` on foreign or mixed ownership; integrated into Layer 3; adversarial listener tests |
+| **TASK-R1.3B-PATCH-04** | Master Patch Verification Suite & Closeout Report | Critical | COMPLETED | Lead Architect / QA | TASK-R1.3B-PATCH-01..03 | 69/69 Rust workspace tests PASS; 33/33 desktop tests PASS; 0 clippy warnings; 0 fmt diffs; updated `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md` |
 
 ---
 

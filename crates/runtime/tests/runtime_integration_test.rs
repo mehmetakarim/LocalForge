@@ -965,6 +965,7 @@ fn test_browser_readiness_verification_across_layers() {
     let _ = store.migrate_to_v2_loopback_ports().unwrap();
 
     let vm = Arc::new(MacOSVolumeManager::new());
+    let vol_info = vm.find_volume_for_path(dir.path()).unwrap().unwrap();
     let vb = Arc::new(VolumeBarrier::new(vm.clone()));
     let pm = Arc::new(MacOSProcessManager::new());
 
@@ -1069,4 +1070,70 @@ fn test_browser_readiness_verification_across_layers() {
     assert!(!report_conflict.listener_verified);
     assert_eq!(report_conflict.target_url, None);
     drop(dummy_listener);
+
+    // 4. Legitimate project startup and readiness verification
+    let site_dir = dir.path().join("real_site");
+    std::fs::create_dir_all(&site_dir).unwrap();
+    std::fs::write(site_dir.join("index.php"), "<?php echo 'READINESS_OK'; ?>").unwrap();
+
+    let proj_real = ProjectRecord {
+        id: ProjectId::from_string("proj_real_readiness"),
+        name: "Real Readiness Site".into(),
+        path: site_dir,
+        volume_uuid: vol_info.uuid.clone(),
+        document_root: "".into(),
+        php_version: "8.5".into(),
+        local_domain: "readiness.test".into(),
+        status: ProjectStatus::Stopped,
+        created_at: "2026-10-24T00:00:00Z".into(),
+        updated_at: "2026-10-24T00:00:00Z".into(),
+        loopback_port: None,
+    };
+    store.insert_project(&proj_real).unwrap();
+
+    // Start project runtime
+    let start_status = service
+        .start_project(&proj_real.id)
+        .expect("Project start must succeed");
+    assert_eq!(start_status.status, ProjectStatus::Running);
+
+    // Verify browser readiness for running project
+    let report_ready = service
+        .verify_browser_readiness(&proj_real.id)
+        .expect("Readiness verification must succeed");
+    assert!(
+        report_ready.is_ready,
+        "Running project with verified identity must be ready: {:?}",
+        report_ready.failure_reason_tr
+    );
+    assert!(report_ready.port_assigned);
+    assert!(report_ready.listener_verified);
+    assert!(report_ready.vhost_configured);
+    assert!(report_ready.runtime_ready);
+    assert!(report_ready.target_url.is_some());
+
+    // 5. Cross-Project Routing & Host Mismatch Defense:
+    let real_port = store
+        .get_project(&proj_real.id)
+        .unwrap()
+        .unwrap()
+        .loopback_port
+        .unwrap();
+
+    // (A) Host mismatch on dedicated port returns 404 with Gateway Host Mismatch marker:
+    let (mismatch_code, mismatch_body) = probe_http_health(real_port, "foreign.test", "/").unwrap();
+    assert_eq!(mismatch_code, 404);
+    assert!(mismatch_body.contains("LocalForge Gateway: Host mismatch"));
+
+    // (B) Host mismatch on health endpoint fails closed:
+    let (health_mismatch_code, _) =
+        probe_http_health(real_port, "foreign.test", "/__localforge_health").unwrap();
+    assert_eq!(health_mismatch_code, 404);
+
+    // (C) Legitimate project health endpoint returns verified JSON identity:
+    let (health_code, health_body) =
+        probe_http_health(real_port, "readiness.test", "/__localforge_health").unwrap();
+    assert_eq!(health_code, 200);
+    assert!(health_body.contains("\"project_id\":\"proj_real_readiness\""));
+    assert!(health_body.contains("\"status\":\"ready\""));
 }

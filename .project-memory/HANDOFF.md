@@ -6,11 +6,11 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.B2 Final Process Safety & Routing Acceptance — Completed / Awaiting PO Final Acceptance**
+- **Current State**: **Gate U5.B2 Final Acceptance Patch — Completed / Awaiting PO Final Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `032ba2a036bb059902cdbdcf20b24508afce6b34`
-- **CI Baseline**: Run `40100159014` — SUCCESS
+- **Baseline Commit**: `55225d168f9e95ea3688d744663b2b154d94504d`
+- **CI Baseline**: Run `40114186966` — SUCCESS
 - **Previous Milestone Status**:
   - **Phase R1.2B**: ACCEPTED by Product Owner.
   - **Phase R1.3A-V Stage A**: ACCEPTED by Product Owner (Direction A+ Approved).
@@ -25,12 +25,13 @@
   - **Gate U5.A (Architecture Safety Reconciliation)**: COMPLETED (Commit `d96fd55`).
   - **Gate U5.B (Isolated Loopback Routing)**: COMPLETED (Commit `55a965b`).
   - **Gate U5.B1 (Routing Security Hardening)**: COMPLETED (Commit `032ba2a`, CI `40100159014`).
-- **Completed in Gate U5.B2 (Final Process Safety & Routing Acceptance)**:
-  - `Finding 01 Nginx PID File TOCTOU Elimination (P0)`: Eradicated unsafe `nginx -s stop` command; direct POSIX `libc::kill(identity.pid, SIGQUIT)` with 100ms grace period and verified process group teardown; macOS `ngx_setproctitle` rewritten proctitle parsing support; adversarial test `test_adversarial_pid_file_replacement_after_verification_does_not_signal_replacement`.
-  - `Finding 02 SQLite Index Definition Integrity Verification (P1)`: Multi-vector index validation (`validate_loopback_port_index`) inspecting columns, partial predicate (`WHERE loopback_port IS NOT NULL`), and uniqueness; fail-closed defense against incompatible indexes; comprehensive unit test suite in `localforge-storage`.
-  - `Finding 03 Six-Layer Browser Readiness Verification (P1)`: 6 discrete layers probed (DNS, Port, Listener ownership, Nginx config, Project runtime readiness [FPM + socket], HTTP response); Tauri IPC command `verify_browser_readiness`; desktop UI gate in `App.tsx` preventing broken browser launches with Turkish error toasts; unit and integration tests.
-  - `Test Verification`: 100% test coverage verified across Rust workspace (66/66 tests PASS) and Node desktop suite (33/33 tests PASS). Clippy clean (0 warnings, `-D warnings`). Rust fmt clean (0 diffs). Deliverable report: `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
-- **Next Permitted Action**: Await Product Owner final acceptance of Gate U5.B2 before initiating Gate U5.C. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
+  - **Gate U5.B2 (Final Process Safety & Routing Acceptance)**: COMPLETED (Commit `55225d1`, CI `40114186966`).
+- **Completed in Gate U5.B2 Final Acceptance Patch**:
+  - `Finding 01 PID Reuse and Signal Delivery Verification (P0)`: Canonical `signal_process_verified` abstraction in `ProcessManager` revalidating UID, path, and microsecond start time (`tv_usec`) immediately before `libc::kill`; clean handling of `libc::ESRCH` and `libc::EPERM`; bounded graceful shutdown (1s); worker group teardown via `terminate_process_group_verified`; post-termination master dead check before removing `nginx.pid`; adversarial tests covering process exit and process replacement.
+  - `Finding 02 Project Identity & HTTP Readiness Verification (P1)`: Added zero-touch `/__localforge_health` endpoint to Nginx vhost returning `{"status":"ready","project_id":"<id>","port":<port>}` with `X-LocalForge-Project-Id` response header; two-stage readiness probe in `verify_browser_readiness`; rejection of Gateway Host Mismatch strings; acceptance of 4xx only after identity proven; complete removal of blind fallback retry with `Host: 127.0.0.1`.
+  - `Finding 03 Strict Multi-PID Listener Ownership Verification (P1)`: Generalized `check_listener_health(port)` scrutinizing all listening PIDs for exact canonical binary, cmdline `-c`/`-p`, and start time; immediate `PortConflict` on foreign or mixed ownership; integrated into Layer 3; adversarial listener tests.
+  - `Test Verification`: 100% test coverage verified across Rust workspace (69/69 tests PASS) and Node desktop suite (33/33 tests PASS). Clippy clean (0 warnings, `-D warnings`). Rust fmt clean (0 diffs). Deliverable report: `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
+- **Next Permitted Action**: Await Product Owner final acceptance of Gate U5.B2 Patch before initiating Gate U5.C. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---
 

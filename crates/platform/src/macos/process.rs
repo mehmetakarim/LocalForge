@@ -269,6 +269,79 @@ impl ProcessManager for MacOSProcessManager {
         Ok(())
     }
 
+    fn signal_process_verified(
+        &self,
+        pid: u32,
+        expected_executable: &Path,
+        expected_start_secs: u64,
+        expected_start_usecs: u32,
+        signal: i32,
+    ) -> Result<bool> {
+        if pid <= 1 || pid == std::process::id() {
+            return Err(LocalForgeError::PlatformError(format!(
+                "Refusing to signal invalid or self PID {pid}"
+            )));
+        }
+
+        let identity = match self.inspect_process(pid)? {
+            Some(id) => id,
+            None => {
+                // Process already terminated (ESRCH)
+                return Ok(false);
+            }
+        };
+
+        // 1. Verify owner UID matches current process UID
+        let current_uid = unsafe { libc::getuid() };
+        if identity.uid != current_uid {
+            return Err(LocalForgeError::PlatformError(format!(
+                "UID mismatch for PID {pid}: process owner UID {} does not match current user {current_uid}",
+                identity.uid
+            )));
+        }
+
+        // 2. Strict PID reuse check (exact launch timestamp)
+        if identity.start_time_secs != expected_start_secs
+            || identity.start_time_usecs != expected_start_usecs
+        {
+            return Err(LocalForgeError::PlatformError(format!(
+                "PID reuse mismatch detected for PID {pid}: expected start {expected_start_secs}.{expected_start_usecs}, found {}.{}",
+                identity.start_time_secs, identity.start_time_usecs
+            )));
+        }
+
+        // 3. Strict canonical executable path check (rejecting replaced binary / basename match)
+        let canonical_expected = dunce::canonicalize(expected_executable)
+            .unwrap_or_else(|_| expected_executable.to_path_buf());
+        if identity.executable_path() != canonical_expected {
+            return Err(LocalForgeError::PlatformError(format!(
+                "Executable mismatch detected for PID {pid}: expected '{}', found '{}'",
+                canonical_expected.display(),
+                identity.executable_path().display()
+            )));
+        }
+
+        // 4. Send signal and check system call return code and errno
+        let res = unsafe { libc::kill(pid as libc::pid_t, signal) };
+        if res == 0 {
+            Ok(true)
+        } else {
+            let err = std::io::Error::last_os_error();
+            match err.raw_os_error() {
+                Some(libc::ESRCH) => {
+                    // Process exited right in the microsecond window between inspect and kill
+                    Ok(false)
+                }
+                Some(libc::EPERM) => Err(LocalForgeError::PlatformError(format!(
+                    "Operation not permitted (EPERM) signaling PID {pid} with signal {signal}: {err}"
+                ))),
+                _ => Err(LocalForgeError::PlatformError(format!(
+                    "Failed to deliver signal {signal} to verified PID {pid}: {err}"
+                ))),
+            }
+        }
+    }
+
     fn find_listening_pids(&self, port: u16) -> Result<Vec<u32>> {
         let output = std::process::Command::new("/usr/sbin/lsof")
             .arg("-nP")
@@ -487,5 +560,85 @@ mod tests {
         assert_eq!(id.pgid, my_pgid);
         // The manager's safety guard ensures that even if pgid == pid,
         // it will never call killpg on current test process group.
+    }
+
+    #[test]
+    fn test_signal_process_verified_lifecycle_and_rejections() {
+        let pm = MacOSProcessManager::new();
+        let my_pid = std::process::id();
+        let my_id = pm.inspect_process(my_pid).unwrap().unwrap();
+
+        // 1. Refuse to signal self or init (pid <= 1 or == self)
+        let err_self = pm.signal_process_verified(
+            my_pid,
+            my_id.executable_path(),
+            my_id.start_time_secs,
+            my_id.start_time_usecs,
+            libc::SIGQUIT,
+        );
+        assert!(err_self.is_err(), "Must refuse to signal self");
+
+        let err_init =
+            pm.signal_process_verified(1, Path::new("/sbin/launchd"), 0, 0, libc::SIGQUIT);
+        assert!(err_init.is_err(), "Must refuse to signal PID 1");
+
+        // 2. Start a child process to test verified signaling
+        let mut child = std::process::Command::new("/bin/sleep")
+            .arg("10")
+            .spawn()
+            .expect("Failed to spawn sleep");
+        let child_pid = child.id();
+        let child_id = pm
+            .inspect_process(child_pid)
+            .unwrap()
+            .expect("Child must exist");
+
+        // 3. Rejection on executable mismatch
+        let err_exec = pm.signal_process_verified(
+            child_pid,
+            Path::new("/bin/ls"),
+            child_id.start_time_secs,
+            child_id.start_time_usecs,
+            libc::SIGTERM,
+        );
+        assert!(err_exec.is_err(), "Must fail closed on executable mismatch");
+
+        // 4. Rejection on start time mismatch (PID reuse protection)
+        let err_time = pm.signal_process_verified(
+            child_pid,
+            child_id.executable_path(),
+            child_id.start_time_secs + 100,
+            child_id.start_time_usecs,
+            libc::SIGTERM,
+        );
+        assert!(err_time.is_err(), "Must fail closed on start time mismatch");
+
+        // 5. Successful verified signal delivery
+        let res = pm.signal_process_verified(
+            child_pid,
+            child_id.executable_path(),
+            child_id.start_time_secs,
+            child_id.start_time_usecs,
+            libc::SIGTERM,
+        );
+        assert!(
+            res.is_ok(),
+            "Must successfully deliver signal to verified child"
+        );
+        assert_eq!(res.unwrap(), true);
+
+        // Wait for child to exit
+        let _ = child.wait();
+
+        // 6. Signal delivered after process exit returns Ok(false) (ESRCH handled safely)
+        let res_dead = pm.signal_process_verified(
+            child_pid,
+            child_id.executable_path(),
+            child_id.start_time_secs,
+            child_id.start_time_usecs,
+            libc::SIGTERM,
+        );
+        assert!(res_dead.is_ok(), "Exited process must return Ok(false)");
+        assert_eq!(res_dead.unwrap(), false);
     }
 }

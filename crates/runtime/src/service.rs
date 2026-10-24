@@ -488,38 +488,24 @@ impl ProjectRuntimeService {
         let mut listener_verified = false;
         if let Some(port) = project.loopback_port {
             if port_assigned {
-                match self.process_manager.find_listening_pids(port) {
-                    Ok(pids) if !pids.is_empty() => {
-                        let mut has_verified_nginx = false;
-                        let mut foreign_pid = None;
-                        for &pid in &pids {
-                            if let Ok(Some(identity)) = self.process_manager.inspect_process(pid) {
-                                if NginxSupervisor::is_legitimate_nginx_binary(
-                                    identity.executable_path(),
-                                ) {
-                                    has_verified_nginx = true;
-                                    break;
-                                } else {
-                                    foreign_pid = Some(pid);
-                                }
-                            }
-                        }
-                        if has_verified_nginx {
-                            listener_verified = true;
-                        } else {
-                            layer_failures.push(format!(
-                                "Port Çakışması: Port {port} LocalForge dışındaki bir süreç (PID {:?}) tarafından işgal edilmiş.",
-                                foreign_pid.unwrap_or(pids[0])
-                            ));
-                        }
+                match self.nginx_supervisor.check_listener_health(port) {
+                    crate::nginx::GatewayHealth::Running { pid: _, .. } => {
+                        listener_verified = true;
                     }
-                    Ok(_) => {
+                    crate::nginx::GatewayHealth::PortConflict {
+                        occupying_pid,
+                        details,
+                        ..
+                    } => {
+                        layer_failures.push(format!(
+                            "Port Çakışması / Ağ Dinleyicisi: Port {port} LocalForge dışındaki bir süreç (PID {:?}) tarafından işgal edilmiş. Detay: {details}",
+                            occupying_pid
+                        ));
+                    }
+                    crate::nginx::GatewayHealth::Stopped => {
                         layer_failures.push(format!(
                             "Ağ Dinleyicisi: Port {port} üzerinde dinleyen aktif bir Nginx ağ geçidi bulunmuyor."
                         ));
-                    }
-                    Err(e) => {
-                        layer_failures.push(format!("Ağ Dinleyicisi Denetimi Başarısız: {e}"));
                     }
                 }
             }
@@ -575,39 +561,93 @@ impl ProjectRuntimeService {
             }
         }
 
-        // Layer 6: Correct Project HTTP Response Probe
+        // Layer 6: Project Identity and HTTP Readiness Probe
         let mut http_status = None;
         let mut http_probe_ok = false;
-        if port_assigned && listener_verified && runtime_ready {
+        if port_assigned && listener_verified && vhost_configured && runtime_ready {
             let port = project.loopback_port.unwrap();
-            let probe_res = probe_http_health(port, &project.local_domain, "/");
-            let probe_res = if probe_res.is_err() {
-                probe_http_health(port, "127.0.0.1", "/")
-            } else {
-                probe_res
+
+            // Step 1: Probe the LocalForge-owned identity-aware health endpoint using the project's domain
+            let identity_probe =
+                probe_http_health(port, &project.local_domain, "/__localforge_health");
+            let mut identity_verified = match identity_probe {
+                Ok((200, ref body)) => {
+                    let expected_id = format!("\"project_id\":\"{}\"", project.id.0);
+                    body.contains(&expected_id) && body.contains("\"status\":\"ready\"")
+                }
+                _ => false,
             };
 
-            match probe_res {
-                Ok((code, body)) => {
-                    http_status = Some(code);
-                    if (200..=399).contains(&code) || code == 404 || code == 403 {
-                        http_probe_ok = true;
-                    } else if code == 502 {
-                        layer_failures.push(format!(
-                            "HTTP Yanıtı: Nginx 502 Bad Gateway döndürdü (PHP-FPM upstream bağlantısı kurulamıyor). Detay: {body}"
-                        ));
-                    } else if code == 503 {
-                        layer_failures.push(
-                            "HTTP Yanıtı: Nginx 503 Service Unavailable döndürdü (Proje durdurulmuş veya soket yanıt vermiyor).".into()
-                        );
-                    } else {
-                        layer_failures.push(format!(
-                            "HTTP Yanıtı: Sunucu beklenmeyen hata kodu döndürdü (HTTP {code})."
-                        ));
+            // If local_domain probe failed, retry with localhost candidate domain
+            if !identity_verified {
+                let localhost_domain = format!("{}.localforge.localhost", slug);
+                let retry_identity =
+                    probe_http_health(port, &localhost_domain, "/__localforge_health");
+                if let Ok((200, ref body)) = retry_identity {
+                    let expected_id = format!("\"project_id\":\"{}\"", project.id.0);
+                    if body.contains(&expected_id) && body.contains("\"status\":\"ready\"") {
+                        identity_verified = true;
                     }
                 }
-                Err(e) => {
-                    layer_failures.push(format!("HTTP Sağlık Probu Başarısız: {e}"));
+            }
+
+            if !identity_verified {
+                layer_failures.push(format!(
+                    "Proje Kimliği Doğrulanamadı: Port {port} üzerindeki uç nokta bu projeye ({}) ait doğrulanmış kimlik yanıtı vermedi.",
+                    project.id.0
+                ));
+            } else {
+                // Step 2: Project identity is proven! Now probe the application root route
+                let app_probe = probe_http_health(port, &project.local_domain, "/");
+                let app_probe = if app_probe.is_err() {
+                    let localhost_domain = format!("{}.localforge.localhost", slug);
+                    probe_http_health(port, &localhost_domain, "/")
+                } else {
+                    app_probe
+                };
+
+                match app_probe {
+                    Ok((code, body)) => {
+                        http_status = Some(code);
+
+                        // Reject any response originating from gateway fallback or default_server
+                        if body.contains("LocalForge Gateway: Host mismatch") {
+                            layer_failures.push(
+                                "Yönlendirme Uyuşmazlığı: Nginx ağ geçidi 'Host mismatch' (alan adı uyuşmazlığı) bildirdi.".into(),
+                            );
+                        } else if body.contains("LocalForge Gateway: Proje Başlatılmamış") {
+                            layer_failures.push(
+                                "Proje Durumu: Nginx ağ geçidi projenin durdurulmuş olduğunu bildirdi (HTTP 503).".into(),
+                            );
+                        } else if body.contains("LocalForge Gateway: Depolama Sürücüsü") {
+                            layer_failures.push(
+                                "Depolama Hatası: Proje depolama sürücüsü bağlı değil (HTTP 502)."
+                                    .into(),
+                            );
+                        } else if (200..=399).contains(&code) {
+                            // Legitimate HTTP 200 OK or 3xx redirect
+                            http_probe_ok = true;
+                        } else if (400..=499).contains(&code) {
+                            // Legitimate application client response (e.g. 401 Unauthorized, 403 Forbidden, 404 Not Found from app routing)
+                            // Accepted because identity_verified has already established that this endpoint belongs to the project!
+                            http_probe_ok = true;
+                        } else if code == 502 {
+                            layer_failures.push(format!(
+                                "HTTP Yanıtı: Nginx 502 Bad Gateway döndürdü (PHP-FPM upstream bağlantısı kurulamıyor). Detay: {body}"
+                            ));
+                        } else if code == 503 {
+                            layer_failures.push(
+                                "HTTP Yanıtı: Nginx 503 Service Unavailable döndürdü (Proje durdurulmuş veya soket yanıt vermiyor).".into(),
+                            );
+                        } else {
+                            layer_failures.push(format!(
+                                "HTTP Yanıtı: Sunucu beklenmeyen hata kodu döndürdü (HTTP {code})."
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        layer_failures.push(format!("HTTP Sağlık Probu Başarısız: {e}"));
+                    }
                 }
             }
         }

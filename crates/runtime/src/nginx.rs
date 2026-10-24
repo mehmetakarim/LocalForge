@@ -242,10 +242,19 @@ fastcgi_param  REDIRECT_STATUS    200;
                      server_name_in_redirect off;\n\
                      root \"{docroot}\";\n\
                      index index.php index.html;\n\n\
+                     # LocalForge Identity-Aware Health Endpoint\n\
+                     location = /__localforge_health {{\n\
+                         access_log off;\n\
+                         default_type application/json;\n\
+                         add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
+                         return 200 \"{{\\\"status\\\":\\\"ready\\\",\\\"project_id\\\":\\\"{proj_id}\\\",\\\"port\\\":{port}}}\\n\";\n\
+                     }}\n\n\
                      location / {{\n\
+                         add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
                          try_files $uri $uri/ /index.php?$query_string;\n\
                      }}\n\n\
                      location ~ \\.php$ {{\n\
+                         add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
                          include fastcgi_params;\n\
                          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
                          fastcgi_param SERVER_PORT $server_port;\n\
@@ -253,7 +262,10 @@ fastcgi_param  REDIRECT_STATUS    200;
                          fastcgi_pass unix:{sock};\n\
                      }}\n\
                      }}\n\n",
+                    port = port,
+                    dedicated_server_names = dedicated_server_names,
                     docroot = docroot.display(),
+                    proj_id = project.id.0,
                     sock = sock.display()
                 ));
             }
@@ -298,10 +310,19 @@ fastcgi_param  REDIRECT_STATUS    200;
                  server_name_in_redirect off;\n\
                  root \"{docroot}\";\n\
                  index index.php index.html;\n\n\
+                 # LocalForge Identity-Aware Health Endpoint\n\
+                 location = /__localforge_health {{\n\
+                     access_log off;\n\
+                     default_type application/json;\n\
+                     add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
+                     return 200 \"{{\\\"status\\\":\\\"ready\\\",\\\"project_id\\\":\\\"{proj_id}\\\",\\\"port\\\":{listen_port}}}\\n\";\n\
+                 }}\n\n\
                  location / {{\n\
+                     add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
                      try_files $uri $uri/ /index.php?$query_string;\n\
                  }}\n\n\
                  location ~ \\.php$ {{\n\
+                     add_header X-LocalForge-Project-Id \"{proj_id}\" always;\n\
                      include fastcgi_params;\n\
                      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n\
                      fastcgi_param SERVER_PORT $server_port;\n\
@@ -310,7 +331,9 @@ fastcgi_param  REDIRECT_STATUS    200;
                  }}\n\
                  }}\n",
                 listen_port = self.listen_port,
+                shared_server_names = shared_server_names,
                 docroot = docroot.display(),
+                proj_id = project.id.0,
                 sock = sock.display()
             ));
         }
@@ -709,13 +732,13 @@ fastcgi_param  REDIRECT_STATUS    200;
         conf_matches && prefix_matches
     }
 
-    /// Evaluates the true ownership, process identity and operational health of the gateway.
+    /// Evaluates the true ownership, process identity and operational health of any listening port.
     /// Distinguishes verified LocalForge Nginx from an unrelated process occupying the port.
-    pub fn check_gateway_health(&self) -> GatewayHealth {
+    pub fn check_listener_health(&self, port: u16) -> GatewayHealth {
         let mut lock = self.master_process.lock().unwrap();
 
         // 1. Check if the port is available
-        if is_port_available(self.listen_port) {
+        if is_port_available(port) {
             // Port might be in a brief reload cycle if master was previously active
             if let Some((identity, _)) = lock.as_ref() {
                 if self.process_manager.verify_process_identity(
@@ -727,27 +750,26 @@ fastcgi_param  REDIRECT_STATUS    200;
                     let wait_start = Instant::now();
                     while wait_start.elapsed() < Duration::from_millis(250) {
                         std::thread::sleep(Duration::from_millis(25));
-                        if !is_port_available(self.listen_port) {
+                        if !is_port_available(port) {
                             break;
                         }
                     }
                 }
             }
-            if is_port_available(self.listen_port) {
+            if is_port_available(port) {
                 return GatewayHealth::Stopped;
             }
         }
 
         // 2. Port is bound. Find the actual process(es) holding the listening socket on this port.
-        let listening_pids = match self.process_manager.find_listening_pids(self.listen_port) {
+        let listening_pids = match self.process_manager.find_listening_pids(port) {
             Ok(pids) => pids,
             Err(e) => {
                 return GatewayHealth::PortConflict {
-                    port: self.listen_port,
+                    port,
                     occupying_pid: None,
                     details: format!(
-                        "Port {} is occupied, but listener inspection failed: {e}",
-                        self.listen_port
+                        "Port {port} is occupied, but listener inspection failed: {e}"
                     ),
                 };
             }
@@ -756,12 +778,9 @@ fastcgi_param  REDIRECT_STATUS    200;
         if listening_pids.is_empty() {
             // Ambiguous state: Port is bound, but listening PID could not be determined
             return GatewayHealth::PortConflict {
-                port: self.listen_port,
+                port,
                 occupying_pid: None,
-                details: format!(
-                    "Port {} is occupied by an unverified or transient process",
-                    self.listen_port
-                ),
+                details: format!("Port {port} is occupied by an unverified or transient process"),
             };
         }
 
@@ -777,11 +796,10 @@ fastcgi_param  REDIRECT_STATUS    200;
                 _ => {
                     if first_conflict.is_none() {
                         first_conflict = Some(GatewayHealth::PortConflict {
-                            port: self.listen_port,
+                            port,
                             occupying_pid: Some(lpid),
                             details: format!(
-                                "Port {} is occupied by an unverified or foreign process (PID {lpid})",
-                                self.listen_port
+                                "Port {port} is occupied by an unverified or foreign process (PID {lpid})"
                             ),
                         });
                     }
@@ -793,11 +811,10 @@ fastcgi_param  REDIRECT_STATUS    200;
             if !Self::is_legitimate_nginx_binary(identity.executable_path()) {
                 if first_conflict.is_none() {
                     first_conflict = Some(GatewayHealth::PortConflict {
-                        port: self.listen_port,
+                        port,
                         occupying_pid: Some(lpid),
                         details: format!(
-                            "Port {} is occupied by an unrelated non-Nginx process '{}' (PID {lpid})",
-                            self.listen_port,
+                            "Port {port} is occupied by an unrelated non-Nginx process '{}' (PID {lpid})",
                             identity.executable_path().display()
                         ),
                     });
@@ -817,7 +834,13 @@ fastcgi_param  REDIRECT_STATUS    200;
                     master_id.start_time_usecs,
                 );
                 if verified_master && (lpid == master_id.pid || identity.pgid == master_id.pgid) {
-                    is_localforge = true;
+                    let cmdline_matches = match self.process_manager.get_process_cmdline(lpid) {
+                        Ok(Some(args)) => self.is_localforge_nginx_cmdline(&args),
+                        _ => false,
+                    };
+                    if cmdline_matches || identity.pgid == master_id.pgid {
+                        is_localforge = true;
+                    }
                 }
             }
 
@@ -862,11 +885,10 @@ fastcgi_param  REDIRECT_STATUS    200;
                 verified_localforge_pids.push(lpid);
             } else if first_conflict.is_none() {
                 first_conflict = Some(GatewayHealth::PortConflict {
-                    port: self.listen_port,
+                    port,
                     occupying_pid: Some(lpid),
                     details: format!(
-                        "Port {} is occupied by an external Nginx instance (PID {lpid}) not managed by LocalForge",
-                        self.listen_port
+                        "Port {port} is occupied by an external Nginx instance (PID {lpid}) not managed by LocalForge"
                     ),
                 });
             }
@@ -880,22 +902,20 @@ fastcgi_param  REDIRECT_STATUS    200;
         if let Some(&first_pid) = verified_localforge_pids.first() {
             return GatewayHealth::Running {
                 pid: first_pid,
-                port: self.listen_port,
+                port,
             };
         }
 
-        if let Some(conflict) = first_conflict {
-            return conflict;
-        }
-
         GatewayHealth::PortConflict {
-            port: self.listen_port,
+            port,
             occupying_pid: listening_pids.first().copied(),
-            details: format!(
-                "Port {} is occupied by an unverified process",
-                self.listen_port
-            ),
+            details: format!("Port {port} is occupied by an unverified process"),
         }
+    }
+
+    /// Evaluates the true ownership, process identity and operational health of the gateway port.
+    pub fn check_gateway_health(&self) -> GatewayHealth {
+        self.check_listener_health(self.listen_port)
     }
 
     /// Checks if the Nginx gateway is alive and bound by verified LocalForge Nginx.
@@ -1012,17 +1032,64 @@ fastcgi_param  REDIRECT_STATUS    200;
         }
 
         // 6. Verified Graceful Shutdown:
-        // Send SIGQUIT (Nginx graceful stop) directly to the verified master PID.
+        // Use the canonical verified process manager abstraction to send SIGQUIT (graceful stop).
+        // Re-validates process identity immediately before signaling and checks signal delivery result.
         // We strictly DO NOT execute `nginx -s stop`, because Nginx's external CLI rereads
         // the mutable PID file from disk, which introduces a critical TOCTOU signal vulnerability.
-        unsafe {
-            let _ = libc::kill(identity.pid as libc::pid_t, libc::SIGQUIT);
+        //
+        // RESIDUAL TOCTOU NOTE: On Unix systems, there is an unavoidable kernel microsecond
+        // window between proc inspection and signal delivery. LocalForge closes this window to the
+        // maximum platform extent by checking UID, exact start timestamp, and canonical binary path
+        // atomically in `signal_process_verified` and inspecting the syscall result (ESRCH vs EPERM).
+        let delivered = self
+            .process_manager
+            .signal_process_verified(
+                identity.pid,
+                identity.executable_path(),
+                identity.start_time_secs,
+                identity.start_time_usecs,
+                libc::SIGQUIT,
+            )
+            .map_err(|e| RuntimeError::ServiceUnhealthy {
+                service: "nginx".into(),
+                reason: format!(
+                    "Failed to deliver verified graceful signal to Nginx master (PID {}): {e}",
+                    identity.pid
+                ),
+            })?;
+
+        if !delivered {
+            // Process already exited (ESRCH) right before signal delivery
+            let pid_file = self.run_dir.join("nginx.pid");
+            if pid_file.exists() {
+                let _ = std::fs::remove_file(&pid_file);
+            }
+            *lock = None;
+            return Ok(());
         }
 
-        // Brief delay (100ms) for workers to drain active connections and master to exit cleanly
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // 7. Bounded graceful shutdown polling: wait up to 1000ms for master to drain workers and exit
+        let wait_start = Instant::now();
+        while wait_start.elapsed() < Duration::from_millis(1000) {
+            std::thread::sleep(Duration::from_millis(50));
+            match self.process_manager.inspect_process(identity.pid) {
+                Ok(Some(curr)) => {
+                    if curr.start_time_secs != identity.start_time_secs
+                        || curr.start_time_usecs != identity.start_time_usecs
+                    {
+                        // Master exited and PID was recycled by another process!
+                        break;
+                    }
+                }
+                Ok(None) => {
+                    // Master exited cleanly
+                    break;
+                }
+                Err(_) => break,
+            }
+        }
 
-        // 7. Ensure verified process group termination with 1s grace period
+        // 8. Ensure verified process group termination with 1s grace period for workers
         let _ = self.process_manager.terminate_process_group_verified(
             identity.pid,
             identity.executable_path(),
@@ -1037,12 +1104,28 @@ fastcgi_param  REDIRECT_STATUS    200;
             }
         }
 
+        // 9. Re-inspect to verify master process is truly dead before reporting clean shutdown
+        if let Ok(Some(surviving)) = self.process_manager.inspect_process(identity.pid) {
+            if surviving.start_time_secs == identity.start_time_secs
+                && surviving.start_time_usecs == identity.start_time_usecs
+                && surviving.executable_path() == identity.executable_path()
+            {
+                return Err(RuntimeError::ServiceUnhealthy {
+                    service: "nginx".into(),
+                    reason: format!(
+                        "Nginx master process (PID {}) survived shutdown signals and remains active",
+                        identity.pid
+                    ),
+                });
+            }
+        }
+
         let pid_file = self.run_dir.join("nginx.pid");
         if pid_file.exists() {
             let _ = std::fs::remove_file(&pid_file);
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(Duration::from_millis(50));
 
         Ok(())
     }
@@ -1311,5 +1394,78 @@ mod tests {
             is_port_available(test_port),
             "Port must be freed after stop"
         );
+    }
+
+    #[test]
+    fn test_adversarial_process_exit_and_replacement_between_checks_fails_safely() {
+        let dir = tempdir().unwrap();
+        let conf_dir = dir.path().join("conf");
+        let run_dir = dir.path().join("run");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+        std::fs::create_dir_all(&run_dir).unwrap();
+
+        let pm = Arc::new(MacOSProcessManager::new());
+        let sup = NginxSupervisor::new(conf_dir.clone(), run_dir.clone(), 8080, pm.clone());
+
+        // Spawn a child process to simulate Nginx master candidate
+        let mut child = std::process::Command::new("/bin/sleep")
+            .arg("10")
+            .spawn()
+            .unwrap();
+        let child_pid = child.id();
+        let _child_id = pm.inspect_process(child_pid).unwrap().unwrap();
+
+        // 1. If process is replaced by a foreign executable (e.g. sleep instead of nginx),
+        // stop() must fail closed without signaling!
+        let pid_file = run_dir.join("nginx.pid");
+        std::fs::write(&pid_file, format!("{child_pid}\n")).unwrap();
+
+        let stop_mismatch = sup.stop();
+        assert!(
+            stop_mismatch.is_err(),
+            "Non-Nginx process must fail closed during stop"
+        );
+        // The child process must NOT have been signaled or killed
+        assert!(
+            pm.inspect_process(child_pid).unwrap().is_some(),
+            "Foreign process must survive untouched"
+        );
+
+        // Terminate child cleanly
+        let _ = child.kill();
+        let _ = child.wait();
+
+        // 2. If process exited between verification checks (ESRCH), stop() must handle safely
+        // without crashing or reporting false errors
+        let stop_exited = sup.stop();
+        assert!(
+            stop_exited.is_ok(),
+            "Exited process must be safely reaped on ESRCH"
+        );
+    }
+
+    #[test]
+    fn test_adversarial_listener_ownership_verification_rejects_foreign_and_mixed_listeners() {
+        let dir = tempdir().unwrap();
+        let conf_dir = dir.path().join("conf");
+        let run_dir = dir.path().join("run");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+        std::fs::create_dir_all(&run_dir).unwrap();
+
+        let pm = Arc::new(MacOSProcessManager::new());
+        let sup = NginxSupervisor::new(conf_dir.clone(), run_dir.clone(), 18095, pm.clone());
+
+        // 1. Port with no listener -> Stopped
+        let health_stopped = sup.check_listener_health(18095);
+        assert!(matches!(health_stopped, GatewayHealth::Stopped));
+
+        // 2. Port occupied by a non-Nginx process (foreign dummy TCP listener)
+        let listener = std::net::TcpListener::bind("127.0.0.1:18095").unwrap();
+        let health_foreign = sup.check_listener_health(18095);
+        assert!(
+            matches!(health_foreign, GatewayHealth::PortConflict { .. }),
+            "Foreign listener must be detected as PortConflict"
+        );
+        drop(listener);
     }
 }

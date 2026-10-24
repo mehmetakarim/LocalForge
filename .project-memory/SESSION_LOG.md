@@ -904,3 +904,49 @@ This document records the chronological engineering log for all development sess
 6. **Deliverable & Closeout**:
    - Authored `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
    - Concluding status: `LOCALFORGE GATE U5.B2 — AWAITING PRODUCT OWNER FINAL SECURITY ACCEPTANCE.`
+
+
+---
+
+## Session 023 — Phase R1.3B UAT Recovery — Gate U5.B2 Final Acceptance Patch
+
+- **Date**: 2026-10-24
+- **Participants**: Principal Software Architect, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.B2 Final Acceptance Patch** (Process Safety, Project Identity & Listener Verification)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Baseline Commit**: `55225d168f9e95ea3688d744663b2b154d94504d`
+
+### Summary of Activities
+1. **Binding Decisions & Boundary Integrity**:
+   - `Decision PO-U5-01`: `Projetest` strictly preserved on PHP 8.4; zero SQLite mutations; zero Homebrew alterations.
+   - `Decision PO-U5-02`: MariaDB datadir initialization strictly held; host untouched.
+   - `Decision PO-U5-03/04`: Strict port isolation within `18081..=18999`; zero unsafe fallbacks.
+   - `Decision PO-U5-05`: Preferred branded local domains preserved with fail-closed security.
+2. **PID Reuse and Signal Delivery Verification (Finding 01, P0)**:
+   - Added canonical `signal_process_verified(pid, expected_executable, expected_start_secs, expected_start_usecs, signal)` to `ProcessManager` trait.
+   - Implemented in `MacOSProcessManager` with low-level Darwin `proc_pidinfo` / `proc_pidpath`, checking EUID, microsecond start time (`tv_usec`), and canonical binary path immediately before `libc::kill`.
+   - Handled return values cleanly: `ESRCH` (already exited) returns `Ok(false)`, `EPERM` fails closed with permission error.
+   - In `NginxSupervisor::stop()`, replaced unchecked kill with `signal_process_verified`, bounded graceful wait (1s), worker group teardown via `terminate_process_group_verified`, and post-termination check verifying master process is dead before removing `nginx.pid`.
+   - Added adversarial tests: `test_signal_process_verified_lifecycle_and_rejections` and `test_adversarial_process_exit_and_replacement_between_checks_fails_safely`.
+3. **Project Identity & HTTP Readiness Verification (Finding 02, P1)**:
+   - Added zero-touch branded endpoint `/__localforge_health` to Nginx vhost config returning `{"status":"ready","project_id":"<id>","port":<port>}` and `X-LocalForge-Project-Id` response header.
+   - In `ProjectRuntimeService::verify_browser_readiness`:
+     - Stage 1: Probes `/__localforge_health` and verifies JSON `project_id` matches target.
+     - Stage 2: Probes `/` and strictly rejects gateway mismatch strings (`LocalForge Gateway: Host mismatch`).
+     - Accepts application 4xx codes only after Stage 1 proves project identity.
+     - Completely removed blind `Host: 127.0.0.1` probe fallback.
+4. **Strict Multi-PID Listener Ownership Verification (Finding 03, P1)**:
+   - Generalized `check_gateway_health` into `NginxSupervisor::check_listener_health(&self, port: u16) -> GatewayHealth`.
+   - Examines all listening PIDs on the port. Verifies exact canonical binary, exact LocalForge command line (`-c` and `-p`), and start timestamp.
+   - If any foreign, mixed, or unverified process is detected on the port, immediately returns `PortConflict`.
+   - Integrated into `verify_browser_readiness` Layer 3.
+   - Added adversarial test `test_adversarial_listener_ownership_verification_rejects_foreign_and_mixed_listeners`.
+5. **Full Verification Suite (100% Pass)**:
+   - Cargo fmt check: 0 violations (`cargo fmt --check`).
+   - Cargo clippy: 0 warnings (`cargo clippy --workspace -- -D warnings`).
+   - Rust workspace tests: 69/69 passed (100% pass across platform, storage, runtime, mariadb, deployment, mcp, desktop lib).
+   - Desktop node tests: 33/33 passed (`npm test --prefix apps/desktop`).
+   - Desktop production build: clean build (`npm run build --prefix apps/desktop`).
+6. **Deliverable & Closeout**:
+   - Updated `docs/phases/R1_3B_U5B2_FINAL_SECURITY_ACCEPTANCE.md`.
+   - Concluding status: `LOCALFORGE U5.B2 FINAL PATCH COMPLETE — AWAITING PRODUCT OWNER ACCEPTANCE.`

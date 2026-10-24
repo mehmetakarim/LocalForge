@@ -46,4 +46,17 @@ impl ProcessManager for WindowsProcessManager {
             "Windows process management not yet implemented".into(),
         ))
     }
+
+    fn signal_process_verified(
+        &self,
+        _pid: u32,
+        _expected_executable: &Path,
+        _expected_start_secs: u64,
+        _expected_start_usecs: u32,
+        _signal: i32,
+    ) -> Result<bool> {
+        Err(LocalForgeError::PlatformError(
+            "Windows process management not yet implemented".into(),
+        ))
+    }
 }

@@ -62,6 +62,22 @@ pub trait ProcessManager: Send + Sync {
         grace_period_secs: u64,
     ) -> Result<()>;
 
+    /// Delivers an OS signal to a verified process after validating UID, executable path,
+    /// and launch timestamp to protect against PID reuse.
+    ///
+    /// Returns:
+    /// - `Ok(true)`: Signal was successfully delivered to the verified process.
+    /// - `Ok(false)`: Process has already exited (ESRCH).
+    /// - `Err(...)`: PID reuse detected, UID/executable mismatch, EPERM, or syscall failure.
+    fn signal_process_verified(
+        &self,
+        pid: u32,
+        expected_executable: &Path,
+        expected_start_secs: u64,
+        expected_start_usecs: u32,
+        signal: i32,
+    ) -> Result<bool>;
+
     /// Identifies the PIDs of processes listening on the given TCP port.
     fn find_listening_pids(&self, _port: u16) -> Result<Vec<u32>> {
         Ok(Vec::new())
