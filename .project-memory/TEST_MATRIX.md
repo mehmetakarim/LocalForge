@@ -84,6 +84,11 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-R1.3B-UAT-14** | Workspace Rust Test Suite | `cargo test --workspace` | Apple Silicon Mac M1 | **PASS** | All unit and integration test suites pass across workspace. |
 | **TEST-R1.3B-UAT-15** | Clippy & Linter Audit | `cargo clippy --workspace --all-targets -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings across entire workspace. |
 | **TEST-R1.3B-UAT-16** | Formatting Audit | `cargo fmt --all -- --check` | Rust Toolchain 1.94.0 | **PASS** | Zero diffs across entire codebase. |
+| **TEST-R1.3B-U5F-01** | Production CLI Migrate-V2 Dry-Run | `target/debug/localforge storage migrate-v2 --db-path ...` | Host Apple Silicon Mac | **PASS** | Real host target DB evaluated; Schema V1 confirmed; 0 modifications made; immutable URI opened. |
+| **TEST-R1.3B-U5F-02** | Disposable CLI Migrate-V2 Live Execution | `localforge storage migrate-v2 --execute --approval-token ...` | Disposable /tmp fixture | **PASS** | Schema V2 migrated, unique index created, ports 18081/18082 assigned, PHP 8.4 preserved. |
+| **TEST-R1.3B-U5F-03** | Runtime Integration Test Suite | `cargo test -p localforge-runtime --test runtime_integration_test -- --test-threads=1` | Apple Silicon Mac | **PASS** | 15/15 passed sequentially avoiding port collision; Nginx vhosts & routing verified. |
+| **TEST-R1.3B-U5F-04** | Desktop Frontend Test Suite | `npm test --prefix apps/desktop` | Node.js Test Runner | **PASS** | 33/33 passed (%100 PASS) covering fixture safety, routing, and recovery suites. |
+| **TEST-R1.3B-U5F-05** | Clippy & Linter Audit | `cargo clippy --workspace -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings across entire workspace. |
 
 ---
 

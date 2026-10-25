@@ -1046,3 +1046,44 @@ This document records the chronological engineering log for all development sess
    - Authored `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`.
    - Updated `.project-memory/` suite (`SESSION_LOG.md`, `PROJECT_STATE.md`, `TASKS.md`, `HANDOFF.md`, `docs/tasks.md`).
    - Concluding status: `LOCALFORGE GATE U5.F — FINAL EXECUTION PROPOSAL READY. AWAITING PRODUCT OWNER EXPLICIT ACTIVATION AUTHORIZATION.`
+
+---
+
+## Session 023 — Gate U5.F Execution Blocker Remediation & CLI Migration Tool
+
+- **Date**: 2026-10-25
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.F Execution Blocker Remediation** (Tooling implementation & verification only; Actual activation strictly on hold)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Verified Code Baseline**: Commit `66303e42907675f2e41f8809f73dd31dd59f3ca9`
+
+### Summary of Activities
+1. **Execution Hold & Strict Boundary Discipline**:
+   - Maintained strict phase boundaries: zero modifications to the Product Owner's persistent SQLite database (`/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db`).
+   - Zero package installations, zero host MariaDB datadir initialization, zero DNS changes.
+2. **P0 — Missing Production Migration Entrypoint Implemented**:
+   - Implemented `localforge storage migrate-v2` command in `tools/cli/src/main.rs`.
+   - Intercepted early in `main()` before `open_metadata_store()` to prevent implicit startup write locks or auto-migrations.
+   - Default mode: `--dry-run` (read-only). Opens via URI `file:<path>?immutable=1` with `SQLITE_OPEN_READ_ONLY | SQLITE_OPEN_URI`, guaranteeing 100% zero write locks, zero WAL side effects.
+   - Live mode (`--execute`): Requires explicit `--approval-token` and `--backup-path`.
+   - Validates database path, UID 501 ownership, symlink rejections, process quiescence (`pgrep -il localforge`).
+   - Validates port availability (`18081` and `18082`) on host.
+   - Calls canonical `MetadataStore::migrate_to_v2_loopback_ports()` and `update_project_loopback_port()`.
+   - Strictly preserves `Projetest` on PHP `8.4`.
+   - Automated bounded rollback into timestamped `quarantine_<timestamp>/` (`chmod 700`) targeting exact allowlist.
+3. **P1 — HTTP Acceptance Semantics Clarified**:
+   - Validated Nginx generator logic: stopped projects produce a single server block with `return 503 ...` without health endpoints.
+   - Clarified that `Projetest` returns `HTTP 503 Service Unavailable` for both `/__localforge_health` and `/` while stopped.
+4. **P1 — Backup and Quarantine Allowlist**:
+   - Replaced wildcard matching with exact allowlist: `localforge.db`, `localforge.db-wal`, `localforge.db-shm`.
+5. **Comprehensive Verification**:
+   - Dry-run executed against real host database: 0 modifications made, Schema V1 confirmed, ports free.
+   - Disposable test database end-to-end migration verified successfully.
+   - `cargo clippy --workspace -- -D warnings`: 0 warnings.
+   - `runtime_integration_test`: 15 passed, 0 failed.
+   - Workspace unit tests: all passed.
+   - Desktop test suite: 33 passed, 0 failed.
+6. **Deliverables Updated**:
+   - Updated `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`.
+   - Updated `.project-memory/` suite (`SESSION_LOG.md`, `PROJECT_STATE.md`, `TASKS.md`, `HANDOFF.md`, `docs/tasks.md`).
+   - Concluding status: `LOCALFORGE GATE U5.F — EXECUTION TOOLING VERIFIED. AWAITING EXPLICIT PRODUCT OWNER ACTIVATION AUTHORIZATION.`

@@ -1927,14 +1927,17 @@ name = "localforge-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "dunce",
+ "libc",
  "localforge-core",
  "localforge-deployment",
  "localforge-platform",
  "localforge-project-manager",
  "localforge-runtime",
  "localforge-storage",
+ "rusqlite",
  "serde",
  "serde_json",
  "tokio",

@@ -48,6 +48,44 @@ enum Commands {
     Volumes,
     /// Smart, auditable deployment management
     Deploy(DeployArgs),
+    /// Manage database storage and controlled migrations
+    Storage(StorageArgs),
+}
+
+#[derive(Args)]
+struct StorageArgs {
+    #[command(subcommand)]
+    action: StorageCommands,
+}
+
+#[derive(Subcommand)]
+enum StorageCommands {
+    /// Safe, auditable V2 loopback port schema migration and port allocation
+    MigrateV2 {
+        /// Target database path (defaults to canonical Application Support path)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+
+        /// Path to verified SQLite backup file (mandatory for live execution)
+        #[arg(long)]
+        backup_path: Option<PathBuf>,
+
+        /// Candidate port for Project A (r1_acceptance_project)
+        #[arg(long, default_value_t = 18081)]
+        port_project_a: u16,
+
+        /// Candidate port for Project B (Projetest)
+        #[arg(long, default_value_t = 18082)]
+        port_project_b: u16,
+
+        /// Explicit execution confirmation (required to disable default read-only dry-run)
+        #[arg(long)]
+        execute: bool,
+
+        /// Mandatory Product Owner human approval token required for live execution
+        #[arg(long)]
+        approval_token: Option<String>,
+    },
 }
 
 #[derive(Args)]
@@ -96,6 +134,10 @@ fn open_metadata_store() -> MetadataStore {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
+
+    if let Commands::Storage(storage_args) = cli.command {
+        return handle_storage_command(storage_args).await;
+    }
 
     let base = localforge_runtime::resolve_application_support_dir()
         .unwrap_or_else(|_| PathBuf::from("Library/Application Support/LocalForge"));
@@ -455,7 +497,387 @@ async fn main() -> Result<()> {
                 }
             }
         },
+        Commands::Storage(_) => {
+            unreachable!("Commands::Storage is handled early before runtime initialization")
+        }
     }
 
     Ok(())
+}
+
+async fn handle_storage_command(args: StorageArgs) -> Result<()> {
+    match args.action {
+        StorageCommands::MigrateV2 {
+            db_path,
+            backup_path,
+            port_project_a,
+            port_project_b,
+            execute,
+            approval_token,
+        } => {
+            let canonical_app_support = localforge_runtime::resolve_application_support_dir()?;
+            let canonical_db_path =
+                db_path.unwrap_or_else(|| canonical_app_support.join("localforge.db"));
+
+            if !canonical_db_path.exists() {
+                return Err(anyhow!(
+                    "Target database '{}' does not exist",
+                    canonical_db_path.display()
+                ));
+            }
+
+            // 1. Ownership & Symlink Verifications
+            use std::os::unix::fs::MetadataExt;
+            let db_meta = std::fs::symlink_metadata(&canonical_db_path)?;
+            if db_meta.file_type().is_symlink() {
+                return Err(anyhow!(
+                    "Security violation: database path cannot be a symbolic link"
+                ));
+            }
+            let current_uid = unsafe { libc::geteuid() };
+            if db_meta.uid() != current_uid {
+                return Err(anyhow!(
+                    "Security violation: database UID {} does not match current user UID {}",
+                    db_meta.uid(),
+                    current_uid
+                ));
+            }
+            if let Some(parent) = canonical_db_path.parent() {
+                let parent_meta = std::fs::symlink_metadata(parent)?;
+                if parent_meta.file_type().is_symlink() {
+                    return Err(anyhow!(
+                        "Security violation: parent directory cannot be a symbolic link"
+                    ));
+                }
+                if parent_meta.uid() != current_uid {
+                    return Err(anyhow!(
+                        "Security violation: parent directory UID {} does not match current user UID {}",
+                        parent_meta.uid(),
+                        current_uid
+                    ));
+                }
+            }
+
+            // 2. SQLite Quiescence Verification
+            let current_pid = std::process::id();
+            if let Ok(output) = std::process::Command::new("pgrep")
+                .arg("-il")
+                .arg("localforge")
+                .output()
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(pid_str) = parts.first() {
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            if pid != current_pid {
+                                return Err(anyhow!(
+                                    "SQLite quiescence check failed: active LocalForge process detected (PID: {})",
+                                    pid
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Port Bounds & Uniqueness
+            if !(18081..=18999).contains(&port_project_a) {
+                return Err(anyhow!(
+                    "Port A ({}) is outside permitted range 18081..=18999",
+                    port_project_a
+                ));
+            }
+            if !(18081..=18999).contains(&port_project_b) {
+                return Err(anyhow!(
+                    "Port B ({}) is outside permitted range 18081..=18999",
+                    port_project_b
+                ));
+            }
+            if port_project_a == port_project_b {
+                return Err(anyhow!(
+                    "Port A and Port B cannot be identical ({})",
+                    port_project_a
+                ));
+            }
+            let a_free = is_port_available(port_project_a);
+            let b_free = is_port_available(port_project_b);
+
+            // 4. Read-Only Dry-Run Mode (Default)
+            if !execute {
+                println!(
+                    "\x1b[1;36m=== LOCALFORGE GATE U5.F: V2 MIGRATION DRY-RUN AUDIT ===\x1b[0m"
+                );
+                println!("Target Database:      {}", canonical_db_path.display());
+                println!("Database Size:        {} bytes", db_meta.len());
+                println!("Database Owner UID:   {}", db_meta.uid());
+                println!("Current User UID:     {}", current_uid);
+
+                // Open STRICTLY in read-only mode with immutable=1 to prevent any writes to db, wal, or shm
+                let uri_path = format!("file:{}?immutable=1", canonical_db_path.display());
+                let conn = rusqlite::Connection::open_with_flags(
+                    &uri_path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                )?;
+
+                let integrity: String =
+                    conn.query_row("PRAGMA integrity_check;", [], |r| r.get(0))?;
+                if integrity != "ok" {
+                    return Err(anyhow!("Database integrity check failed: {}", integrity));
+                }
+                println!("Integrity Check:      \x1b[1;32m{}\x1b[0m", integrity);
+
+                let has_port_col: i64 = conn.prepare("SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'loopback_port';")?
+                    .query_row([], |r| r.get(0))?;
+                println!(
+                    "Schema Status:        {}",
+                    if has_port_col > 0 {
+                        "Schema V2 (loopback_port present)"
+                    } else {
+                        "Schema V1 (loopback_port absent)"
+                    }
+                );
+
+                let mut stmt = conn.prepare(
+                    "SELECT id, name, php_version, local_domain FROM projects ORDER BY name ASC;",
+                )?;
+                let projects = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                })?;
+
+                println!("\nProject Inspection:");
+                for p in projects {
+                    let (id, name, php_version, domain) = p?;
+                    let proposed_port = if name.contains("r1_acceptance") {
+                        port_project_a
+                    } else {
+                        port_project_b
+                    };
+                    let port_free = if name.contains("r1_acceptance") {
+                        a_free
+                    } else {
+                        b_free
+                    };
+                    println!("  - [{}] {}", id, name);
+                    println!("    PHP Version:     {}", php_version);
+                    println!("    Local Domain:    {}", domain);
+                    println!(
+                        "    Proposed Port:   {} (Available on host: {})",
+                        proposed_port,
+                        if port_free {
+                            "\x1b[32mYES\x1b[0m"
+                        } else {
+                            "\x1b[31mNO\x1b[0m"
+                        }
+                    );
+                    if name == "Projetest" {
+                        if php_version != "8.4" {
+                            return Err(anyhow!(
+                                "PO-U5-01 VIOLATION: Projetest PHP version is '{}', expected '8.4'",
+                                php_version
+                            ));
+                        }
+                        println!(
+                            "    PO Compliance:   \x1b[1;32mPO-U5-01 PRESERVED (PHP 8.4)\x1b[0m"
+                        );
+                    }
+                }
+
+                println!(
+                    "\n\x1b[1;33m[!] DRY-RUN COMPLETE: Zero modifications made to database.\x1b[0m"
+                );
+                println!("To execute live migration, explicit authorization is required:\n  localforge storage migrate-v2 --execute --approval-token <TOKEN> --backup-path <PATH>");
+                return Ok(());
+            }
+
+            // 5. Live Execution Mode
+            let token = approval_token.as_deref().unwrap_or("").trim();
+            if token.is_empty() {
+                return Err(anyhow!(
+                    "Execution rejected: --approval-token is mandatory when --execute is specified"
+                ));
+            }
+
+            let bpath = backup_path.ok_or_else(|| {
+                anyhow!("Execution rejected: --backup-path is mandatory for live execution")
+            })?;
+            if !bpath.exists() {
+                return Err(anyhow!("Backup file '{}' does not exist", bpath.display()));
+            }
+            let bmeta = std::fs::symlink_metadata(&bpath)?;
+            if bmeta.file_type().is_symlink() {
+                return Err(anyhow!(
+                    "Security violation: backup file cannot be a symbolic link"
+                ));
+            }
+            if bmeta.uid() != current_uid {
+                return Err(anyhow!(
+                    "Security violation: backup file UID does not match current user"
+                ));
+            }
+
+            // Verify backup file integrity and Schema V1 in read-only mode
+            let b_uri = format!("file:{}?immutable=1", bpath.display());
+            let bconn = rusqlite::Connection::open_with_flags(
+                &b_uri,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+            )?;
+            let b_integ: String = bconn.query_row("PRAGMA integrity_check;", [], |r| r.get(0))?;
+            if b_integ != "ok" {
+                return Err(anyhow!("Backup integrity check failed: {}", b_integ));
+            }
+            let b_count: i64 =
+                bconn.query_row("SELECT count(*) FROM projects;", [], |r| r.get(0))?;
+            if b_count != 2 {
+                return Err(anyhow!(
+                    "Backup project count mismatch: expected 2, found {}",
+                    b_count
+                ));
+            }
+            let b_has_port: i64 = bconn.query_row(
+                "SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'loopback_port';",
+                [],
+                |r| r.get(0),
+            )?;
+            if b_has_port != 0 {
+                return Err(anyhow!(
+                    "Backup is not clean Schema V1 (already has loopback_port column)"
+                ));
+            }
+
+            if !a_free {
+                return Err(anyhow!("Port A ({}) is currently occupied on the host. Aborting without modifying database.", port_project_a));
+            }
+            if !b_free {
+                return Err(anyhow!("Port B ({}) is currently occupied on the host. Aborting without modifying database.", port_project_b));
+            }
+
+            println!("\x1b[1;32m[✓] All preconditions verified: Approval Token present, Quiescence ok, Backup verified V1, Ports free.\x1b[0m");
+
+            let rollback = |reason: &str| -> Result<()> {
+                eprintln!("\x1b[1;31m[!] Live migration failed: {}. Initiating auditable rollback...\x1b[0m", reason);
+                let allowlist = ["localforge.db", "localforge.db-wal", "localforge.db-shm"];
+                let quarantine_dir = canonical_app_support.join("quarantine").join(format!(
+                    "quarantine_{}",
+                    chrono::Utc::now().format("%Y%m%d_%H%M%S")
+                ));
+                std::fs::create_dir_all(&quarantine_dir)?;
+                let qmeta = std::fs::metadata(&quarantine_dir)?;
+                if qmeta.uid() != current_uid {
+                    return Err(anyhow!("Quarantine directory ownership failure"));
+                }
+
+                for name in &allowlist {
+                    let fpath = canonical_app_support.join(name);
+                    if fpath.exists() {
+                        let fmeta = std::fs::symlink_metadata(&fpath)?;
+                        if !fmeta.file_type().is_symlink() {
+                            std::fs::rename(&fpath, quarantine_dir.join(name))?;
+                        }
+                    }
+                }
+
+                std::fs::copy(&bpath, &canonical_db_path)?;
+                eprintln!(
+                    "\x1b[1;32m[✓] Rollback completed: state restored from backup '{}'.\x1b[0m",
+                    bpath.display()
+                );
+                Ok(())
+            };
+
+            // Open live database via canonical MetadataStore
+            let store = MetadataStore::open(&canonical_db_path)?;
+
+            let projects = store.list_projects()?;
+            let p1 = projects
+                .iter()
+                .find(|p| p.name == "r1_acceptance_project")
+                .ok_or_else(|| anyhow!("Project 'r1_acceptance_project' not found in database"))?;
+            let p2 = projects
+                .iter()
+                .find(|p| p.name == "Projetest")
+                .ok_or_else(|| anyhow!("Project 'Projetest' not found in database"))?;
+
+            if p2.php_version != "8.4" {
+                return Err(anyhow!(
+                    "PO-U5-01 VIOLATION: Projetest PHP version is '{}', must be '8.4'",
+                    p2.php_version
+                ));
+            }
+
+            println!("Executing canonical MetadataStore::migrate_to_v2_loopback_ports()...");
+            let report = match store.migrate_to_v2_loopback_ports() {
+                Ok(r) => r,
+                Err(e) => {
+                    let _ = rollback(&format!("Migration failed: {e}"));
+                    return Err(anyhow!("Migration failed: {e}"));
+                }
+            };
+            println!(
+                "Migration report: Target version {}, applied: {}",
+                report.target_version, report.applied
+            );
+
+            println!(
+                "Assigning loopback ports via MetadataStore::update_project_loopback_port()..."
+            );
+            if let Err(e) = store.update_project_loopback_port(&p1.id, Some(port_project_a)) {
+                let _ = rollback(&format!("Port A assignment failed: {e}"));
+                return Err(anyhow!("Port A assignment failed: {e}"));
+            }
+            if let Err(e) = store.update_project_loopback_port(&p2.id, Some(port_project_b)) {
+                let _ = rollback(&format!("Port B assignment failed: {e}"));
+                return Err(anyhow!("Port B assignment failed: {e}"));
+            }
+
+            // Post-migration verification
+            let p1_after = store
+                .get_project(&p1.id)?
+                .ok_or_else(|| anyhow!("Project A missing after migration"))?;
+            let p2_after = store
+                .get_project(&p2.id)?
+                .ok_or_else(|| anyhow!("Project B missing after migration"))?;
+
+            if p1_after.loopback_port != Some(port_project_a) {
+                let _ = rollback("Project A loopback_port verification mismatch");
+                return Err(anyhow!("Project A port verification failed"));
+            }
+            if p2_after.loopback_port != Some(port_project_b) {
+                let _ = rollback("Project B loopback_port verification mismatch");
+                return Err(anyhow!("Project B port verification failed"));
+            }
+            if p2_after.php_version != "8.4" {
+                let _ = rollback("PO-U5-01 VIOLATION: Projetest PHP version mutated");
+                return Err(anyhow!(
+                    "PO-U5-01 VIOLATION: Projetest PHP version mutated to {}",
+                    p2_after.php_version
+                ));
+            }
+
+            let check_conn = rusqlite::Connection::open(&canonical_db_path)?;
+            if localforge_storage::validate_loopback_port_index(&check_conn)?
+                != localforge_storage::IndexValidationStatus::Valid
+            {
+                let _ = rollback("Post-migration unique index validation failed");
+                return Err(anyhow!("Unique index validation failed"));
+            }
+
+            println!("\x1b[1;32m=== LIVE MIGRATION AND PORT ALLOCATION COMPLETED SUCCESSFULLY ===\x1b[0m");
+            println!("  - Project A ({}): Port {}", p1_after.name, port_project_a);
+            println!(
+                "  - Project B ({}): Port {} (PHP 8.4 strictly preserved)",
+                p2_after.name, port_project_b
+            );
+            println!("  - Unique Index:    VALIDATED (idx_projects_loopback_port)");
+            println!("  - Schema Version:  2");
+
+            Ok(())
+        }
+    }
 }

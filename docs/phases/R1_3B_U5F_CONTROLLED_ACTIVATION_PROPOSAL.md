@@ -143,16 +143,34 @@ Manual SQL execution paths are completely excluded. The migration is executed st
                   └─────────────────────────────────────────────────────────┘
 ```
 
-### Exact Executable / Application Command:
-The migration and port assignment will be invoked via the compiled LocalForge storage execution runner:
+### Exact Executable Command (Gated CLI Migration Tool):
+The migration and port assignment are strictly executed through the canonical LocalForge CLI tool (`localforge storage migrate-v2`). No Cargo test runners or manual SQL paths are permitted:
+
+1. **Safety Default — Read-Only Dry Run:**
 ```bash
 /Volumes/Mac\ Harici\ Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
   --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db"
 ```
-Or via the direct deterministic Rust integration runner:
+*Dry-Run Guarantees:*
+- Opened via SQLite URI `file:<path>?immutable=1` using `SQLITE_OPEN_READ_ONLY | SQLITE_OPEN_URI`.
+- Zero write mode, zero write locks, zero WAL or SHM writes.
+- Verifies database path, UID 501 ownership, canonical non-symlink paths, process quiescence (`pgrep -il localforge`), schema V1 status, port candidates (`18081`, `18082`), and host port availability.
+
+2. **Live Execution (Requires Explicit Approval Token & Tested Backup):**
 ```bash
-cargo test -p localforge-storage --test storage_integration_test -- test_v2_migration_and_index_lifecycle --exact
+/Volumes/Mac\ Harici Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
+  --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db" \
+  --execute \
+  --approval-token "U5F-ACTIVATION-AUTHORIZED-20261025" \
+  --backup-path "$BACKUP_DIR/localforge_v1_atomic_backup.db"
 ```
+*Live Execution Guarantees:*
+- Re-verifies backup existence, UID 501 ownership, schema V1 integrity, and exact project counts.
+- Re-verifies SQLite quiescence.
+- Invokes `MetadataStore::migrate_to_v2_loopback_ports()` in an immediate transaction.
+- Invokes `MetadataStore::update_project_loopback_port()` assigning 18081 (`r1_acceptance_project`) and 18082 (`Projetest`).
+- Validates that `Projetest` retains PHP `8.4` (PO-U5-01).
+- Automatic bounded rollback to the exact allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`) in quarantine if any step fails.
 
 ### Data Integrity Guarantees:
 - **Version Tracking:** Schema version 2 explicitly recorded in `schema_migrations`.
@@ -173,16 +191,16 @@ All identity probes MUST supply the expected `Host` header to validate virtual h
 |---|---|---|---|---|---|---|
 | **`r1_acceptance_project`** | `18081` | `r1-acceptance-project.localforge` | `curl -sS -i -H "Host: r1-acceptance-project.localforge" http://127.0.0.1:18081/__localforge_health` | **HTTP 200 OK** | `X-LocalForge-Project-ID: proj_e92e56cd0e0c4c36952804a35b3587a3` | Verified active PHP 8.5 project |
 | **`r1_acceptance_project`** | `18081` | `r1-acceptance-project.localforge` | `curl -sS -i -H "Host: r1-acceptance-project.localforge" http://127.0.0.1:18081/` | **HTTP 200 OK** | Dynamic JSON response from `index.php` | Live application response |
-| **`Projetest`** | `18082` | `projetest.localforge` | `curl -sS -i -H "Host: projetest.localforge" http://127.0.0.1:18082/__localforge_health` | **HTTP 200 OK** | `X-LocalForge-Project-ID: proj_db5472bb224c4fd0960ff69f793590a7` | Confirms dedicated port & vhost binding |
-| **`Projetest`** | `18082` | `projetest.localforge` | `curl -sS -i -H "Host: projetest.localforge" http://127.0.0.1:18082/` | **HTTP 503 Service Unavailable** / Stopped | FastCGI socket unmounted | **Honest stopped-project outcome. PHP 8.4 not yet installed.** |
+| **`Projetest`** | `18082` | `projetest.localforge` | `curl -sS -i -H "Host: projetest.localforge" http://127.0.0.1:18082/__localforge_health` | **HTTP 503 Service Unavailable** | Single stopped server block returns 503 unconditionally | **Stopped project semantics:** Nginx generator produces 503 block with no separate health location |
+| **`Projetest`** | `18082` | `projetest.localforge` | `curl -sS -i -H "Host: projetest.localforge" http://127.0.0.1:18082/` | **HTTP 503 Service Unavailable** | Single stopped server block returns 503 unconditionally | **Honest stopped-project outcome. PHP 8.4 not yet installed.** |
 | **Legacy Gateway** | `8080` | `r1-acceptance-project.localforge` | `curl -sS -i -H "Host: r1-acceptance-project.localforge" http://127.0.0.1:8080/` | **HTTP 200 OK** | Dynamic JSON response | Preserves 8080 backward compatibility |
 | **Legacy Domain** | `8080` | `r1_acceptance_project.test` | `curl -sS -i -H "Host: r1_acceptance_project.test" http://127.0.0.1:8080/` | **HTTP 200 OK** | Dynamic JSON response | Preserves `.test` metadata routing |
 
 ### Strict Stop Conditions for HTTP Probes:
-- If `/__localforge_health` returns any project ID other than the expected ID, fail immediately.
-- If `/__localforge_health` returns HTTP 404, it is classified as **UNHEALTHY**; fail immediately.
-- If `http://127.0.0.1:18082/` routes to `r1_acceptance_project` (cross-project routing), fail immediately.
-- `Projetest` is **NOT** expected to return HTTP 200. Returning 503 or stopped status is the authorized, honest behavior.
+- If `r1_acceptance_project` `/__localforge_health` returns any project ID other than `proj_e92e56cd0e0c4c36952804a35b3587a3`, fail immediately.
+- If `r1_acceptance_project` `/__localforge_health` returns HTTP 404, it is classified as **UNHEALTHY**; fail immediately.
+- If `http://127.0.0.1:18082/` routes to `r1_acceptance_project` (cross-project routing leak), fail immediately.
+- `Projetest` while stopped is **EXPECTED** to return HTTP 503 Service Unavailable on all endpoints. It must NOT return HTTP 200 (which would indicate unauthorized execution of a stopped project).
 
 ---
 
@@ -240,10 +258,13 @@ If any verification fails after activation begins:
         │     ├── Validate syntax: nginx -t -c ... -p ...
         │     └── Signal SIGHUP to verified Nginx master PID
         │
-        ├── STEP 2: NON-DESTRUCTIVE DATABASE QUARANTINE (No Blind Deletion)
+        ├── STEP 2: NON-DESTRUCTIVE DATABASE QUARANTINE (Exact Allowlist, No Wildcards)
         │     ├── QUARANTINE_DIR="$APP_SUPPORT/quarantine/quarantine_$(date +%Y%m%d_%H%M%S)"
         │     ├── mkdir -m 700 -p "$QUARANTINE_DIR"
-        │     └── mv "$APP_SUPPORT/localforge.db"* "$QUARANTINE_DIR/"
+        │     ├── For f in "localforge.db" "localforge.db-wal" "localforge.db-shm":
+        │     │     ├── Verify UID 501 ownership & ensure not symlink
+        │     │     └── mv "$APP_SUPPORT/$f" "$QUARANTINE_DIR/" (if exists)
+        │     └── Zero wildcard matching; zero foreign file tampering
         │
         ├── STEP 3: ATOMIC DATABASE RESTORATION
         │     ├── cp "$BACKUP_DIR/localforge_v1_atomic_backup.db" "$APP_SUPPORT/localforge.db"

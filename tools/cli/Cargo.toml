@@ -25,3 +25,6 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 dunce.workspace = true
 anyhow.workspace = true
+rusqlite.workspace = true
+chrono.workspace = true
+libc.workspace = true
