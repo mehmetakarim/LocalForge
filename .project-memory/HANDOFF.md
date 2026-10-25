@@ -6,18 +6,18 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.F Execution Tooling Verified — Actual Activation Strictly on Hold / Awaiting PO Explicit Activation Authorization**
+- **Current State**: **Gate U5.F Final Executor Safety Patch Completed — Actual Activation Strictly on Hold / Awaiting PO Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `66303e42907675f2e41f8809f73dd31dd59f3ca9`
+- **Baseline Commit**: `4d2bac7c14401903c399f7201ec60cea88acc70d`
 - **Previous Milestone Status**:
-  - **Gate U5.F Final Execution Proposal**: Corrected proposal accepted; execution held for blocker remediation.
-- **Completed in Gate U5.F Execution Blocker Remediation**:
-  1. `P0 — Missing Production Migration Entrypoint`: Implemented `localforge storage migrate-v2` in `tools/cli/src/main.rs`. Early intercept before `open_metadata_store()` prevents implicit write locks or auto-migrations. Default mode is read-only `--dry-run` opening `file:<path>?immutable=1` with zero write locks and zero WAL side effects. Gated live mode `--execute` strictly requires `--approval-token` and `--backup-path`, verifies SQLite quiescence, executes `migrate_to_v2_loopback_ports()` and `update_project_loopback_port()`, preserves Projetest PHP 8.4, and provides automated rollback into timestamped `quarantine_<timestamp>/` (`chmod 700`).
-  2. `P1 — Stopped Project Semantics`: Validated that stopped projects produce a single server block with `return 503 ...` without health endpoints. Clarified that `Projetest` returns `HTTP 503 Service Unavailable` for both `/__localforge_health` and `/` while stopped.
-  3. `P1 — Backup and Quarantine Allowlist`: Replaced wildcard matching with exact allowlist: `localforge.db`, `localforge.db-wal`, `localforge.db-shm` with UID 501 check and symlink rejection.
-  4. Tested and verified on real host (dry-run, 0 modifications made) and disposable copies (full migration and rollback verified). All 69 Rust tests, 15 runtime integration tests, and 33 desktop tests pass with 0 clippy warnings.
-- **Next Permitted Action**: Await explicit Product Owner activation authorization specifically for Gate U5.F execution before making ANY persistent modifications to `localforge.db`, writing vhosts, or signaling Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
+  - **Gate U5.F Execution Blocker Remediation**: CLI migration entrypoint implemented; safety patch applied for authorization bypass, rollback scope isolation, and WAL snapshot preflight.
+- **Completed in Gate U5.F Final Executor Safety Patch**:
+  1. `P0-01 — Approval Authorization Bypass Remediation`: Implemented `crates/storage/src/approval.rs`. Replaced arbitrary string acceptance with RFC 2104 / RFC 4231 HMAC-SHA256 signature verification over canonical payload binding `token_id`, `database_path`, `database_sha256`, `scope` (`migrate-v2-loopback-ports`), and exact `projects` (`proj_e92e56cd...: 18081`, `proj_db5472bb...: 18082`). Implemented persistent replay ledger (`consumed_approvals.jsonl` at 0600 permissions). Zero hardcoded secrets (reads `LOCALFORGE_PO_APPROVAL_KEY`, fails closed if missing).
+  2. `P0-02 — SQLite Rollback With Open Connection Remediation`: Implemented `crates/storage/src/rollback.rs`. Divided execution and rollback into distinct ownership scopes (`MetadataStore` connection is dropped before rollback begins). Verifies writer quiescence immediately prior to restoration (`verify_writer_quiescence`), failing closed if active SQLite processes exist. Quarantines failed live state into `quarantine_<timestamp>/` (0700) using exact allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`). Restores backup atomically (0600) and independently verifies integrity and records. Simulated failure injection tested across multiple failure points.
+  3. `P1-01 — WAL-Aware Read-Only Preflight Remediation`: Implemented `crates/storage/src/snapshot.rs`. Uses SQLite Online Backup API against live database into an isolated temporary file to obtain a consistent snapshot without forcing dirty WAL flushes or mutating live WAL/SHM file metadata. Runs preflight schema and project record inspection against the snapshot.
+  4. Tested and verified: Real-host dry-run confirmed 0 modifications and valid WAL snapshot. 18 storage unit tests, 15 runtime integration tests, 79 workspace library tests, 33 desktop frontend tests pass (112 total). Zero clippy warnings, zero fmt diffs.
+- **Next Permitted Action**: Await explicit Product Owner acceptance and subsequent activation authorization specifically for Gate U5.F execution before making ANY persistent modifications to `localforge.db`, writing vhosts, or signaling Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---
 

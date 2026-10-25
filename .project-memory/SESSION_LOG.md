@@ -1087,3 +1087,46 @@ This document records the chronological engineering log for all development sess
    - Updated `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`.
    - Updated `.project-memory/` suite (`SESSION_LOG.md`, `PROJECT_STATE.md`, `TASKS.md`, `HANDOFF.md`, `docs/tasks.md`).
    - Concluding status: `LOCALFORGE GATE U5.F — EXECUTION TOOLING VERIFIED. AWAITING EXPLICIT PRODUCT OWNER ACTIVATION AUTHORIZATION.`
+
+---
+
+## Session 024 — Gate U5.F Final Executor Safety Patch
+
+- **Date**: 2026-10-25
+- **Participants**: Principal Software Architect, Senior Rust Engineer, Systems Engineer, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.F Final Executor Safety Patch** (Tooling safety patch & verification only; Actual activation strictly on hold)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Verified Code Baseline**: Commit `4d2bac7c14401903c399f7201ec60cea88acc70d`
+- **CI Baseline**: Run `40223298633` — SUCCESS
+
+### Summary of Activities
+1. **P0-01 — Approval Authorization Bypass Remediation**:
+   - Eliminated acceptance of arbitrary nonempty string tokens.
+   - Implemented `crates/storage/src/approval.rs` with RFC 2104 / RFC 4231 HMAC-SHA256 signature verification over canonical payload binding `token_id`, `database_path`, `database_sha256`, `scope` (`migrate-v2-loopback-ports`), and exact `projects` (`proj_e92e56cd...: 18081`, `proj_db5472bb...: 18082`).
+   - Integrated anti-replay protection with a persistent ledger at `<app_support>/security/consumed_approvals.jsonl` enforced with `0600` permissions.
+   - Requires explicit Product Owner secret key via environment variable `LOCALFORGE_PO_APPROVAL_KEY` (fail-closed if unset; zero embedded secrets in source code).
+   - Records verification evidence (`token_id`, `subject`, `timestamp`, `scope`) without exposing keys.
+   - Validated against RFC 4231 test vectors and negative test suite (arbitrary string rejection, signature mismatch, expired token, replay rejection).
+2. **P0-02 — SQLite Rollback With Open Connection Remediation**:
+   - Implemented `crates/storage/src/rollback.rs` with strict two-phase ownership scope separation.
+   - Scope 1: Migration executed in an immediately evaluated closure; `MetadataStore` connection is guaranteed dropped and closed immediately upon completion or failure.
+   - Scope 2: Rollback only runs after `MetadataStore` connection is completely dropped.
+   - Verifies writer quiescence immediately prior to restoration (`verify_writer_quiescence`), failing closed if active SQLite processes are found.
+   - Failed live state is safely moved to a private timestamped directory `quarantine_<timestamp>/` (`chmod 700`) targeting exact allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`) to preserve state for forensics without silent overwrites.
+   - Restores verified backup atomically (`chmod 600`) and executes independent validation (`PRAGMA integrity_check`, project count, and Projetest PHP 8.4 verification).
+   - Validated with simulated failure injection at multiple points (immediately after schema migration, after project A port assignment).
+3. **P1-01 — WAL-Aware Read-Only Preflight Remediation**:
+   - Implemented `crates/storage/src/snapshot.rs` using the SQLite Online Backup API (`sqlite3_backup_*`) against live database into an isolated temporary file.
+   - Opens live database with `SQLITE_OPEN_READ_ONLY` and transfers uncheckpointed WAL frames into snapshot without triggering dirty WAL checkpoint flushes or altering live WAL/SHM file metadata.
+   - Performs all preflight inspections against the isolated snapshot, verifying SHA-256, `PRAGMA integrity_check`, schema V1/V2 state, and project records.
+   - Distinguishes unreadable live database, corrupt snapshot, and inconsistent snapshot failures.
+4. **Comprehensive Verification**:
+   - Dry-run executed against host live database (`./target/debug/localforge storage migrate-v2`): confirmed zero modifications, consistent WAL snapshot generated, integrity `ok`, schema V1 confirmed, and host ports `18081`/`18082` available.
+   - All 18 tests in `localforge-storage` pass (including HMAC-SHA256, replay ledger, WAL snapshot, and failure injection rollbacks).
+   - All 15 integration tests in `localforge-runtime` pass.
+   - All 79 library tests across workspace pass (0 failures).
+   - All 33 desktop frontend tests pass.
+   - `cargo clippy --workspace -- -D warnings`: 0 warnings.
+   - `cargo fmt --check`: 0 formatting diffs.
+5. **Closeout Status**:
+   - `LOCALFORGE GATE U5.F — EXECUTOR SAFETY PATCH COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`

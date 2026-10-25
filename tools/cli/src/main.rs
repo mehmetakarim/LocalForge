@@ -603,70 +603,52 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
             let a_free = is_port_available(port_project_a);
             let b_free = is_port_available(port_project_b);
 
-            // 4. Read-Only Dry-Run Mode (Default)
+            // 4. WAL-Aware Read-Only Preflight Mode (Default)
             if !execute {
                 println!(
-                    "\x1b[1;36m=== LOCALFORGE GATE U5.F: V2 MIGRATION DRY-RUN AUDIT ===\x1b[0m"
+                    "\x1b[1;36m=== LOCALFORGE GATE U5.F: WAL-SAFE READ-ONLY PREFLIGHT AUDIT ===\x1b[0m"
                 );
                 println!("Target Database:      {}", canonical_db_path.display());
                 println!("Database Size:        {} bytes", db_meta.len());
                 println!("Database Owner UID:   {}", db_meta.uid());
                 println!("Current User UID:     {}", current_uid);
 
-                // Open STRICTLY in read-only mode with immutable=1 to prevent any writes to db, wal, or shm
-                let uri_path = format!("file:{}?immutable=1", canonical_db_path.display());
-                let conn = rusqlite::Connection::open_with_flags(
-                    &uri_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                )?;
+                // Perform safe snapshot via SQLite Online Backup API (never immutable=1 on live WAL!)
+                let audit = localforge_storage::inspect_wal_database_preflight(&canonical_db_path)
+                    .context("Failed to complete WAL-safe preflight audit on live database")?;
 
-                let integrity: String =
-                    conn.query_row("PRAGMA integrity_check;", [], |r| r.get(0))?;
-                if integrity != "ok" {
-                    return Err(anyhow!("Database integrity check failed: {}", integrity));
-                }
-                println!("Integrity Check:      \x1b[1;32m{}\x1b[0m", integrity);
-
-                let has_port_col: i64 = conn.prepare("SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'loopback_port';")?
-                    .query_row([], |r| r.get(0))?;
+                println!(
+                    "Snapshot SHA-256:     \x1b[1;35m{}\x1b[0m",
+                    audit.database_sha256
+                );
+                println!(
+                    "Integrity Status:     \x1b[1;32m{}\x1b[0m",
+                    audit.integrity_status
+                );
                 println!(
                     "Schema Status:        {}",
-                    if has_port_col > 0 {
-                        "Schema V2 (loopback_port present)"
+                    if audit.has_loopback_port_column {
+                        "Schema V2 (loopback_port column present)"
                     } else {
-                        "Schema V1 (loopback_port absent)"
+                        "Schema V1 (loopback_port column absent)"
                     }
                 );
 
-                let mut stmt = conn.prepare(
-                    "SELECT id, name, php_version, local_domain FROM projects ORDER BY name ASC;",
-                )?;
-                let projects = stmt.query_map([], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                    ))
-                })?;
-
-                println!("\nProject Inspection:");
-                for p in projects {
-                    let (id, name, php_version, domain) = p?;
-                    let proposed_port = if name.contains("r1_acceptance") {
+                println!("\nProject Inspection (From Consistent Snapshot):");
+                for p in audit.projects {
+                    let proposed_port = if p.name.contains("r1_acceptance") {
                         port_project_a
                     } else {
                         port_project_b
                     };
-                    let port_free = if name.contains("r1_acceptance") {
+                    let port_free = if p.name.contains("r1_acceptance") {
                         a_free
                     } else {
                         b_free
                     };
-                    println!("  - [{}] {}", id, name);
-                    println!("    PHP Version:     {}", php_version);
-                    println!("    Local Domain:    {}", domain);
+                    println!("  - [{}] {}", p.id, p.name);
+                    println!("    PHP Version:     {}", p.php_version);
+                    println!("    Local Domain:    {}", p.local_domain);
                     println!(
                         "    Proposed Port:   {} (Available on host: {})",
                         proposed_port,
@@ -676,11 +658,11 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                             "\x1b[31mNO\x1b[0m"
                         }
                     );
-                    if name == "Projetest" {
-                        if php_version != "8.4" {
+                    if p.name == "Projetest" {
+                        if p.php_version != "8.4" {
                             return Err(anyhow!(
                                 "PO-U5-01 VIOLATION: Projetest PHP version is '{}', expected '8.4'",
-                                php_version
+                                p.php_version
                             ));
                         }
                         println!(
@@ -690,19 +672,29 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                 }
 
                 println!(
-                    "\n\x1b[1;33m[!] DRY-RUN COMPLETE: Zero modifications made to database.\x1b[0m"
+                    "\n\x1b[1;33m[!] PREFLIGHT COMPLETE: Zero modifications made to database. Zero WAL/SHM mutations.\x1b[0m"
                 );
-                println!("To execute live migration, explicit authorization is required:\n  localforge storage migrate-v2 --execute --approval-token <TOKEN> --backup-path <PATH>");
+                println!("To execute live migration, explicit Product Owner cryptographic authorization is required:");
+                println!("  export LOCALFORGE_PO_APPROVAL_KEY=\"<PO_SECRET_KEY>\"");
+                println!("  localforge storage migrate-v2 --execute --approval-token <TOKEN_OR_@FILE> --backup-path <PATH>");
                 return Ok(());
             }
 
             // 5. Live Execution Mode
-            let token = approval_token.as_deref().unwrap_or("").trim();
-            if token.is_empty() {
+            let token_raw = approval_token.as_deref().unwrap_or("").trim();
+            if token_raw.is_empty() {
                 return Err(anyhow!(
                     "Execution rejected: --approval-token is mandatory when --execute is specified"
                 ));
             }
+
+            let token_str = if let Some(stripped_path) = token_raw.strip_prefix('@') {
+                std::fs::read_to_string(stripped_path).with_context(|| {
+                    format!("Failed to read approval token file from '{stripped_path}'")
+                })?
+            } else {
+                token_raw.to_string()
+            };
 
             let bpath = backup_path.ok_or_else(|| {
                 anyhow!("Execution rejected: --backup-path is mandatory for live execution")
@@ -722,11 +714,10 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                 ));
             }
 
-            // Verify backup file integrity and Schema V1 in read-only mode
-            let b_uri = format!("file:{}?immutable=1", bpath.display());
+            // Verify backup file integrity and Schema V1 via standard read-only connection
             let bconn = rusqlite::Connection::open_with_flags(
-                &b_uri,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                &bpath,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
             )?;
             let b_integ: String = bconn.query_row("PRAGMA integrity_check;", [], |r| r.get(0))?;
             if b_integ != "ok" {
@@ -750,6 +741,7 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                     "Backup is not clean Schema V1 (already has loopback_port column)"
                 ));
             }
+            drop(bconn);
 
             if !a_free {
                 return Err(anyhow!("Port A ({}) is currently occupied on the host. Aborting without modifying database.", port_project_a));
@@ -758,124 +750,88 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                 return Err(anyhow!("Port B ({}) is currently occupied on the host. Aborting without modifying database.", port_project_b));
             }
 
-            println!("\x1b[1;32m[✓] All preconditions verified: Approval Token present, Quiescence ok, Backup verified V1, Ports free.\x1b[0m");
+            // Compute exact backup file SHA-256 for approval binding
+            let backup_sha256 = localforge_storage::compute_file_sha256(&bpath)?;
 
-            let rollback = |reason: &str| -> Result<()> {
-                eprintln!("\x1b[1;31m[!] Live migration failed: {}. Initiating auditable rollback...\x1b[0m", reason);
-                let allowlist = ["localforge.db", "localforge.db-wal", "localforge.db-shm"];
-                let quarantine_dir = canonical_app_support.join("quarantine").join(format!(
-                    "quarantine_{}",
-                    chrono::Utc::now().format("%Y%m%d_%H%M%S")
-                ));
-                std::fs::create_dir_all(&quarantine_dir)?;
-                let qmeta = std::fs::metadata(&quarantine_dir)?;
-                if qmeta.uid() != current_uid {
-                    return Err(anyhow!("Quarantine directory ownership failure"));
-                }
+            // 6. Verifiable Product Owner One-Time Approval Verification
+            let ledger_path = canonical_app_support
+                .join("security")
+                .join("consumed_approvals.jsonl");
+            let expected_projects = [
+                ("proj_e92e56cd0e0c4c36952804a35b3587a3", port_project_a),
+                ("proj_db5472bb224c4fd0960ff69f793590a7", port_project_b),
+            ];
 
-                for name in &allowlist {
-                    let fpath = canonical_app_support.join(name);
-                    if fpath.exists() {
-                        let fmeta = std::fs::symlink_metadata(&fpath)?;
-                        if !fmeta.file_type().is_symlink() {
-                            std::fs::rename(&fpath, quarantine_dir.join(name))?;
-                        }
-                    }
-                }
-
-                std::fs::copy(&bpath, &canonical_db_path)?;
-                eprintln!(
-                    "\x1b[1;32m[✓] Rollback completed: state restored from backup '{}'.\x1b[0m",
-                    bpath.display()
-                );
-                Ok(())
-            };
-
-            // Open live database via canonical MetadataStore
-            let store = MetadataStore::open(&canonical_db_path)?;
-
-            let projects = store.list_projects()?;
-            let p1 = projects
-                .iter()
-                .find(|p| p.name == "r1_acceptance_project")
-                .ok_or_else(|| anyhow!("Project 'r1_acceptance_project' not found in database"))?;
-            let p2 = projects
-                .iter()
-                .find(|p| p.name == "Projetest")
-                .ok_or_else(|| anyhow!("Project 'Projetest' not found in database"))?;
-
-            if p2.php_version != "8.4" {
-                return Err(anyhow!(
-                    "PO-U5-01 VIOLATION: Projetest PHP version is '{}', must be '8.4'",
-                    p2.php_version
-                ));
-            }
-
-            println!("Executing canonical MetadataStore::migrate_to_v2_loopback_ports()...");
-            let report = match store.migrate_to_v2_loopback_ports() {
-                Ok(r) => r,
-                Err(e) => {
-                    let _ = rollback(&format!("Migration failed: {e}"));
-                    return Err(anyhow!("Migration failed: {e}"));
-                }
-            };
-            println!(
-                "Migration report: Target version {}, applied: {}",
-                report.target_version, report.applied
-            );
+            let evidence = localforge_storage::verify_and_consume_approval(
+                &token_str,
+                &canonical_db_path,
+                &backup_sha256,
+                "migrate-v2-loopback-ports",
+                &expected_projects,
+                &ledger_path,
+                None,
+            )?;
 
             println!(
-                "Assigning loopback ports via MetadataStore::update_project_loopback_port()..."
+                "\x1b[1;32m[✓] Cryptographic Approval Verified & Consumed: Token ID {}, Scope '{}', Signature Prefix {}\x1b[0m",
+                evidence.token_id, evidence.scope, evidence.signature_prefix
             );
-            if let Err(e) = store.update_project_loopback_port(&p1.id, Some(port_project_a)) {
-                let _ = rollback(&format!("Port A assignment failed: {e}"));
-                return Err(anyhow!("Port A assignment failed: {e}"));
-            }
-            if let Err(e) = store.update_project_loopback_port(&p2.id, Some(port_project_b)) {
-                let _ = rollback(&format!("Port B assignment failed: {e}"));
-                return Err(anyhow!("Port B assignment failed: {e}"));
-            }
 
-            // Post-migration verification
-            let p1_after = store
-                .get_project(&p1.id)?
-                .ok_or_else(|| anyhow!("Project A missing after migration"))?;
-            let p2_after = store
-                .get_project(&p2.id)?
-                .ok_or_else(|| anyhow!("Project B missing after migration"))?;
+            // 7. Gated Migration Lifecycle Execution with Distinct Ownership Scopes
+            let rollback_cfg = localforge_storage::RollbackConfig {
+                db_path: canonical_db_path.clone(),
+                backup_path: bpath.clone(),
+                app_support_dir: canonical_app_support.clone(),
+                allowlist: vec![
+                    "localforge.db".to_string(),
+                    "localforge.db-wal".to_string(),
+                    "localforge.db-shm".to_string(),
+                ],
+            };
 
-            if p1_after.loopback_port != Some(port_project_a) {
-                let _ = rollback("Project A loopback_port verification mismatch");
-                return Err(anyhow!("Project A port verification failed"));
-            }
-            if p2_after.loopback_port != Some(port_project_b) {
-                let _ = rollback("Project B loopback_port verification mismatch");
-                return Err(anyhow!("Project B port verification failed"));
-            }
-            if p2_after.php_version != "8.4" {
-                let _ = rollback("PO-U5-01 VIOLATION: Projetest PHP version mutated");
-                return Err(anyhow!(
-                    "PO-U5-01 VIOLATION: Projetest PHP version mutated to {}",
-                    p2_after.php_version
-                ));
-            }
+            let migration_res = localforge_storage::execute_gated_migration_lifecycle(
+                &rollback_cfg,
+                "proj_e92e56cd0e0c4c36952804a35b3587a3",
+                port_project_a,
+                "proj_db5472bb224c4fd0960ff69f793590a7",
+                port_project_b,
+                localforge_storage::FailureInjectionPoint::None,
+            )?;
 
-            let check_conn = rusqlite::Connection::open(&canonical_db_path)?;
+            // 8. Post-Migration Independent Index Integrity Validation
+            let check_conn = rusqlite::Connection::open_with_flags(
+                &canonical_db_path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )?;
             if localforge_storage::validate_loopback_port_index(&check_conn)?
                 != localforge_storage::IndexValidationStatus::Valid
             {
-                let _ = rollback("Post-migration unique index validation failed");
-                return Err(anyhow!("Unique index validation failed"));
+                drop(check_conn);
+                let _ = localforge_storage::execute_isolated_quarantine_and_restore(
+                    &rollback_cfg,
+                    "Post-migration index validation failed",
+                    2,
+                    "8.4",
+                );
+                return Err(anyhow!("Unique index validation failed after migration"));
             }
+            drop(check_conn);
 
             println!("\x1b[1;32m=== LIVE MIGRATION AND PORT ALLOCATION COMPLETED SUCCESSFULLY ===\x1b[0m");
-            println!("  - Project A ({}): Port {}", p1_after.name, port_project_a);
+            println!(
+                "  - Project A ({}): Port {}",
+                migration_res.project_a_after.name, port_project_a
+            );
             println!(
                 "  - Project B ({}): Port {} (PHP 8.4 strictly preserved)",
-                p2_after.name, port_project_b
+                migration_res.project_b_after.name, port_project_b
             );
             println!("  - Unique Index:    VALIDATED (idx_projects_loopback_port)");
-            println!("  - Schema Version:  2");
+            println!(
+                "  - Schema Version:  {}",
+                migration_res.report.target_version
+            );
+            println!("  - Approval ID:     {}", evidence.token_id);
 
             Ok(())
         }

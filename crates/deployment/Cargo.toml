@@ -18,7 +18,7 @@ uuid.workspace = true
 dunce.workspace = true
 
 # Cryptographic SHA-256 calculation
-sha2 = "0.10"
+sha2.workspace = true
 walkdir = "2.5"
 
 [dev-dependencies]

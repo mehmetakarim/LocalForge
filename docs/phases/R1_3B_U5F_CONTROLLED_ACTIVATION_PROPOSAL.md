@@ -146,31 +146,29 @@ Manual SQL execution paths are completely excluded. The migration is executed st
 ### Exact Executable Command (Gated CLI Migration Tool):
 The migration and port assignment are strictly executed through the canonical LocalForge CLI tool (`localforge storage migrate-v2`). No Cargo test runners or manual SQL paths are permitted:
 
-1. **Safety Default — Read-Only Dry Run:**
+1. **Safety Default — WAL-Safe Read-Only Dry Run (P1-01 Compliant):**
 ```bash
 /Volumes/Mac\ Harici\ Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
   --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db"
 ```
 *Dry-Run Guarantees:*
-- Opened via SQLite URI `file:<path>?immutable=1` using `SQLITE_OPEN_READ_ONLY | SQLITE_OPEN_URI`.
-- Zero write mode, zero write locks, zero WAL or SHM writes.
-- Verifies database path, UID 501 ownership, canonical non-symlink paths, process quiescence (`pgrep -il localforge`), schema V1 status, port candidates (`18081`, `18082`), and host port availability.
+- **WAL-Safe Snapshot Preflight (P1-01):** Uses SQLite Online Backup API (`sqlite3_backup_*`) against an active live WAL database into a secure temporary file to obtain a consistent snapshot without forcing dirty WAL checkpoint flushes or mutating live WAL/SHM frames.
+- **Zero Live Mutations:** Live database is opened exclusively with `SQLITE_OPEN_READ_ONLY`. All schema and project inspections run against the isolated snapshot.
+- **Full Scope Verification:** Verifies database path, UID 501 ownership, canonical non-symlink paths, process quiescence (`pgrep -il localforge`), schema V1 status, port candidates (`18081`, `18082`), and host port availability.
 
-2. **Live Execution (Requires Explicit Approval Token & Tested Backup):**
+2. **Live Execution (Requires Cryptographic One-Time Approval & Verified Backup):**
 ```bash
-/Volumes/Mac\ Harici Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
+export LOCALFORGE_PO_APPROVAL_KEY="<PO_SECRET_KEY>"
+/Volumes/Mac\ Harici\ Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
   --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db" \
   --execute \
-  --approval-token "U5F-ACTIVATION-AUTHORIZED-20261025" \
+  --approval-token "@approval_token.json" \
   --backup-path "$BACKUP_DIR/localforge_v1_atomic_backup.db"
 ```
 *Live Execution Guarantees:*
-- Re-verifies backup existence, UID 501 ownership, schema V1 integrity, and exact project counts.
-- Re-verifies SQLite quiescence.
-- Invokes `MetadataStore::migrate_to_v2_loopback_ports()` in an immediate transaction.
-- Invokes `MetadataStore::update_project_loopback_port()` assigning 18081 (`r1_acceptance_project`) and 18082 (`Projetest`).
-- Validates that `Projetest` retains PHP `8.4` (PO-U5-01).
-- Automatic bounded rollback to the exact allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`) in quarantine if any step fails.
+- **Cryptographic One-Time Approval (P0-01):** RFC 2104 / RFC 4231 HMAC-SHA256 signature verification over canonical payload binding `token_id`, `database_path`, `database_sha256`, `scope` (`migrate-v2-loopback-ports`), and exact `projects` (`proj_e92e56cd...: 18081`, `proj_db5472bb...: 18082`). Expired tokens (past `valid_until`) and previously consumed tokens recorded in `consumed_approvals.jsonl` (permissions `0600`) are rejected (anti-replay). Arbitrary nonempty strings fail closed.
+- **Connection-Isolated Rollback & Quarantine (P0-02):** Execution and rollback are divided into two mutually exclusive ownership scopes. `MetadataStore` connection is guaranteed dropped before any rollback restoration begins. Immediate writer quiescence is verified before file operations. Failed live files (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`) are moved to a secure quarantine directory (`chmod 700`) to preserve failed live state for forensic inspection. Backup is atomically copied to destination (`chmod 600`) and independently verified with `PRAGMA integrity_check` and record count validation.
+- **PO-U5-01 Strict Enforcement:** Validates that `Projetest` retains PHP `8.4`. Any mutation fails closed and triggers rollback.
 
 ### Data Integrity Guarantees:
 - **Version Tracking:** Schema version 2 explicitly recorded in `schema_migrations`.

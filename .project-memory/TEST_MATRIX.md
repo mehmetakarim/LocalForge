@@ -89,6 +89,10 @@ This document records all test scenarios, executed checks, environments, and ver
 | **TEST-R1.3B-U5F-03** | Runtime Integration Test Suite | `cargo test -p localforge-runtime --test runtime_integration_test -- --test-threads=1` | Apple Silicon Mac | **PASS** | 15/15 passed sequentially avoiding port collision; Nginx vhosts & routing verified. |
 | **TEST-R1.3B-U5F-04** | Desktop Frontend Test Suite | `npm test --prefix apps/desktop` | Node.js Test Runner | **PASS** | 33/33 passed (%100 PASS) covering fixture safety, routing, and recovery suites. |
 | **TEST-R1.3B-U5F-05** | Clippy & Linter Audit | `cargo clippy --workspace -- -D warnings` | Rust Toolchain 1.94.0 | **PASS** | Zero warnings across entire workspace. |
+| **TEST-R1.3B-U5F-06** | Approval Token HMAC-SHA256 & Replay Ledger | `cargo test -p localforge-storage approval::tests` | Rust Toolchain 1.94.0 | **PASS** | 5/5 passed; RFC 4231 vector verified; expired/replayed/tampered tokens fail closed. |
+| **TEST-R1.3B-U5F-07** | Connection-Isolated Rollback Lifecycle | `cargo test -p localforge-storage rollback::tests` | Rust Toolchain 1.94.0 | **PASS** | 3/3 passed; simulated failure injection triggers isolated 0700 quarantine & clean restore. |
+| **TEST-R1.3B-U5F-08** | WAL-Safe SQLite Online Backup Snapshot | `cargo test -p localforge-storage snapshot::tests` | Rust Toolchain 1.94.0 | **PASS** | 2/2 passed; uncheckpointed WAL frames captured in snapshot without live WAL mutation. |
+| **TEST-R1.3B-U5F-09** | Real Host WAL-Safe Dry-Run Preflight | `./target/debug/localforge storage migrate-v2` | Host Apple Silicon Mac | **PASS** | Consistent WAL snapshot evaluated; Schema V1 confirmed; Projetest PHP 8.4 preserved; zero live DB mutations. |
 
 ---
 
