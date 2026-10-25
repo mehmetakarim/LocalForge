@@ -146,19 +146,20 @@ Manual SQL execution paths are completely excluded. The migration is executed st
 ### Exact Executable Command (Gated CLI Migration Tool):
 The migration and port assignment are strictly executed through the canonical LocalForge CLI tool (`localforge storage migrate-v2`). No Cargo test runners or manual SQL paths are permitted:
 
-1. **Safety Default — WAL-Safe Read-Only Dry Run (P1-01 Compliant):**
+1. **Safety Default — WAL-Safe Read-Only Dry Run (P1-01 & Finding 04 Compliant):**
 ```bash
 /Volumes/Mac\ Harici\ Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
   --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db"
 ```
 *Dry-Run Guarantees:*
 - **WAL-Safe Snapshot Preflight (P1-01):** Uses SQLite Online Backup API (`sqlite3_backup_*`) against an active live WAL database into a secure temporary file to obtain a consistent snapshot without forcing dirty WAL checkpoint flushes or mutating live WAL/SHM frames.
-- **Zero Live Mutations:** Live database is opened exclusively with `SQLITE_OPEN_READ_ONLY`. All schema and project inspections run against the isolated snapshot.
-- **Full Scope Verification:** Verifies database path, UID 501 ownership, canonical non-symlink paths, process quiescence (`pgrep -il localforge`), schema V1 status, port candidates (`18081`, `18082`), and host port availability.
+- **Signed Activation Snapshot Identity (Finding 04):** Explicitly labels and extracts `activation_snapshot_sha256` from the verified pre-activation backup.
+- **Rich Project Metadata Extraction:** Audits exact project IDs, paths, volume UUIDs, document roots, PHP versions, local domains, and candidate loopback ports.
+- **Zero Live Mutations:** Live database is opened exclusively with `SQLITE_OPEN_READ_ONLY`. All inspections run against the isolated snapshot.
 
-2. **Live Execution (Requires Cryptographic One-Time Approval & Verified Backup):**
+2. **Live Execution (Requires Asymmetric Ed25519 Approval & Verified Backup):**
 ```bash
-export LOCALFORGE_PO_APPROVAL_KEY="<PO_SECRET_KEY>"
+export LOCALFORGE_PO_PUBLIC_KEY="<PO_PUBLIC_KEY_HEX>"
 /Volumes/Mac\ Harici\ Disk/VibeProject/LocalForge/target/debug/localforge storage migrate-v2 \
   --db-path "/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db" \
   --execute \
@@ -166,9 +167,10 @@ export LOCALFORGE_PO_APPROVAL_KEY="<PO_SECRET_KEY>"
   --backup-path "$BACKUP_DIR/localforge_v1_atomic_backup.db"
 ```
 *Live Execution Guarantees:*
-- **Cryptographic One-Time Approval (P0-01):** RFC 2104 / RFC 4231 HMAC-SHA256 signature verification over canonical payload binding `token_id`, `database_path`, `database_sha256`, `scope` (`migrate-v2-loopback-ports`), and exact `projects` (`proj_e92e56cd...: 18081`, `proj_db5472bb...: 18082`). Expired tokens (past `valid_until`) and previously consumed tokens recorded in `consumed_approvals.jsonl` (permissions `0600`) are rejected (anti-replay). Arbitrary nonempty strings fail closed.
-- **Connection-Isolated Rollback & Quarantine (P0-02):** Execution and rollback are divided into two mutually exclusive ownership scopes. `MetadataStore` connection is guaranteed dropped before any rollback restoration begins. Immediate writer quiescence is verified before file operations. Failed live files (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`) are moved to a secure quarantine directory (`chmod 700`) to preserve failed live state for forensic inspection. Backup is atomically copied to destination (`chmod 600`) and independently verified with `PRAGMA integrity_check` and record count validation.
-- **PO-U5-01 Strict Enforcement:** Validates that `Projetest` retains PHP `8.4`. Any mutation fails closed and triggers rollback.
+- **Asymmetric Trust Separation (Finding 01):** Verifier-only Ed25519 architecture. The runtime executor binary possesses ONLY the Product Owner's Public Key (`LOCALFORGE_PO_PUBLIC_KEY`). The private signing key is held strictly by the Product Owner offline/air-gapped. Automated coding agents cannot forge signatures or self-approve.
+- **Cross-Process Atomic Replay Protection (Finding 02):** Replay ledger at `<app_support>/security/consumed_approvals.jsonl` is protected by exclusive POSIX `flock(fd, LOCK_EX)`. Reads, corruption checks, replay verification, appends, and `sync_all()` durability are performed in a single atomic critical section. Symlinks are rejected, file ownership (UID 501) and creation mode `0600` are strictly enforced. Malformed ledger records fail closed.
+- **Staged Fail-Closed SQLite Rollback (Finding 03):** Execution and rollback are divided into two mutually exclusive ownership scopes (`MetadataStore` connection dropped before rollback). Pre-flight writer quiescence is verified using `lsof -t` on database and companion files plus `pgrep`, failing closed on command failure. Restorations are prepared and verified (`PRAGMA integrity_check`, count, Projetest PHP 8.4) in a temporary staging file before atomic promotion (`rename`). Failed live files are safely quarantined (`0700`). Errors are never swallowed.
+- **Signed Snapshot Identity & Full Record Binding (Finding 04):** Binds approval token directly to `activation_snapshot_sha256` and rich project assertions (`id`, `name`, `path`, `volume_uuid`, `document_root`, `php_version`, `local_domain`, `assigned_loopback_port`). Projetest must strictly remain pinned to PHP `8.4` (PO-U5-01).
 
 ### Data Integrity Guarantees:
 - **Version Tracking:** Schema version 2 explicitly recorded in `schema_migrations`.

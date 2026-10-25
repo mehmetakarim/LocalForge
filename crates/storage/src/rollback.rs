@@ -2,7 +2,7 @@ use crate::db::{MetadataStore, MigrationReport, ProjectRecord};
 use chrono::Utc;
 use localforge_core::{LocalForgeError, ProjectId, Result};
 use rusqlite::{Connection, OpenFlags};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureInjectionPoint {
@@ -35,26 +35,94 @@ impl Default for RollbackConfig {
     }
 }
 
-/// Verifies writer quiescence by ensuring no other localforge processes are active.
-pub fn verify_writer_quiescence() -> Result<bool> {
+/// Verifies writer quiescence by inspecting both file descriptors (via `lsof`) and process names (via `pgrep`).
+///
+/// Security guarantees:
+/// 1. Inspects `localforge.db`, `localforge.db-wal`, and `localforge.db-shm` to ensure no other process holds open file descriptors.
+/// 2. Inspects running processes to ensure no foreign `localforge` daemons are active.
+/// 3. Treats failure to execute inspection commands as an explicit unsafe condition (fail-closed).
+pub fn verify_writer_quiescence(db_path: &Path) -> Result<bool> {
     let current_pid = std::process::id();
-    if let Ok(output) = std::process::Command::new("pgrep")
-        .arg("-il")
-        .arg("localforge")
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if let Some(pid_str) = parts.first() {
-                if let Ok(pid) = pid_str.parse::<u32>() {
-                    if pid != current_pid {
-                        return Ok(false);
+
+    // Check 1: lsof inspection on db_path and its WAL/SHM companions
+    let parent = db_path.parent();
+    let companions = [
+        Some(db_path.to_path_buf()),
+        parent.map(|p| p.join("localforge.db-wal")),
+        parent.map(|p| p.join("localforge.db-shm")),
+    ];
+
+    for target in companions.into_iter().flatten() {
+        if !target.exists() {
+            continue;
+        }
+        let lsof_res = std::process::Command::new("lsof")
+            .arg("-t")
+            .arg(&target)
+            .output();
+
+        match lsof_res {
+            Ok(output) => {
+                if output.status.code() == Some(0) {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        if let Ok(pid) = line.trim().parse::<u32>() {
+                            if pid != current_pid {
+                                return Ok(false);
+                            }
+                        }
                     }
+                } else if output.status.code() != Some(1) {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(LocalForgeError::DatabaseError(format!(
+                        "UnsafeCondition: lsof inspection failed with status {}: {stderr}",
+                        output.status
+                    )));
                 }
+            }
+            Err(e) => {
+                return Err(LocalForgeError::DatabaseError(format!(
+                    "UnsafeCondition: failed to execute lsof for database quiescence check: {e}"
+                )));
             }
         }
     }
+
+    // Check 2: pgrep inspection for foreign localforge processes
+    let pgrep_res = std::process::Command::new("pgrep")
+        .arg("-il")
+        .arg("localforge")
+        .output();
+
+    match pgrep_res {
+        Ok(output) => {
+            if output.status.code() == Some(0) {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(pid_str) = parts.first() {
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            if pid != current_pid {
+                                return Ok(false);
+                            }
+                        }
+                    }
+                }
+            } else if output.status.code() != Some(1) {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(LocalForgeError::DatabaseError(format!(
+                    "UnsafeCondition: pgrep inspection failed with status {}: {stderr}",
+                    output.status
+                )));
+            }
+        }
+        Err(e) => {
+            return Err(LocalForgeError::DatabaseError(format!(
+                "UnsafeCondition: failed to execute pgrep for process quiescence check: {e}"
+            )));
+        }
+    }
+
     Ok(true)
 }
 
@@ -63,12 +131,13 @@ pub fn verify_writer_quiescence() -> Result<bool> {
 /// Precondition: All SQLite connections to the database MUST be closed and dropped before calling.
 ///
 /// Execution guarantees:
-/// 1. Verifies writer quiescence immediately before restoration. Fails closed if writers detected.
-/// 2. Uses explicit allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`).
-/// 3. Moves failed live files to a timestamped quarantine directory with 0700 permissions.
-/// 4. Copies backup atomically to destination with 0600 permissions.
-/// 5. Independently verifies restored database integrity (`PRAGMA integrity_check`) and project records.
-/// 6. Never reports successful recovery without verified evidence.
+/// 1. Verifies writer quiescence immediately before restoration. Fails closed on inspection failure or active writers.
+/// 2. Prepares restored data in a secure temporary staging file on the same filesystem.
+/// 3. Verifies staging file integrity (`PRAGMA integrity_check`), record counts, and Projetest PHP version BEFORE touching live files.
+/// 4. Does NOT swallow verification errors (missing Projetest or incorrect PHP version fails closed).
+/// 5. Moves failed live files to a timestamped quarantine directory with 0700 permissions.
+/// 6. Atomically promotes staging file to destination path.
+/// 7. Performs final verification on promoted database before reporting success.
 pub fn execute_isolated_quarantine_and_restore(
     config: &RollbackConfig,
     failure_reason: &str,
@@ -76,7 +145,7 @@ pub fn execute_isolated_quarantine_and_restore(
     expected_projetest_php_version: &str,
 ) -> Result<PathBuf> {
     // 1. Verify Writer Quiescence Immediately Before Restoration
-    let is_quiescent = verify_writer_quiescence()?;
+    let is_quiescent = verify_writer_quiescence(&config.db_path)?;
     if !is_quiescent {
         return Err(LocalForgeError::DatabaseError(format!(
             "CRITICAL: Rollback aborted: active SQLite processes detected. Live failed state preserved at '{}'. Human intervention required immediately.",
@@ -84,14 +153,103 @@ pub fn execute_isolated_quarantine_and_restore(
         )));
     }
 
-    // 2. Prepare Private Quarantine Directory (0700)
+    // 2. Prepare Restored Data in a Secure Temporary Staging File (Same Filesystem)
+    let parent_dir = config.db_path.parent().unwrap_or(&config.app_support_dir);
     let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+    let staging_path = parent_dir.join(format!(".restore_staging_{timestamp}.db"));
+
+    if !config.backup_path.exists() {
+        return Err(LocalForgeError::DatabaseError(format!(
+            "Rollback fatal error: verified backup file '{}' does not exist",
+            config.backup_path.display()
+        )));
+    }
+
+    std::fs::copy(&config.backup_path, &staging_path).map_err(|e| {
+        LocalForgeError::DatabaseError(format!(
+            "Rollback fatal error: failed to stage backup copy at '{}': {e}",
+            staging_path.display()
+        ))
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&staging_path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    // 3. Verify Prepared Restore BEFORE Touching Live Files
+    let verify_conn = Connection::open_with_flags(&staging_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&staging_path);
+            LocalForgeError::DatabaseError(format!(
+                "Staged rollback verification failed: cannot open staging db: {e}"
+            ))
+        })?;
+
+    let integrity: String = verify_conn
+        .query_row("PRAGMA integrity_check;", [], |r| r.get(0))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&staging_path);
+            LocalForgeError::DatabaseError(format!(
+                "Staged rollback verification failed: integrity check failed: {e}"
+            ))
+        })?;
+
+    if integrity != "ok" {
+        let _ = std::fs::remove_file(&staging_path);
+        return Err(LocalForgeError::DatabaseError(format!(
+            "Staged rollback verification failed: integrity corrupted: {integrity}"
+        )));
+    }
+
+    let count: usize = verify_conn
+        .query_row("SELECT count(*) FROM projects;", [], |r| r.get(0))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&staging_path);
+            LocalForgeError::DatabaseError(format!(
+                "Staged rollback verification failed: project count query failed: {e}"
+            ))
+        })?;
+
+    if count != expected_restored_project_count {
+        let _ = std::fs::remove_file(&staging_path);
+        return Err(LocalForgeError::DatabaseError(format!(
+            "Staged rollback verification failed: expected {expected_restored_project_count} projects, found {count}"
+        )));
+    }
+
+    // Must NOT swallow verification errors:
+    let php_ver: String = verify_conn
+        .query_row(
+            "SELECT php_version FROM projects WHERE name = 'Projetest';",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&staging_path);
+            LocalForgeError::DatabaseError(format!(
+                "Staged rollback verification failed: Projetest missing or query failed after restore: {e}"
+            ))
+        })?;
+
+    if php_ver != expected_projetest_php_version {
+        let _ = std::fs::remove_file(&staging_path);
+        return Err(LocalForgeError::DatabaseError(format!(
+            "Staged rollback verification failed: Projetest PHP version is '{php_ver}', expected '{expected_projetest_php_version}'"
+        )));
+    }
+
+    drop(verify_conn);
+
+    // 4. Prepare Private Quarantine Directory (0700)
     let quarantine_dir = config
         .app_support_dir
         .join("quarantine")
         .join(format!("quarantine_{timestamp}"));
 
     std::fs::create_dir_all(&quarantine_dir).map_err(|e| {
+        let _ = std::fs::remove_file(&staging_path);
         LocalForgeError::DatabaseError(format!(
             "Rollback failed: could not create quarantine directory '{}': {e}",
             quarantine_dir.display()
@@ -104,15 +262,12 @@ pub fn execute_isolated_quarantine_and_restore(
         let _ = std::fs::set_permissions(&quarantine_dir, std::fs::Permissions::from_mode(0o700));
     }
 
-    // 3. Move Allowlist Files into Quarantine (Preserve failed live state for diagnosis)
+    // 5. Move Allowlist Files into Quarantine (Preserve failed live state for diagnosis)
     for filename in &config.allowlist {
-        let live_file = config
-            .db_path
-            .parent()
-            .unwrap_or(&config.app_support_dir)
-            .join(filename);
+        let live_file = parent_dir.join(filename);
         if live_file.exists() {
             let meta = std::fs::symlink_metadata(&live_file).map_err(|e| {
+                let _ = std::fs::remove_file(&staging_path);
                 LocalForgeError::DatabaseError(format!(
                     "Failed to read metadata for '{}': {e}",
                     live_file.display()
@@ -120,6 +275,7 @@ pub fn execute_isolated_quarantine_and_restore(
             })?;
 
             if meta.file_type().is_symlink() {
+                let _ = std::fs::remove_file(&staging_path);
                 return Err(LocalForgeError::DatabaseError(format!(
                     "Rollback security violation: target file '{}' is a symbolic link",
                     live_file.display()
@@ -128,6 +284,7 @@ pub fn execute_isolated_quarantine_and_restore(
 
             let dest_file = quarantine_dir.join(filename);
             std::fs::rename(&live_file, &dest_file).map_err(|e| {
+                let _ = std::fs::remove_file(&staging_path);
                 LocalForgeError::DatabaseError(format!(
                     "Rollback failed: unable to move '{}' to quarantine '{}': {e}",
                     live_file.display(),
@@ -137,18 +294,11 @@ pub fn execute_isolated_quarantine_and_restore(
         }
     }
 
-    // 4. Restore Verified Backup
-    if !config.backup_path.exists() {
-        return Err(LocalForgeError::DatabaseError(format!(
-            "Rollback fatal error: verified backup file '{}' does not exist",
-            config.backup_path.display()
-        )));
-    }
-
-    std::fs::copy(&config.backup_path, &config.db_path).map_err(|e| {
+    // 6. Atomically Promote Verified Staging File to Live Destination
+    std::fs::rename(&staging_path, &config.db_path).map_err(|e| {
         LocalForgeError::DatabaseError(format!(
-            "Rollback fatal error: failed to restore backup from '{}' to '{}': {e}",
-            config.backup_path.display(),
+            "Rollback fatal error: failed to promote staged database '{}' to '{}': {e}",
+            staging_path.display(),
             config.db_path.display()
         ))
     })?;
@@ -159,63 +309,29 @@ pub fn execute_isolated_quarantine_and_restore(
         let _ = std::fs::set_permissions(&config.db_path, std::fs::Permissions::from_mode(0o600));
     }
 
-    // 5. Independent Post-Restoration Verification
-    let verify_conn =
-        Connection::open_with_flags(&config.db_path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(
-            |e| {
-                LocalForgeError::DatabaseError(format!(
-                    "Rollback verification failed: cannot open restored database: {e}"
-                ))
-            },
-        )?;
+    // 7. Final Independent Post-Promotion Verification
+    let final_conn = Connection::open_with_flags(&config.db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| {
+            LocalForgeError::DatabaseError(format!(
+                "Final rollback verification failed: cannot open promoted database: {e}"
+            ))
+        })?;
 
-    let integrity: String = verify_conn
+    let final_integrity: String = final_conn
         .query_row("PRAGMA integrity_check;", [], |r| r.get(0))
         .map_err(|e| {
             LocalForgeError::DatabaseError(format!(
-                "Rollback verification failed: integrity check failed: {e}"
+                "Final rollback verification failed: integrity check failed: {e}"
             ))
         })?;
 
-    if integrity != "ok" {
+    if final_integrity != "ok" {
         return Err(LocalForgeError::DatabaseError(format!(
-            "Rollback verification failed: restored database integrity corrupted: {integrity}"
+            "Final rollback verification failed: promoted database integrity corrupted: {final_integrity}"
         )));
     }
 
-    let count: usize = verify_conn
-        .query_row("SELECT count(*) FROM projects;", [], |r| r.get(0))
-        .map_err(|e| {
-            LocalForgeError::DatabaseError(format!(
-                "Rollback verification failed: project count query failed: {e}"
-            ))
-        })?;
-
-    if count != expected_restored_project_count {
-        return Err(LocalForgeError::DatabaseError(format!(
-            "Rollback verification failed: expected {expected_restored_project_count} projects, found {count}"
-        )));
-    }
-
-    let projetest_php: Result<String> = verify_conn
-        .query_row(
-            "SELECT php_version FROM projects WHERE name = 'Projetest';",
-            [],
-            |r| r.get(0),
-        )
-        .map_err(|e| {
-            LocalForgeError::DatabaseError(format!("Projetest missing after restore: {e}"))
-        });
-
-    if let Ok(php_ver) = projetest_php {
-        if php_ver != expected_projetest_php_version {
-            return Err(LocalForgeError::DatabaseError(format!(
-                "Rollback verification failed: Projetest PHP version is '{php_ver}', expected '{expected_projetest_php_version}'"
-            )));
-        }
-    }
-
-    drop(verify_conn);
+    drop(final_conn);
 
     tracing::warn!(
         "Database rollback successfully executed due to: {}. Restored from '{}'. Failed live state quarantined at '{}'.",
@@ -391,7 +507,6 @@ mod tests {
         let app_support = dir.path().to_path_buf();
 
         create_test_v1_database(&db_path);
-        // Create atomic backup copy
         std::fs::copy(&db_path, &backup_path).unwrap();
 
         let config = RollbackConfig {
@@ -502,6 +617,75 @@ mod tests {
             )
             .unwrap();
         assert_eq!(p2_php, "8.4");
+    }
+
+    #[test]
+    fn test_missing_projetest_fails_closed_without_swallowing_error() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        let backup_path = dir.path().join("backup_corrupt.db");
+        let app_support = dir.path().to_path_buf();
+
+        // Create backup where Projetest is missing!
+        let conn = Connection::open(&backup_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, php_version TEXT);
+             INSERT INTO projects VALUES ('p1', 'OtherProject', '8.5');",
+        )
+        .unwrap();
+
+        let config = RollbackConfig {
+            db_path,
+            backup_path,
+            app_support_dir: app_support,
+            allowlist: vec!["localforge.db".into()],
+        };
+
+        let res =
+            execute_isolated_quarantine_and_restore(&config, "testing missing projetest", 2, "8.4");
+
+        let err = res.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("Staged rollback verification failed")
+                || err.to_string().contains("Projetest missing")
+        );
+    }
+
+    #[test]
+    fn test_incorrect_php_version_after_restore_fails_closed() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        let backup_path = dir.path().join("backup_mutated.db");
+        let app_support = dir.path().to_path_buf();
+
+        // Create backup where Projetest has mutated PHP 8.5
+        let conn = Connection::open(&backup_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, php_version TEXT);
+             INSERT INTO projects VALUES ('p1', 'r1_acceptance_project', '8.5');
+             INSERT INTO projects VALUES ('p2', 'Projetest', '8.5');",
+        )
+        .unwrap();
+
+        let config = RollbackConfig {
+            db_path,
+            backup_path,
+            app_support_dir: app_support,
+            allowlist: vec!["localforge.db".into()],
+        };
+
+        let res = execute_isolated_quarantine_and_restore(
+            &config,
+            "testing mutated php version",
+            2,
+            "8.4",
+        );
+
+        let err = res.unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Projetest PHP version is '8.5', expected '8.4'"));
     }
 
     #[test]

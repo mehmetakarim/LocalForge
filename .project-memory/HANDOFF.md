@@ -6,17 +6,18 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.F Final Executor Safety Patch Completed — Actual Activation Strictly on Hold / Awaiting PO Acceptance**
+- **Current State**: **Gate U5.F Final Authorization & Recovery Safety Closeout Completed — Actual Activation Strictly on Hold / Awaiting PO Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `4d2bac7c14401903c399f7201ec60cea88acc70d`
+- **Baseline Commit**: `da26863dad9a7c9ddfc9bf3bc7f409b8cf53e56d`
 - **Previous Milestone Status**:
-  - **Gate U5.F Execution Blocker Remediation**: CLI migration entrypoint implemented; safety patch applied for authorization bypass, rollback scope isolation, and WAL snapshot preflight.
-- **Completed in Gate U5.F Final Executor Safety Patch**:
-  1. `P0-01 — Approval Authorization Bypass Remediation`: Implemented `crates/storage/src/approval.rs`. Replaced arbitrary string acceptance with RFC 2104 / RFC 4231 HMAC-SHA256 signature verification over canonical payload binding `token_id`, `database_path`, `database_sha256`, `scope` (`migrate-v2-loopback-ports`), and exact `projects` (`proj_e92e56cd...: 18081`, `proj_db5472bb...: 18082`). Implemented persistent replay ledger (`consumed_approvals.jsonl` at 0600 permissions). Zero hardcoded secrets (reads `LOCALFORGE_PO_APPROVAL_KEY`, fails closed if missing).
-  2. `P0-02 — SQLite Rollback With Open Connection Remediation`: Implemented `crates/storage/src/rollback.rs`. Divided execution and rollback into distinct ownership scopes (`MetadataStore` connection is dropped before rollback begins). Verifies writer quiescence immediately prior to restoration (`verify_writer_quiescence`), failing closed if active SQLite processes exist. Quarantines failed live state into `quarantine_<timestamp>/` (0700) using exact allowlist (`localforge.db`, `localforge.db-wal`, `localforge.db-shm`). Restores backup atomically (0600) and independently verifies integrity and records. Simulated failure injection tested across multiple failure points.
-  3. `P1-01 — WAL-Aware Read-Only Preflight Remediation`: Implemented `crates/storage/src/snapshot.rs`. Uses SQLite Online Backup API against live database into an isolated temporary file to obtain a consistent snapshot without forcing dirty WAL flushes or mutating live WAL/SHM file metadata. Runs preflight schema and project record inspection against the snapshot.
-  4. Tested and verified: Real-host dry-run confirmed 0 modifications and valid WAL snapshot. 18 storage unit tests, 15 runtime integration tests, 79 workspace library tests, 33 desktop frontend tests pass (112 total). Zero clippy warnings, zero fmt diffs.
+  - **Gate U5.F Executor Safety Patch**: Implemented initial approval token and rollback connection isolation; conditionally accepted by PO.
+- **Completed in Gate U5.F Final Authorization & Recovery Closeout**:
+  1. `Finding 01 — Asymmetric Trust Separation`: Implemented Ed25519 verifier-only public key architecture in `crates/storage/src/approval.rs`. The runtime executor holds only `LOCALFORGE_PO_PUBLIC_KEY`. The private key remains strictly offline with the Product Owner. Agents cannot self-approve.
+  2. `Finding 02 — Cross-Process Atomic Replay Protection`: Protected `consumed_approvals.jsonl` with exclusive POSIX `flock(fd, LOCK_EX)`. Atomically checks replay, validates non-corrupted lines, appends new record, and forces durability via `sync_all()`. Verified with 8 concurrent racing threads.
+  3. `Finding 03 — Staged Fail-Closed SQLite Rollback`: Staged temporary restore file validated prior to live file modification; non-swallowing error handling (Projetest missing or mutated PHP 8.4 fails closed); dual-layer writer quiescence (`lsof -t` on DB/WAL/SHM + `pgrep`); 0700 quarantine preservation.
+  4. `Finding 04 — Signed Snapshot Identity & Metadata Assertions`: Explicitly labeled `activation_snapshot_sha256`; bound rich project assertions (`id`, `name`, `path`, `volume_uuid`, `document_root`, `php_version`, `local_domain`, `assigned_loopback_port`); strict PHP 8.4 verification.
+  5. Tested and verified: Real-host dry-run confirmed 0 modifications and valid WAL snapshot. Disposable drill completed with 100% precision. 20 storage unit tests, 15 runtime integration tests, 81 workspace library tests, 33 desktop frontend tests pass (114 total). Zero clippy warnings, zero fmt diffs.
 - **Next Permitted Action**: Await explicit Product Owner acceptance and subsequent activation authorization specifically for Gate U5.F execution before making ANY persistent modifications to `localforge.db`, writing vhosts, or signaling Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---

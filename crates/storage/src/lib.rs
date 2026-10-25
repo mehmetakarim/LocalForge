@@ -6,8 +6,8 @@ pub mod rollback;
 pub mod snapshot;
 
 pub use approval::{
-    compute_hmac_sha256, verify_and_consume_approval, ApprovalEvidence, MigrationApprovalPayload,
-    MigrationApprovalToken, ProjectPortApproval,
+    verify_and_consume_approval, ApprovalEvidence, MigrationApprovalPayload,
+    MigrationApprovalToken, ProjectSnapshotAssertion,
 };
 pub use barrier::VolumeBarrier;
 pub use db::{

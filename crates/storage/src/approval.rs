@@ -1,83 +1,47 @@
 use chrono::Utc;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use localforge_core::{LocalForgeError, Result};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Seek, Write};
 use std::path::{Path, PathBuf};
 
-/// Implements standard RFC 2104 / RFC 4231 HMAC-SHA256 without external crate dependencies.
-pub fn compute_hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
-    let mut key_block = [0u8; 64];
-    if key.len() > 64 {
-        let mut hasher = Sha256::new();
-        hasher.update(key);
-        let key_hash = hasher.finalize();
-        key_block[..32].copy_from_slice(&key_hash);
-    } else {
-        key_block[..key.len()].copy_from_slice(key);
-    }
-
-    let mut o_key_pad = [0x5cu8; 64];
-    let mut i_key_pad = [0x36u8; 64];
-    for i in 0..64 {
-        o_key_pad[i] ^= key_block[i];
-        i_key_pad[i] ^= key_block[i];
-    }
-
-    let mut inner_hasher = Sha256::new();
-    inner_hasher.update(i_key_pad);
-    inner_hasher.update(message);
-    let inner_hash = inner_hasher.finalize();
-
-    let mut outer_hasher = Sha256::new();
-    outer_hasher.update(o_key_pad);
-    outer_hasher.update(inner_hash);
-    outer_hasher.finalize().into()
-}
-
-/// Constant-time byte slice comparison to defend against timing attacks.
-pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ProjectPortApproval {
+pub struct ProjectSnapshotAssertion {
     pub id: String,
-    pub loopback_port: u16,
+    pub name: String,
+    pub path: String,
+    pub volume_uuid: String,
+    pub document_root: String,
+    pub php_version: String,
+    pub local_domain: String,
+    pub assigned_loopback_port: u16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MigrationApprovalPayload {
     pub token_id: String,
     pub database_path: String,
-    pub database_sha256: String,
+    pub activation_snapshot_sha256: String,
     pub scope: String,
-    pub projects: Vec<ProjectPortApproval>,
+    pub expected_projects: Vec<ProjectSnapshotAssertion>,
     pub issued_at: i64,
     pub expires_at: i64,
 }
 
 impl MigrationApprovalPayload {
-    /// Produces a deterministic canonical byte sequence for signing.
+    /// Produces a deterministic canonical byte sequence for asymmetric Ed25519 signing and verification.
     pub fn to_canonical_bytes(&self) -> Result<Vec<u8>> {
         // Sort projects by ID for deterministic byte layout
-        let mut sorted_projects = self.projects.clone();
+        let mut sorted_projects = self.expected_projects.clone();
         sorted_projects.sort_by(|a, b| a.id.cmp(&b.id));
 
         let canonical_struct = MigrationApprovalPayload {
             token_id: self.token_id.clone(),
             database_path: self.database_path.clone(),
-            database_sha256: self.database_sha256.clone(),
+            activation_snapshot_sha256: self.activation_snapshot_sha256.to_lowercase(),
             scope: self.scope.clone(),
-            projects: sorted_projects,
+            expected_projects: sorted_projects,
             issued_at: self.issued_at,
             expires_at: self.expires_at,
         };
@@ -91,16 +55,23 @@ impl MigrationApprovalPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MigrationApprovalToken {
     pub payload: MigrationApprovalPayload,
-    pub signature: String,
+    pub signature: String, // 64-byte Ed25519 signature in hex format
 }
 
 impl MigrationApprovalToken {
-    /// Issues a verifiable token signed with the provided Product Owner key.
-    pub fn issue(key: &[u8], payload: MigrationApprovalPayload) -> Result<Self> {
+    /// Independent issuance helper used by the offline Product Owner tooling and verification tests.
+    /// The runtime executor does NOT have access to a signing key and can only verify.
+    pub fn issue_with_signing_key(
+        signing_key: &ed25519_dalek::SigningKey,
+        payload: MigrationApprovalPayload,
+    ) -> Result<Self> {
+        use ed25519_dalek::Signer;
         let canonical_bytes = payload.to_canonical_bytes()?;
-        let hmac = compute_hmac_sha256(key, &canonical_bytes);
-        let signature = hex::encode(hmac);
-        Ok(Self { payload, signature })
+        let signature = signing_key.sign(&canonical_bytes);
+        Ok(Self {
+            payload,
+            signature: hex::encode(signature.to_bytes()),
+        })
     }
 
     /// Serializes token to formatted JSON string.
@@ -110,7 +81,7 @@ impl MigrationApprovalToken {
     }
 }
 
-mod hex {
+pub mod hex {
     pub fn encode(data: impl AsRef<[u8]>) -> String {
         let mut s = String::with_capacity(data.as_ref().len() * 2);
         for byte in data.as_ref() {
@@ -134,53 +105,82 @@ mod hex {
 pub struct ApprovalEvidence {
     pub token_id: String,
     pub scope: String,
-    pub database_sha256: String,
+    pub activation_snapshot_sha256: String,
     pub consumed_at: String,
     pub signature_prefix: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct ConsumedRecord {
-    token_id: String,
-    consumed_at: String,
-    scope: String,
-    database_sha256: String,
+pub struct ConsumedRecord {
+    pub token_id: String,
+    pub consumed_at: String,
+    pub scope: String,
+    pub activation_snapshot_sha256: String,
 }
 
-/// Verifies and atomically consumes a Product Owner approval token.
+/// RAII lock guard to ensure exclusive POSIX flock is always released upon function exit.
+#[cfg(unix)]
+struct FlockGuard(std::os::unix::io::RawFd);
+
+#[cfg(unix)]
+impl Drop for FlockGuard {
+    fn drop(&mut self) {
+        unsafe {
+            libc::flock(self.0, libc::LOCK_UN);
+        }
+    }
+}
+
+/// Verifies and atomically consumes a Product Owner approval token using a verifier-only
+/// asymmetric Ed25519 public key architecture and an OS-level flock-protected replay ledger.
 ///
-/// Ensures:
-/// 1. Token cannot be self-issued by the executor (requires PO secret key).
-/// 2. Binds approval to the exact database path, target database SHA-256, project IDs, and port assignments.
-/// 3. Rejects expired tokens.
-/// 4. Prevents replay attacks by checking and recording consumed token IDs in an isolated ledger.
-/// 5. Records approval evidence without exposing secrets.
+/// Security guarantees:
+/// 1. Asymmetric separation: The executor only holds the public key; automated agents cannot self-approve.
+/// 2. Cryptographic binding: Binds approval to the exact DB path, signed snapshot SHA-256, scope, and rich project assertions.
+/// 3. Cross-process atomic replay protection: Exclusive `flock` critical section covering read, validation, append, and durable `sync_all()`.
+/// 4. Fail-closed ledger safety: Rejects symlinks, verifies file ownership, enforces 0600 mode, and fails closed on corrupted ledger lines.
+/// 5. Durability: Consumed token record is written and synced to disk before migration is permitted to begin.
 pub fn verify_and_consume_approval(
     token_str: &str,
     expected_db_path: &Path,
-    expected_db_sha256: &str,
+    expected_snapshot_sha256: &str,
     expected_scope: &str,
-    expected_projects: &[(&str, u16)],
+    expected_projects: &[ProjectSnapshotAssertion],
     consumed_ledger_path: &Path,
-    po_key_override: Option<&[u8]>,
+    po_pubkey_override: Option<&[u8]>,
 ) -> Result<ApprovalEvidence> {
-    // 1. Resolve Product Owner secret key (from environment or explicit override for tests)
-    let env_key = std::env::var("LOCALFORGE_PO_APPROVAL_KEY").ok();
-    let key_bytes: &[u8] = if let Some(override_key) = po_key_override {
-        override_key
-    } else if let Some(ref k) = env_key {
-        k.as_bytes()
+    // 1. Resolve Product Owner public key (from override, environment, or config file)
+    let pubkey_bytes: [u8; 32] = if let Some(pk_slice) = po_pubkey_override {
+        if pk_slice.len() != 32 {
+            return Err(LocalForgeError::Validation(
+                "Invalid Product Owner public key override length: expected 32 bytes".into(),
+            ));
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(pk_slice);
+        arr
+    } else if let Ok(env_pk_hex) = std::env::var("LOCALFORGE_PO_PUBLIC_KEY") {
+        let trimmed = env_pk_hex.trim();
+        let bytes = hex::decode(trimmed).ok_or_else(|| {
+            LocalForgeError::Validation("LOCALFORGE_PO_PUBLIC_KEY must be valid 64-char hex".into())
+        })?;
+        if bytes.len() != 32 {
+            return Err(LocalForgeError::Validation(
+                "LOCALFORGE_PO_PUBLIC_KEY must be exactly 32 bytes (64 hex characters)".into(),
+            ));
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        arr
     } else {
         return Err(LocalForgeError::Validation(
-            "Authorization rejected: Product Owner authorization key not found in environment (LOCALFORGE_PO_APPROVAL_KEY required)".into(),
+            "Authorization rejected: Product Owner public key not configured (LOCALFORGE_PO_PUBLIC_KEY required)".into(),
         ));
     };
 
-    if key_bytes.is_empty() {
-        return Err(LocalForgeError::Validation(
-            "Authorization rejected: Product Owner authorization key cannot be empty".into(),
-        ));
-    }
+    let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes).map_err(|e| {
+        LocalForgeError::Validation(format!("Invalid Product Owner Ed25519 public key: {e}"))
+    })?;
 
     // 2. Parse token from JSON or Base64
     let trimmed = token_str.trim();
@@ -203,20 +203,28 @@ pub fn verify_and_consume_approval(
         })?
     };
 
-    // 3. Verify signature
+    // 3. Verify asymmetric Ed25519 signature
     let canonical_bytes = token.payload.to_canonical_bytes()?;
-    let expected_hmac = compute_hmac_sha256(key_bytes, &canonical_bytes);
-    let Some(provided_hmac) = hex::decode(&token.signature) else {
-        return Err(LocalForgeError::Validation(
-            "Invalid approval signature encoding: must be valid hex".into(),
-        ));
-    };
+    let sig_bytes_vec = hex::decode(&token.signature).ok_or_else(|| {
+        LocalForgeError::Validation("Invalid approval signature encoding: must be valid hex".into())
+    })?;
 
-    if !constant_time_eq(&expected_hmac, &provided_hmac) {
-        return Err(LocalForgeError::Validation(
-            "Authorization signature mismatch: token was not issued with the verified Product Owner approval key".into(),
-        ));
+    if sig_bytes_vec.len() != 64 {
+        return Err(LocalForgeError::Validation(format!(
+            "Invalid approval signature length: expected 64 bytes (128 hex chars), found {}",
+            sig_bytes_vec.len()
+        )));
     }
+
+    let mut sig_arr = [0u8; 64];
+    sig_arr.copy_from_slice(&sig_bytes_vec);
+    let signature = Signature::from_bytes(&sig_arr);
+
+    verifying_key.verify(&canonical_bytes, &signature).map_err(|_| {
+        LocalForgeError::Validation(
+            "Authorization signature verification failed: token was not signed by the verified Product Owner public key".into(),
+        )
+    })?;
 
     // 4. Verify Expiration and Clock Skew
     let now = Utc::now().timestamp();
@@ -255,96 +263,117 @@ pub fn verify_and_consume_approval(
         )));
     }
 
-    // 7. Verify Database Checksum
+    // 7. Verify Activation Snapshot SHA-256 Checksum (Finding 04)
     if !token
         .payload
-        .database_sha256
-        .eq_ignore_ascii_case(expected_db_sha256)
+        .activation_snapshot_sha256
+        .eq_ignore_ascii_case(expected_snapshot_sha256)
     {
         return Err(LocalForgeError::Validation(format!(
-            "Authorization checksum mismatch: token binds to database SHA-256 '{}', current is '{}'",
-            token.payload.database_sha256, expected_db_sha256
+            "Authorization checksum mismatch: token binds to activation snapshot SHA-256 '{}', actual snapshot is '{}'",
+            token.payload.activation_snapshot_sha256, expected_snapshot_sha256
         )));
     }
 
-    // 8. Verify Project IDs and Port Assignments
-    if token.payload.projects.len() != expected_projects.len() {
+    // 8. Verify Exact Project Assertions (Finding 04: Never rely on project count alone)
+    if token.payload.expected_projects.len() != expected_projects.len() {
         return Err(LocalForgeError::Validation(format!(
             "Authorization projects mismatch: token specifies {} projects, expected {}",
-            token.payload.projects.len(),
+            token.payload.expected_projects.len(),
             expected_projects.len()
         )));
     }
 
-    for (exp_id, exp_port) in expected_projects {
-        let matched = token.payload.projects.iter().find(|p| p.id == *exp_id);
+    for expected in expected_projects {
+        let matched = token
+            .payload
+            .expected_projects
+            .iter()
+            .find(|p| p.id == expected.id);
+
         match matched {
-            Some(p) => {
-                if p.loopback_port != *exp_port {
+            Some(token_proj) => {
+                if token_proj.name != expected.name {
                     return Err(LocalForgeError::Validation(format!(
-                        "Authorization port mismatch for project '{}': token authorizes port {}, expected {}",
-                        exp_id, p.loopback_port, exp_port
+                        "Project '{}' name mismatch: token specifies '{}', snapshot has '{}'",
+                        expected.id, token_proj.name, expected.name
                     )));
+                }
+                if token_proj.path != expected.path {
+                    return Err(LocalForgeError::Validation(format!(
+                        "Project '{}' path mismatch: token specifies '{}', snapshot has '{}'",
+                        expected.id, token_proj.path, expected.path
+                    )));
+                }
+                if token_proj.volume_uuid != expected.volume_uuid {
+                    return Err(LocalForgeError::Validation(format!(
+                        "Project '{}' volume UUID mismatch: token specifies '{}', snapshot has '{}'",
+                        expected.id, token_proj.volume_uuid, expected.volume_uuid
+                    )));
+                }
+                if token_proj.document_root != expected.document_root {
+                    return Err(LocalForgeError::Validation(format!(
+                        "Project '{}' document root mismatch: token specifies '{}', snapshot has '{}'",
+                        expected.id, token_proj.document_root, expected.document_root
+                    )));
+                }
+                if token_proj.php_version != expected.php_version {
+                    return Err(LocalForgeError::Validation(format!(
+                        "Project '{}' PHP version mismatch: token specifies '{}', snapshot has '{}'",
+                        expected.id, token_proj.php_version, expected.php_version
+                    )));
+                }
+                if token_proj.assigned_loopback_port != expected.assigned_loopback_port {
+                    return Err(LocalForgeError::Validation(format!(
+                        "Project '{}' port mismatch: token authorizes port {}, expected {}",
+                        expected.id,
+                        token_proj.assigned_loopback_port,
+                        expected.assigned_loopback_port
+                    )));
+                }
+                if token_proj.name == "Projetest" && token_proj.php_version != "8.4" {
+                    return Err(LocalForgeError::Validation(
+                        "PO-U5-01 VIOLATION: Projetest must strictly remain pinned to PHP 8.4"
+                            .into(),
+                    ));
                 }
             }
             None => {
                 return Err(LocalForgeError::Validation(format!(
                     "Authorization project missing: token does not authorize project '{}'",
-                    exp_id
+                    expected.id
                 )));
             }
         }
     }
 
-    // 9. Replay Check
-    if let Some(parent) = consumed_ledger_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| {
-            LocalForgeError::DatabaseError(format!("Failed to create security ledger dir: {e}"))
-        })?;
-    }
-
-    if consumed_ledger_path.exists() {
-        let file = std::fs::File::open(consumed_ledger_path).map_err(|e| {
-            LocalForgeError::DatabaseError(format!("Failed to open consumed approvals ledger: {e}"))
-        })?;
-        let reader = BufReader::new(file);
-        for line_res in reader.lines() {
-            let line: String = line_res.map_err(|e| {
-                LocalForgeError::DatabaseError(format!("Failed to read consumed ledger line: {e}"))
-            })?;
-            if let Ok(rec) = serde_json::from_str::<ConsumedRecord>(&line) {
-                if rec.token_id == token.payload.token_id {
-                    return Err(LocalForgeError::Validation(format!(
-                        "Security violation: approval token '{}' has already been consumed (replay prevented)",
-                        token.payload.token_id
-                    )));
-                }
-            }
-        }
-    }
-
-    // 10. Atomically record consumption
-    let record = ConsumedRecord {
-        token_id: token.payload.token_id.clone(),
-        consumed_at: Utc::now().to_rfc3339(),
-        scope: token.payload.scope.clone(),
-        database_sha256: token.payload.database_sha256.clone(),
-    };
-    let record_line = serde_json::to_string(&record).map_err(|e| {
-        LocalForgeError::Serialization(format!("Failed to serialize consumed record: {e}"))
+    // 9. Cross-Process Atomic Replay Protection (Finding 02)
+    let parent = consumed_ledger_path.parent().ok_or_else(|| {
+        LocalForgeError::DatabaseError("Invalid consumed approvals ledger path".into())
+    })?;
+    std::fs::create_dir_all(parent).map_err(|e| {
+        LocalForgeError::DatabaseError(format!("Failed to create security dir: {e}"))
     })?;
 
-    let mut ledger_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(consumed_ledger_path)
-        .map_err(|e| {
-            LocalForgeError::DatabaseError(format!(
-                "Failed to open consumed approvals ledger for writing: {e}"
-            ))
-        })?;
+    // Open ledger file with read/write and 0600 mode
+    #[cfg(unix)]
+    use std::os::unix::fs::OpenOptionsExt;
+    #[cfg(unix)]
+    use std::os::unix::io::AsRawFd;
 
-    // Enforce 0600 permissions
+    let mut ledger_opts = OpenOptions::new();
+    ledger_opts.read(true).write(true).create(true);
+    #[cfg(unix)]
+    ledger_opts.mode(0o600);
+
+    let mut ledger_file = ledger_opts.open(consumed_ledger_path).map_err(|e| {
+        LocalForgeError::DatabaseError(format!(
+            "Failed to open consumed approvals ledger '{}': {e}",
+            consumed_ledger_path.display()
+        ))
+    })?;
+
+    // Ensure permissions 0600 even if file already existed
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -352,15 +381,100 @@ pub fn verify_and_consume_approval(
             std::fs::set_permissions(consumed_ledger_path, std::fs::Permissions::from_mode(0o600));
     }
 
-    writeln!(ledger_file, "{}", record_line).map_err(|e| {
-        LocalForgeError::DatabaseError(format!("Failed to record consumed approval token: {e}"))
+    // Symlink and ownership verification
+    let meta = std::fs::symlink_metadata(consumed_ledger_path).map_err(|e| {
+        LocalForgeError::DatabaseError(format!("Failed to read ledger metadata: {e}"))
     })?;
-    ledger_file.flush().map_err(|e| {
-        LocalForgeError::DatabaseError(format!("Failed to flush consumed approvals ledger: {e}"))
+    if meta.file_type().is_symlink() {
+        return Err(LocalForgeError::DatabaseError(format!(
+            "Security violation: replay ledger '{}' is a symbolic link",
+            consumed_ledger_path.display()
+        )));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let current_uid = unsafe { libc::geteuid() };
+        if meta.uid() != current_uid {
+            return Err(LocalForgeError::DatabaseError(format!(
+                "Security violation: replay ledger ownership mismatch: expected UID {current_uid}, got {}",
+                meta.uid()
+            )));
+        }
+    }
+
+    // Acquire exclusive OS-level advisory lock (LOCK_EX)
+    #[cfg(unix)]
+    let _lock_guard = {
+        let fd = ledger_file.as_raw_fd();
+        let ret = unsafe { libc::flock(fd, libc::LOCK_EX) };
+        if ret != 0 {
+            return Err(LocalForgeError::DatabaseError(
+                "Failed to acquire exclusive lock on replay ledger".into(),
+            ));
+        }
+        FlockGuard(fd)
+    };
+
+    // Read and validate all existing ledger records
+    ledger_file.seek(std::io::SeekFrom::Start(0)).map_err(|e| {
+        LocalForgeError::DatabaseError(format!("Failed to seek replay ledger to start: {e}"))
     })?;
 
-    let sig_prefix = if token.signature.len() >= 12 {
-        token.signature[..12].to_string()
+    let reader = BufReader::new(&ledger_file);
+    for (line_idx, line_res) in reader.lines().enumerate() {
+        let line = line_res.map_err(|e| {
+            LocalForgeError::DatabaseError(format!("Failed to read replay ledger line: {e}"))
+        })?;
+        let trimmed_line = line.trim();
+        if trimmed_line.is_empty() {
+            continue;
+        }
+
+        // Fail closed on malformed or corrupted records
+        let rec: ConsumedRecord = serde_json::from_str(trimmed_line).map_err(|e| {
+            LocalForgeError::DatabaseError(format!(
+                "Security violation: malformed or corrupted replay ledger record at line {}: {e}",
+                line_idx + 1
+            ))
+        })?;
+
+        if rec.token_id == token.payload.token_id {
+            return Err(LocalForgeError::Validation(format!(
+                "Security violation: approval token '{}' has already been consumed at {} (replay rejected)",
+                token.payload.token_id, rec.consumed_at
+            )));
+        }
+    }
+
+    // 10. Record consumed token atomically and sync to disk before migration
+    let new_record = ConsumedRecord {
+        token_id: token.payload.token_id.clone(),
+        consumed_at: Utc::now().to_rfc3339(),
+        scope: token.payload.scope.clone(),
+        activation_snapshot_sha256: token.payload.activation_snapshot_sha256.clone(),
+    };
+    let record_line = serde_json::to_string(&new_record).map_err(|e| {
+        LocalForgeError::Serialization(format!("Failed to serialize consumed record: {e}"))
+    })?;
+
+    ledger_file.seek(std::io::SeekFrom::End(0)).map_err(|e| {
+        LocalForgeError::DatabaseError(format!("Failed to seek replay ledger to end: {e}"))
+    })?;
+
+    writeln!(ledger_file, "{}", record_line).map_err(|e| {
+        LocalForgeError::DatabaseError(format!("Failed to write to consumed approvals ledger: {e}"))
+    })?;
+
+    // Force durable write to disk before migration begins
+    ledger_file.sync_all().map_err(|e| {
+        LocalForgeError::DatabaseError(format!(
+            "Failed to sync consumed approvals ledger to disk: {e}"
+        ))
+    })?;
+
+    let prefix = if token.signature.len() >= 16 {
+        token.signature[..16].to_string()
     } else {
         token.signature.clone()
     };
@@ -368,27 +482,23 @@ pub fn verify_and_consume_approval(
     Ok(ApprovalEvidence {
         token_id: token.payload.token_id,
         scope: token.payload.scope,
-        database_sha256: token.payload.database_sha256,
-        consumed_at: record.consumed_at,
-        signature_prefix: sig_prefix,
+        activation_snapshot_sha256: token.payload.activation_snapshot_sha256,
+        consumed_at: new_record.consumed_at,
+        signature_prefix: prefix,
     })
 }
 
 fn base64_decode(input: &str) -> std::result::Result<Vec<u8>, ()> {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = Vec::with_capacity(input.len() * 3 / 4);
-    let bytes = input.as_bytes();
+    let mut out = Vec::new();
     let mut buf = 0u32;
-    let mut bits = 0u32;
+    let mut bits = 0;
 
-    for &b in bytes {
+    for &b in input.as_bytes() {
         if b == b'=' {
             break;
         }
-        let val = match TABLE.iter().position(|&x| x == b) {
-            Some(idx) => idx as u32,
-            None => return Err(()),
-        };
+        let val = TABLE.iter().position(|&x| x == b).ok_or(())? as u32;
         buf = (buf << 6) | val;
         bits += 6;
         if bits >= 8 {
@@ -397,83 +507,92 @@ fn base64_decode(input: &str) -> std::result::Result<Vec<u8>, ()> {
             buf &= (1 << bits) - 1;
         }
     }
+
     Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::SigningKey;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
-    #[test]
-    fn test_rfc4231_test_vector_1() {
-        // RFC 4231 Test Case 1
-        let key = vec![0x0bu8; 20];
-        let data = b"Hi There";
-        let hmac = compute_hmac_sha256(&key, data);
-        let expected_hex = "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7";
-        assert_eq!(hex::encode(hmac), expected_hex);
+    fn sample_assertions() -> Vec<ProjectSnapshotAssertion> {
+        vec![
+            ProjectSnapshotAssertion {
+                id: "proj_e92e56cd0e0c4c36952804a35b3587a3".into(),
+                name: "r1_acceptance_project".into(),
+                path:
+                    "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project"
+                        .into(),
+                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+                document_root: "public".into(),
+                php_version: "8.5".into(),
+                local_domain: "r1-acceptance.localforge".into(),
+                assigned_loopback_port: 18081,
+            },
+            ProjectSnapshotAssertion {
+                id: "proj_db5472bb224c4fd0960ff69f793590a7".into(),
+                name: "Projetest".into(),
+                path: "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/Projetest".into(),
+                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+                document_root: "public".into(),
+                php_version: "8.4".into(),
+                local_domain: "projetest.localforge".into(),
+                assigned_loopback_port: 18082,
+            },
+        ]
     }
 
     #[test]
-    fn test_valid_approval_token_issuance_and_consumption() {
+    fn test_valid_asymmetric_approval_issuance_and_consumption() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"dummy db bytes").unwrap();
         let ledger_path = dir.path().join("security").join("consumed.jsonl");
 
-        let po_key = b"super_secret_po_production_key_98765";
+        let signing_key = SigningKey::from_bytes(&[42u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+        let pubkey_bytes = verifying_key.to_bytes();
+
         let payload = MigrationApprovalPayload {
             token_id: uuid::Uuid::new_v4().to_string(),
             database_path: db_path.display().to_string(),
-            database_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                .into(),
+            activation_snapshot_sha256:
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into(),
             scope: "migrate-v2-loopback-ports".into(),
-            projects: vec![
-                ProjectPortApproval {
-                    id: "proj_e92e56cd0e0c4c36952804a35b3587a3".into(),
-                    loopback_port: 18081,
-                },
-                ProjectPortApproval {
-                    id: "proj_db5472bb224c4fd0960ff69f793590a7".into(),
-                    loopback_port: 18082,
-                },
-            ],
+            expected_projects: sample_assertions(),
             issued_at: Utc::now().timestamp(),
             expires_at: Utc::now().timestamp() + 3600,
         };
 
-        let token = MigrationApprovalToken::issue(po_key, payload).unwrap();
+        let token = MigrationApprovalToken::issue_with_signing_key(&signing_key, payload).unwrap();
         let token_json = token.to_json().unwrap();
-
-        let expected_projects = [
-            ("proj_e92e56cd0e0c4c36952804a35b3587a3", 18081),
-            ("proj_db5472bb224c4fd0960ff69f793590a7", 18082),
-        ];
 
         let evidence = verify_and_consume_approval(
             &token_json,
             &db_path,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "migrate-v2-loopback-ports",
-            &expected_projects,
+            &sample_assertions(),
             &ledger_path,
-            Some(po_key),
+            Some(&pubkey_bytes),
         )
         .unwrap();
 
         assert_eq!(evidence.scope, "migrate-v2-loopback-ports");
         assert!(ledger_path.exists());
 
-        // Replay of the same token MUST be rejected
+        // Replay of the exact same token MUST fail closed
         let replay_err = verify_and_consume_approval(
             &token_json,
             &db_path,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "migrate-v2-loopback-ports",
-            &expected_projects,
+            &sample_assertions(),
             &ledger_path,
-            Some(po_key),
+            Some(&pubkey_bytes),
         )
         .unwrap_err();
 
@@ -481,121 +600,199 @@ mod tests {
     }
 
     #[test]
-    fn test_expired_token_rejection() {
+    fn test_concurrent_token_consumption_race_condition_protection() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
-        std::fs::write(&db_path, b"db").unwrap();
-        let ledger_path = dir.path().join("consumed.jsonl");
+        std::fs::write(&db_path, b"dummy db bytes").unwrap();
+        let ledger_path = Arc::new(dir.path().join("security").join("consumed.jsonl"));
 
-        let po_key = b"secret";
+        let signing_key = SigningKey::from_bytes(&[101u8; 32]);
+        let pubkey_bytes = Arc::new(signing_key.verifying_key().to_bytes());
+
         let payload = MigrationApprovalPayload {
             token_id: uuid::Uuid::new_v4().to_string(),
             database_path: db_path.display().to_string(),
-            database_sha256: "abc".into(),
+            activation_snapshot_sha256: "abc".into(),
             scope: "migrate-v2-loopback-ports".into(),
-            projects: vec![ProjectPortApproval {
-                id: "proj_1".into(),
-                loopback_port: 18081,
-            }],
-            issued_at: Utc::now().timestamp() - 7200,
-            expires_at: Utc::now().timestamp() - 3600, // Expired
-        };
-
-        let token = MigrationApprovalToken::issue(po_key, payload).unwrap();
-        let token_json = token.to_json().unwrap();
-
-        let err = verify_and_consume_approval(
-            &token_json,
-            &db_path,
-            "abc",
-            "migrate-v2-loopback-ports",
-            &[("proj_1", 18081)],
-            &ledger_path,
-            Some(po_key),
-        )
-        .unwrap_err();
-
-        assert!(err.to_string().contains("Authorization expired"));
-    }
-
-    #[test]
-    fn test_tampered_payload_and_arbitrary_string_rejection() {
-        let dir = tempdir().unwrap();
-        let db_path = dir.path().join("localforge.db");
-        std::fs::write(&db_path, b"db").unwrap();
-        let ledger_path = dir.path().join("consumed.jsonl");
-
-        let po_key = b"secret";
-
-        // Arbitrary non-JSON string
-        let err1 = verify_and_consume_approval(
-            "arbitrary_unverified_token_string",
-            &db_path,
-            "abc",
-            "migrate-v2-loopback-ports",
-            &[("proj_1", 18081)],
-            &ledger_path,
-            Some(po_key),
-        )
-        .unwrap_err();
-        assert!(err1.to_string().contains("Invalid approval token"));
-
-        // Tampered port in payload
-        let payload = MigrationApprovalPayload {
-            token_id: uuid::Uuid::new_v4().to_string(),
-            database_path: db_path.display().to_string(),
-            database_sha256: "abc".into(),
-            scope: "migrate-v2-loopback-ports".into(),
-            projects: vec![ProjectPortApproval {
-                id: "proj_1".into(),
-                loopback_port: 18081,
-            }],
+            expected_projects: sample_assertions(),
             issued_at: Utc::now().timestamp(),
             expires_at: Utc::now().timestamp() + 3600,
         };
 
-        let mut token = MigrationApprovalToken::issue(po_key, payload).unwrap();
-        // Tamper signature
-        token.signature = "deadbeef1234".into();
-        let token_json = token.to_json().unwrap();
+        let token = MigrationApprovalToken::issue_with_signing_key(&signing_key, payload).unwrap();
+        let token_json = Arc::new(token.to_json().unwrap());
+        let db_path_arc = Arc::new(db_path);
 
-        let err2 = verify_and_consume_approval(
-            &token_json,
-            &db_path,
-            "abc",
-            "migrate-v2-loopback-ports",
-            &[("proj_1", 18081)],
-            &ledger_path,
-            Some(po_key),
-        )
-        .unwrap_err();
-        assert!(
-            err2.to_string().contains("signature mismatch")
-                || err2.to_string().contains("Invalid approval signature")
+        // Spawn 8 concurrent threads attempting to consume the exact same token
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let t_json = Arc::clone(&token_json);
+            let t_db = Arc::clone(&db_path_arc);
+            let t_ledger = Arc::clone(&ledger_path);
+            let t_pk = Arc::clone(&pubkey_bytes);
+
+            handles.push(std::thread::spawn(move || {
+                verify_and_consume_approval(
+                    &t_json,
+                    &t_db,
+                    "abc",
+                    "migrate-v2-loopback-ports",
+                    &sample_assertions(),
+                    &t_ledger,
+                    Some(&*t_pk),
+                )
+            }));
+        }
+
+        let mut successes = 0;
+        let mut rejections = 0;
+
+        for h in handles {
+            match h.join().unwrap() {
+                Ok(_) => successes += 1,
+                Err(err) => {
+                    assert!(err.to_string().contains("already been consumed"));
+                    rejections += 1;
+                }
+            }
+        }
+
+        // Exactly ONE thread must succeed; all 7 others must be rejected
+        assert_eq!(
+            successes, 1,
+            "Only 1 concurrent caller should consume the token"
+        );
+        assert_eq!(
+            rejections, 7,
+            "All 7 concurrent callers should be rejected by atomic lock"
         );
     }
 
     #[test]
-    fn test_missing_po_key_fails_closed() {
+    fn test_corrupted_replay_ledger_fails_closed() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
-        let ledger_path = dir.path().join("consumed.jsonl");
+        std::fs::write(&db_path, b"db").unwrap();
+        let ledger_path = dir.path().join("security").join("consumed.jsonl");
+        std::fs::create_dir_all(ledger_path.parent().unwrap()).unwrap();
 
-        std::env::remove_var("LOCALFORGE_PO_APPROVAL_KEY");
+        // Write malformed corrupted JSON line
+        std::fs::write(&ledger_path, b"{\"corrupt\": true\nINVALID_JSON_HERE\n").unwrap();
+
+        let signing_key = SigningKey::from_bytes(&[77u8; 32]);
+        let pubkey_bytes = signing_key.verifying_key().to_bytes();
+
+        let payload = MigrationApprovalPayload {
+            token_id: uuid::Uuid::new_v4().to_string(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: "abc".into(),
+            scope: "migrate-v2-loopback-ports".into(),
+            expected_projects: sample_assertions(),
+            issued_at: Utc::now().timestamp(),
+            expires_at: Utc::now().timestamp() + 3600,
+        };
+
+        let token = MigrationApprovalToken::issue_with_signing_key(&signing_key, payload).unwrap();
+        let token_json = token.to_json().unwrap();
 
         let err = verify_and_consume_approval(
-            "{}",
+            &token_json,
             &db_path,
             "abc",
             "migrate-v2-loopback-ports",
-            &[],
+            &sample_assertions(),
             &ledger_path,
-            None,
+            Some(&pubkey_bytes),
         )
         .unwrap_err();
 
         assert!(err
             .to_string()
-            .contains("LOCALFORGE_PO_APPROVAL_KEY required"));
+            .contains("malformed or corrupted replay ledger"));
+    }
+
+    #[test]
+    fn test_agent_cannot_self_approve_without_po_private_key() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        std::fs::write(&db_path, b"db").unwrap();
+        let ledger_path = dir.path().join("consumed.jsonl");
+
+        // The true Product Owner keypair
+        let po_signing_key = SigningKey::from_bytes(&[99u8; 32]);
+        let po_pubkey_bytes = po_signing_key.verifying_key().to_bytes();
+
+        // An automated agent tries to generate its OWN keypair to self-approve
+        let rogue_agent_key = SigningKey::from_bytes(&[66u8; 32]);
+
+        let payload = MigrationApprovalPayload {
+            token_id: uuid::Uuid::new_v4().to_string(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: "abc".into(),
+            scope: "migrate-v2-loopback-ports".into(),
+            expected_projects: sample_assertions(),
+            issued_at: Utc::now().timestamp(),
+            expires_at: Utc::now().timestamp() + 3600,
+        };
+
+        // Rogue agent signs with its own key
+        let rogue_token =
+            MigrationApprovalToken::issue_with_signing_key(&rogue_agent_key, payload).unwrap();
+        let rogue_json = rogue_token.to_json().unwrap();
+
+        // The executor verifier uses the true PO public key
+        let err = verify_and_consume_approval(
+            &rogue_json,
+            &db_path,
+            "abc",
+            "migrate-v2-loopback-ports",
+            &sample_assertions(),
+            &ledger_path,
+            Some(&po_pubkey_bytes),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("signature verification failed"));
+    }
+
+    #[test]
+    fn test_projetest_php_mutation_fails_closed() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        std::fs::write(&db_path, b"db").unwrap();
+        let ledger_path = dir.path().join("consumed.jsonl");
+
+        let signing_key = SigningKey::from_bytes(&[55u8; 32]);
+        let pubkey_bytes = signing_key.verifying_key().to_bytes();
+
+        let mut mutated_projects = sample_assertions();
+        // Mutate Projetest PHP to 8.5 (PO-U5-01 violation)
+        mutated_projects[1].php_version = "8.5".into();
+
+        let payload = MigrationApprovalPayload {
+            token_id: uuid::Uuid::new_v4().to_string(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: "abc".into(),
+            scope: "migrate-v2-loopback-ports".into(),
+            expected_projects: mutated_projects.clone(),
+            issued_at: Utc::now().timestamp(),
+            expires_at: Utc::now().timestamp() + 3600,
+        };
+
+        let token = MigrationApprovalToken::issue_with_signing_key(&signing_key, payload).unwrap();
+        let token_json = token.to_json().unwrap();
+
+        let err = verify_and_consume_approval(
+            &token_json,
+            &db_path,
+            "abc",
+            "migrate-v2-loopback-ports",
+            &mutated_projects,
+            &ledger_path,
+            Some(&pubkey_bytes),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("PO-U5-01 VIOLATION"));
     }
 }

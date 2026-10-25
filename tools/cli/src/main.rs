@@ -618,8 +618,8 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                     .context("Failed to complete WAL-safe preflight audit on live database")?;
 
                 println!(
-                    "Snapshot SHA-256:     \x1b[1;35m{}\x1b[0m",
-                    audit.database_sha256
+                    "Snapshot SHA-256:     \x1b[1;35m{}\x1b[0m (Activation Snapshot)",
+                    audit.activation_snapshot_sha256
                 );
                 println!(
                     "Integrity Status:     \x1b[1;32m{}\x1b[0m",
@@ -647,6 +647,9 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                         b_free
                     };
                     println!("  - [{}] {}", p.id, p.name);
+                    println!("    Path:            {}", p.path);
+                    println!("    Volume UUID:     {}", p.volume_uuid);
+                    println!("    Document Root:   {}", p.document_root);
                     println!("    PHP Version:     {}", p.php_version);
                     println!("    Local Domain:    {}", p.local_domain);
                     println!(
@@ -675,7 +678,7 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                     "\n\x1b[1;33m[!] PREFLIGHT COMPLETE: Zero modifications made to database. Zero WAL/SHM mutations.\x1b[0m"
                 );
                 println!("To execute live migration, explicit Product Owner cryptographic authorization is required:");
-                println!("  export LOCALFORGE_PO_APPROVAL_KEY=\"<PO_SECRET_KEY>\"");
+                println!("  export LOCALFORGE_PO_PUBLIC_KEY=\"<PO_PUBLIC_KEY_HEX>\"");
                 println!("  localforge storage migrate-v2 --execute --approval-token <TOKEN_OR_@FILE> --backup-path <PATH>");
                 return Ok(());
             }
@@ -741,6 +744,43 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                     "Backup is not clean Schema V1 (already has loopback_port column)"
                 ));
             }
+
+            // Extract rich project metadata from backup for cryptographic assertion verification (Finding 04)
+            let mut b_stmt = bconn.prepare("SELECT id, name, path, volume_uuid, document_root, php_version, local_domain FROM projects ORDER BY name ASC;")?;
+            let b_rows = b_stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            })?;
+
+            let mut expected_assertions = Vec::new();
+            for r in b_rows {
+                let (id, name, path, volume_uuid, document_root, php_version, local_domain) = r?;
+                let port = if id == "proj_e92e56cd0e0c4c36952804a35b3587a3" {
+                    port_project_a
+                } else if id == "proj_db5472bb224c4fd0960ff69f793590a7" {
+                    port_project_b
+                } else {
+                    return Err(anyhow!("Unexpected project record in backup: {}", id));
+                };
+                expected_assertions.push(localforge_storage::ProjectSnapshotAssertion {
+                    id,
+                    name,
+                    path,
+                    volume_uuid,
+                    document_root,
+                    php_version,
+                    local_domain,
+                    assigned_loopback_port: port,
+                });
+            }
+            drop(b_stmt);
             drop(bconn);
 
             if !a_free {
@@ -757,17 +797,13 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
             let ledger_path = canonical_app_support
                 .join("security")
                 .join("consumed_approvals.jsonl");
-            let expected_projects = [
-                ("proj_e92e56cd0e0c4c36952804a35b3587a3", port_project_a),
-                ("proj_db5472bb224c4fd0960ff69f793590a7", port_project_b),
-            ];
 
             let evidence = localforge_storage::verify_and_consume_approval(
                 &token_str,
                 &canonical_db_path,
                 &backup_sha256,
                 "migrate-v2-loopback-ports",
-                &expected_projects,
+                &expected_assertions,
                 &ledger_path,
                 None,
             )?;

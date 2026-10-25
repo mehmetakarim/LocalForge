@@ -38,6 +38,9 @@ pub fn compute_file_sha256(path: &Path) -> Result<String> {
 pub struct ProjectSnapshotRecord {
     pub id: String,
     pub name: String,
+    pub path: String,
+    pub volume_uuid: String,
+    pub document_root: String,
     pub php_version: String,
     pub local_domain: String,
     pub loopback_port: Option<u16>,
@@ -45,6 +48,7 @@ pub struct ProjectSnapshotRecord {
 
 #[derive(Debug, Clone)]
 pub struct WalSnapshotAudit {
+    pub activation_snapshot_sha256: String,
     pub database_sha256: String,
     pub integrity_status: String,
     pub has_loopback_port_column: bool,
@@ -161,7 +165,7 @@ pub fn inspect_wal_database_preflight(live_db_path: &Path) -> Result<WalSnapshot
         .unwrap_or(0);
 
     let mut stmt = snap_conn
-        .prepare("SELECT id, name, php_version, local_domain FROM projects ORDER BY name ASC;")
+        .prepare("SELECT id, name, path, volume_uuid, document_root, php_version, local_domain FROM projects ORDER BY name ASC;")
         .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
     let rows = stmt
@@ -171,13 +175,16 @@ pub fn inspect_wal_database_preflight(live_db_path: &Path) -> Result<WalSnapshot
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
             ))
         })
         .map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
     let mut projects = Vec::new();
     for r in rows {
-        let (id, name, php_version, local_domain) =
+        let (id, name, path, volume_uuid, document_root, php_version, local_domain) =
             r.map_err(|e| LocalForgeError::DatabaseError(e.to_string()))?;
 
         let port: Option<u16> = if has_port_col > 0 {
@@ -195,6 +202,9 @@ pub fn inspect_wal_database_preflight(live_db_path: &Path) -> Result<WalSnapshot
         projects.push(ProjectSnapshotRecord {
             id,
             name,
+            path,
+            volume_uuid,
+            document_root,
             php_version,
             local_domain,
             loopback_port: port,
@@ -202,6 +212,7 @@ pub fn inspect_wal_database_preflight(live_db_path: &Path) -> Result<WalSnapshot
     }
 
     Ok(WalSnapshotAudit {
+        activation_snapshot_sha256: sha256.clone(),
         database_sha256: sha256,
         integrity_status: integrity,
         has_loopback_port_column: has_port_col > 0,
