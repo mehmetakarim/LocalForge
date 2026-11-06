@@ -6,18 +6,37 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.F Final Authorization & Recovery Safety Closeout Completed — Actual Activation Strictly on Hold / Awaiting PO Acceptance**
+- **Current State**: **Gate U5.F Final Acceptance Corrections Completed — Real Host Activation Remains Strict No-Go / Awaiting PO Acceptance**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `da26863dad9a7c9ddfc9bf3bc7f409b8cf53e56d`
+- **Baseline Commit**: `b05c89ddd3459c3a33c9ecda3d4f6390ca518f3e`
 - **Previous Milestone Status**:
-  - **Gate U5.F Executor Safety Patch**: Implemented initial approval token and rollback connection isolation; conditionally accepted by PO.
-- **Completed in Gate U5.F Final Authorization & Recovery Closeout**:
-  1. `Finding 01 — Asymmetric Trust Separation`: Implemented Ed25519 verifier-only public key architecture in `crates/storage/src/approval.rs`. The runtime executor holds only `LOCALFORGE_PO_PUBLIC_KEY`. The private key remains strictly offline with the Product Owner. Agents cannot self-approve.
-  2. `Finding 02 — Cross-Process Atomic Replay Protection`: Protected `consumed_approvals.jsonl` with exclusive POSIX `flock(fd, LOCK_EX)`. Atomically checks replay, validates non-corrupted lines, appends new record, and forces durability via `sync_all()`. Verified with 8 concurrent racing threads.
-  3. `Finding 03 — Staged Fail-Closed SQLite Rollback`: Staged temporary restore file validated prior to live file modification; non-swallowing error handling (Projetest missing or mutated PHP 8.4 fails closed); dual-layer writer quiescence (`lsof -t` on DB/WAL/SHM + `pgrep`); 0700 quarantine preservation.
-  4. `Finding 04 — Signed Snapshot Identity & Metadata Assertions`: Explicitly labeled `activation_snapshot_sha256`; bound rich project assertions (`id`, `name`, `path`, `volume_uuid`, `document_root`, `php_version`, `local_domain`, `assigned_loopback_port`); strict PHP 8.4 verification.
-  5. Tested and verified: Real-host dry-run confirmed 0 modifications and valid WAL snapshot. Disposable drill completed with 100% precision. 20 storage unit tests, 15 runtime integration tests, 81 workspace library tests, 33 desktop frontend tests pass (114 total). Zero clippy warnings, zero fmt diffs.
+  - **Gate U5.F Final Authorization & Recovery Safety Closeout**: Implemented asymmetric Ed25519 authorization, flock replay ledger, fail-closed staged rollback; conditionally accepted by PO.
+- **Completed in Gate U5.F Final Acceptance Corrections**:
+  1. `P0-01 — Enrolled Product Owner Trust Anchor Architecture`:
+     - Implemented `crates/storage/src/trust_anchor.rs`.
+     - Disallowed reading `LOCALFORGE_PO_PUBLIC_KEY` from the execution environment (fails closed if set).
+     - Trust anchor enrolled via `localforge storage enroll-trust-anchor` requiring explicit human authorization phrases (`"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"` / `"I AUTHORIZE REPLACEMENT OF EXISTING PRODUCT OWNER TRUST ANCHOR"` with `--replace`).
+     - Automated agents cannot self-enroll or replace trust anchor without human intervention.
+     - Enforced `0600` permissions, UID ownership, non-symlink checks, and SHA-256 fingerprint verification.
+     - Added `localforge storage show-trust-anchor` for status inspection.
+     - Zero production keys or approval tokens minted during testing or implementation.
+  2. `P0-02 — Never Swallow Rollback Errors & Post-Migration Verification`:
+     - Eliminated `let _ =` ignored rollback in `tools/cli/src/main.rs` Step 8.
+     - Post-migration validation explicitly verifies independent loopback port unique index, project record counts, and Projetest PHP 8.4 compliance.
+     - On any verification failure, triggers atomic quarantine and restore, and explicitly propagates results.
+     - Verifies restored database is clean Schema V1, contains 2 projects, and Projetest is PHP 8.4.
+     - Preserves quarantined failed live state for diagnosis; halts dependent activation steps.
+     - Preserves both original failure and rollback failure diagnostics if rollback fails.
+     - Added regression tests in `crates/storage/src/rollback.rs` for failed post-migration index validation and failed rollback error propagation.
+  3. **Verification**:
+     - 27/27 `localforge-storage` tests pass (including trust anchor lifecycle, replacement phrase guard, attacker key substitution rejection, rollback error preservation, and simulated index validation failure).
+     - 15/15 `localforge-runtime` integration tests pass.
+     - 88/88 library tests pass across all workspace crates.
+     - 33/33 desktop frontend tests pass (121 tests total).
+     - `cargo clippy --workspace -- -D warnings`: 0 warnings.
+     - `cargo fmt --check`: 0 diffs.
+     - `localforge storage migrate-v2` dry-run preflight verified on live host database with zero writes.
 - **Next Permitted Action**: Await explicit Product Owner acceptance and subsequent activation authorization specifically for Gate U5.F execution before making ANY persistent modifications to `localforge.db`, writing vhosts, or signaling Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
 
 ---

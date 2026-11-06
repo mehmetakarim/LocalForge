@@ -1171,3 +1171,45 @@ This document records the chronological engineering log for all development sess
    - `cargo fmt --check`: 0 diffs.
 6. **Closeout Status**:
    - `LOCALFORGE GATE U5.F — AUTHORIZATION & RECOVERY CLOSEOUT COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`
+
+---
+
+## Session 036 — Gate U5.F Final Acceptance Corrections
+
+- **Date**: 2026-10-26
+- **Participants**: Principal Software Architect, Security Engineer, Lead Agent
+- **Authorized Scope**: **Gate U5.F Final Acceptance Corrections** (P0-01 Trust Anchor Model & P0-02 Rollback Error Preservation; Real host activation strictly on hold)
+- **Git Branch**: `phase-r1/r1-3b-uat-recovery`
+- **Verified Code Baseline**: Commit `b05c89ddd3459c3a33c9ecda3d4f6390ca518f3e`
+- **CI Baseline**: Run `40244093532` — SUCCESS
+
+### Summary of Activities
+1. **P0-01 — Enrolled Product Owner Trust Anchor Architecture**:
+   - Implemented `crates/storage/src/trust_anchor.rs`:
+     - Disallowed reading `LOCALFORGE_PO_PUBLIC_KEY` from the execution environment; explicit fail-closed rejection if set.
+     - Implemented `enroll_trust_anchor(&anchor_path, &public_key_hex, &human_auth_phrase, replace)` requiring explicit human authorization phrases (`"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"` for enrollment, `"I AUTHORIZE REPLACEMENT OF EXISTING PRODUCT OWNER TRUST ANCHOR"` with `--replace` for replacement).
+     - Enforced `0600` file permissions, UID ownership check, non-symlink verification, and cryptographic SHA-256 fingerprint validation against Ed25519 public key curve points.
+     - Automated agents cannot self-enroll or replace trust anchor without human authorization phrases.
+     - Added CLI subcommands `localforge storage enroll-trust-anchor` and `localforge storage show-trust-anchor`.
+     - Zero production keys or approval tokens minted during testing or implementation.
+2. **P0-02 — Rollback Error Propagation & Post-Migration Verification**:
+   - In `tools/cli/src/main.rs`:
+     - Removed ignored rollback results (`let _ =`) in Step 8 post-migration validation.
+     - Wrapped post-migration checks (independent index validation, project counts, Projetest PHP 8.4 compliance) in an explicit verification closure.
+     - On failure, calls `execute_isolated_quarantine_and_restore` and explicitly propagates results.
+     - On successful rollback: verifies restored database is clean Schema V1, contains 2 projects, and Projetest is PHP 8.4; preserves quarantined failed files and halts execution with descriptive diagnostics.
+     - On rollback failure: halts immediately with a fatal diagnostic preserving BOTH the post-migration failure and the rollback failure.
+   - In `crates/storage/src/rollback.rs`:
+     - Added `FailureInjectionPoint::DuringPostMigrationIndexValidation`.
+     - Added independent index verification inside `execute_gated_migration_lifecycle`.
+     - Added regression tests `test_simulated_failure_during_index_validation_triggers_clean_isolated_rollback` and `test_failed_rollback_preserves_both_original_and_rollback_errors`.
+3. **Comprehensive Verification**:
+   - 27/27 `localforge-storage` tests pass (including trust anchor lifecycle, replacement phrase guard, attacker key substitution rejection, rollback error preservation, and simulated index validation failure).
+   - 15/15 `localforge-runtime` integration tests pass.
+   - 88/88 library tests pass across all workspace crates.
+   - 33/33 desktop frontend tests pass.
+   - `cargo clippy --workspace -- -D warnings`: 0 warnings.
+   - `cargo fmt --check`: 0 diffs.
+   - `localforge storage migrate-v2` dry-run preflight verified on live host database with zero writes.
+4. **Closeout Status**:
+   - `LOCALFORGE GATE U5.F — FINAL ACCEPTANCE CORRECTIONS COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`

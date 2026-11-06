@@ -10,6 +10,7 @@ pub enum FailureInjectionPoint {
     ImmediatelyAfterSchemaMigration,
     AfterProjectAPortAssignment,
     DuringPostVerification,
+    DuringPostMigrationIndexValidation,
 }
 
 #[derive(Debug, Clone)]
@@ -432,12 +433,33 @@ pub fn execute_gated_migration_lifecycle(
             ));
         }
 
+        drop(store);
+
+        // Independent Unique Index Validation
+        let check_conn =
+            Connection::open_with_flags(&config.db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .map_err(|e| {
+                    LocalForgeError::DatabaseError(format!(
+                        "Failed to open database for post-migration index check: {e}"
+                    ))
+                })?;
+        let index_status = crate::db::validate_loopback_port_index(&check_conn)?;
+        drop(check_conn);
+
+        if index_status != crate::db::IndexValidationStatus::Valid
+            || failure_injection == FailureInjectionPoint::DuringPostMigrationIndexValidation
+        {
+            return Err(LocalForgeError::DatabaseError(
+                "Post-migration independent index validation failed: idx_projects_loopback_port missing or corrupt"
+                    .into(),
+            ));
+        }
+
         Ok(GatedMigrationResult {
             report,
             project_a_after: p1_after,
             project_b_after: p2_after,
         })
-        // NOTE: `store` is explicitly dropped here when the closure finishes!
     })();
 
     // -------------------------------------------------------------------------
@@ -718,5 +740,112 @@ mod tests {
         assert_eq!(success.project_a_after.loopback_port, Some(18081));
         assert_eq!(success.project_b_after.loopback_port, Some(18082));
         assert_eq!(success.project_b_after.php_version, "8.4");
+    }
+
+    #[test]
+    fn test_simulated_failure_during_index_validation_triggers_clean_isolated_rollback() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        let backup_path = dir.path().join("backup_v1.db");
+        let app_support = dir.path().to_path_buf();
+
+        create_test_v1_database(&db_path);
+        std::fs::copy(&db_path, &backup_path).unwrap();
+
+        let config = RollbackConfig {
+            db_path: db_path.clone(),
+            backup_path: backup_path.clone(),
+            app_support_dir: app_support.clone(),
+            allowlist: vec!["localforge.db".into()],
+        };
+
+        let res = execute_gated_migration_lifecycle(
+            &config,
+            "proj_a",
+            18081,
+            "proj_b",
+            18082,
+            FailureInjectionPoint::DuringPostMigrationIndexValidation,
+        );
+
+        let err = res.unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Post-migration independent index validation failed"));
+        assert!(err
+            .to_string()
+            .contains("Database rolled back successfully"));
+
+        // Verify restored DB is clean V1
+        let conn = Connection::open(&db_path).unwrap();
+        let integrity: String = conn
+            .query_row("PRAGMA integrity_check;", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(integrity, "ok");
+
+        let has_port: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'loopback_port';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            has_port, 0,
+            "Restored database must be clean V1 (no loopback_port column)"
+        );
+
+        let p2_php: String = conn
+            .query_row(
+                "SELECT php_version FROM projects WHERE id = 'proj_b';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(p2_php, "8.4", "PO-U5-01 Projetest must remain PHP 8.4");
+    }
+
+    #[test]
+    fn test_failed_rollback_preserves_both_original_and_rollback_errors() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        // Intentionally nonexistent backup path to force rollback failure
+        let nonexistent_backup = dir.path().join("nonexistent_backup.db");
+        let app_support = dir.path().to_path_buf();
+
+        create_test_v1_database(&db_path);
+
+        let config = RollbackConfig {
+            db_path: db_path.clone(),
+            backup_path: nonexistent_backup,
+            app_support_dir: app_support,
+            allowlist: vec!["localforge.db".into()],
+        };
+
+        let res = execute_gated_migration_lifecycle(
+            &config,
+            "proj_a",
+            18081,
+            "proj_b",
+            18082,
+            FailureInjectionPoint::ImmediatelyAfterSchemaMigration,
+        );
+
+        let err = res.unwrap_err();
+        let err_msg = err.to_string();
+
+        // Must preserve BOTH original migration failure AND rollback failure without swallowing
+        assert!(
+            err_msg.contains("Simulated failure immediately after schema migration"),
+            "Original migration error must be preserved in diagnostics"
+        );
+        assert!(
+            err_msg.contains("AND rollback failed"),
+            "Rollback failure indication must be preserved in diagnostics"
+        );
+        assert!(
+            err_msg.contains("FATAL ERROR: Migration failed"),
+            "Fatal condition must be explicitly reported"
+        );
     }
 }

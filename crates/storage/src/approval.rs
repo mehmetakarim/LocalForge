@@ -1,5 +1,5 @@
 use chrono::Utc;
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Verifier};
 use localforge_core::{LocalForgeError, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
@@ -147,40 +147,11 @@ pub fn verify_and_consume_approval(
     expected_scope: &str,
     expected_projects: &[ProjectSnapshotAssertion],
     consumed_ledger_path: &Path,
-    po_pubkey_override: Option<&[u8]>,
+    trust_anchor_path: &Path,
 ) -> Result<ApprovalEvidence> {
-    // 1. Resolve Product Owner public key (from override, environment, or config file)
-    let pubkey_bytes: [u8; 32] = if let Some(pk_slice) = po_pubkey_override {
-        if pk_slice.len() != 32 {
-            return Err(LocalForgeError::Validation(
-                "Invalid Product Owner public key override length: expected 32 bytes".into(),
-            ));
-        }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(pk_slice);
-        arr
-    } else if let Ok(env_pk_hex) = std::env::var("LOCALFORGE_PO_PUBLIC_KEY") {
-        let trimmed = env_pk_hex.trim();
-        let bytes = hex::decode(trimmed).ok_or_else(|| {
-            LocalForgeError::Validation("LOCALFORGE_PO_PUBLIC_KEY must be valid 64-char hex".into())
-        })?;
-        if bytes.len() != 32 {
-            return Err(LocalForgeError::Validation(
-                "LOCALFORGE_PO_PUBLIC_KEY must be exactly 32 bytes (64 hex characters)".into(),
-            ));
-        }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        arr
-    } else {
-        return Err(LocalForgeError::Validation(
-            "Authorization rejected: Product Owner public key not configured (LOCALFORGE_PO_PUBLIC_KEY required)".into(),
-        ));
-    };
-
-    let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes).map_err(|e| {
-        LocalForgeError::Validation(format!("Invalid Product Owner Ed25519 public key: {e}"))
-    })?;
+    // 1. Resolve and verify Product Owner trust anchor (never accept arbitrary environment keys)
+    let (verifying_key, _anchor) =
+        crate::trust_anchor::load_verified_trust_anchor(trust_anchor_path)?;
 
     // 2. Parse token from JSON or Base64
     let trimmed = token_str.trim();
@@ -545,16 +516,29 @@ mod tests {
         ]
     }
 
+    fn enroll_test_trust_anchor(dir: &Path, signing_key: &SigningKey) -> PathBuf {
+        let anchor_path = dir.join("security").join("trust_anchor.json");
+        let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
+        crate::trust_anchor::enroll_trust_anchor(
+            &anchor_path,
+            &pubkey_hex,
+            crate::trust_anchor::HUMAN_ENROLLMENT_PHRASE,
+            false,
+        )
+        .unwrap();
+        anchor_path
+    }
+
     #[test]
     fn test_valid_asymmetric_approval_issuance_and_consumption() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"dummy db bytes").unwrap();
         let ledger_path = dir.path().join("security").join("consumed.jsonl");
 
         let signing_key = SigningKey::from_bytes(&[42u8; 32]);
-        let verifying_key = signing_key.verifying_key();
-        let pubkey_bytes = verifying_key.to_bytes();
+        let anchor_path = enroll_test_trust_anchor(dir.path(), &signing_key);
 
         let payload = MigrationApprovalPayload {
             token_id: uuid::Uuid::new_v4().to_string(),
@@ -577,7 +561,7 @@ mod tests {
             "migrate-v2-loopback-ports",
             &sample_assertions(),
             &ledger_path,
-            Some(&pubkey_bytes),
+            &anchor_path,
         )
         .unwrap();
 
@@ -592,7 +576,7 @@ mod tests {
             "migrate-v2-loopback-ports",
             &sample_assertions(),
             &ledger_path,
-            Some(&pubkey_bytes),
+            &anchor_path,
         )
         .unwrap_err();
 
@@ -601,13 +585,14 @@ mod tests {
 
     #[test]
     fn test_concurrent_token_consumption_race_condition_protection() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"dummy db bytes").unwrap();
         let ledger_path = Arc::new(dir.path().join("security").join("consumed.jsonl"));
 
         let signing_key = SigningKey::from_bytes(&[101u8; 32]);
-        let pubkey_bytes = Arc::new(signing_key.verifying_key().to_bytes());
+        let anchor_path = Arc::new(enroll_test_trust_anchor(dir.path(), &signing_key));
 
         let payload = MigrationApprovalPayload {
             token_id: uuid::Uuid::new_v4().to_string(),
@@ -629,7 +614,7 @@ mod tests {
             let t_json = Arc::clone(&token_json);
             let t_db = Arc::clone(&db_path_arc);
             let t_ledger = Arc::clone(&ledger_path);
-            let t_pk = Arc::clone(&pubkey_bytes);
+            let t_anchor = Arc::clone(&anchor_path);
 
             handles.push(std::thread::spawn(move || {
                 verify_and_consume_approval(
@@ -639,7 +624,7 @@ mod tests {
                     "migrate-v2-loopback-ports",
                     &sample_assertions(),
                     &t_ledger,
-                    Some(&*t_pk),
+                    &t_anchor,
                 )
             }));
         }
@@ -670,6 +655,7 @@ mod tests {
 
     #[test]
     fn test_corrupted_replay_ledger_fails_closed() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"db").unwrap();
@@ -680,7 +666,7 @@ mod tests {
         std::fs::write(&ledger_path, b"{\"corrupt\": true\nINVALID_JSON_HERE\n").unwrap();
 
         let signing_key = SigningKey::from_bytes(&[77u8; 32]);
-        let pubkey_bytes = signing_key.verifying_key().to_bytes();
+        let anchor_path = enroll_test_trust_anchor(dir.path(), &signing_key);
 
         let payload = MigrationApprovalPayload {
             token_id: uuid::Uuid::new_v4().to_string(),
@@ -702,7 +688,7 @@ mod tests {
             "migrate-v2-loopback-ports",
             &sample_assertions(),
             &ledger_path,
-            Some(&pubkey_bytes),
+            &anchor_path,
         )
         .unwrap_err();
 
@@ -713,6 +699,7 @@ mod tests {
 
     #[test]
     fn test_agent_cannot_self_approve_without_po_private_key() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"db").unwrap();
@@ -720,7 +707,7 @@ mod tests {
 
         // The true Product Owner keypair
         let po_signing_key = SigningKey::from_bytes(&[99u8; 32]);
-        let po_pubkey_bytes = po_signing_key.verifying_key().to_bytes();
+        let anchor_path = enroll_test_trust_anchor(dir.path(), &po_signing_key);
 
         // An automated agent tries to generate its OWN keypair to self-approve
         let rogue_agent_key = SigningKey::from_bytes(&[66u8; 32]);
@@ -740,7 +727,7 @@ mod tests {
             MigrationApprovalToken::issue_with_signing_key(&rogue_agent_key, payload).unwrap();
         let rogue_json = rogue_token.to_json().unwrap();
 
-        // The executor verifier uses the true PO public key
+        // The executor verifier uses the true PO public key from trust anchor
         let err = verify_and_consume_approval(
             &rogue_json,
             &db_path,
@@ -748,7 +735,7 @@ mod tests {
             "migrate-v2-loopback-ports",
             &sample_assertions(),
             &ledger_path,
-            Some(&po_pubkey_bytes),
+            &anchor_path,
         )
         .unwrap_err();
 
@@ -757,13 +744,14 @@ mod tests {
 
     #[test]
     fn test_projetest_php_mutation_fails_closed() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"db").unwrap();
         let ledger_path = dir.path().join("consumed.jsonl");
 
         let signing_key = SigningKey::from_bytes(&[55u8; 32]);
-        let pubkey_bytes = signing_key.verifying_key().to_bytes();
+        let anchor_path = enroll_test_trust_anchor(dir.path(), &signing_key);
 
         let mut mutated_projects = sample_assertions();
         // Mutate Projetest PHP to 8.5 (PO-U5-01 violation)
@@ -789,10 +777,105 @@ mod tests {
             "migrate-v2-loopback-ports",
             &mutated_projects,
             &ledger_path,
-            Some(&pubkey_bytes),
+            &anchor_path,
         )
         .unwrap_err();
 
         assert!(err.to_string().contains("PO-U5-01 VIOLATION"));
+    }
+
+    #[test]
+    fn test_attacker_key_substitution_fails_closed() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        std::fs::write(&db_path, b"db").unwrap();
+        let ledger_path = dir.path().join("consumed.jsonl");
+
+        // 1. Enrolled PO key
+        let po_signing_key = SigningKey::from_bytes(&[12u8; 32]);
+        let anchor_path = enroll_test_trust_anchor(dir.path(), &po_signing_key);
+
+        // 2. Attacker generates their own keypair
+        let attacker_signing_key = SigningKey::from_bytes(&[99u8; 32]);
+        let attacker_pubkey_hex = hex::encode(attacker_signing_key.verifying_key().to_bytes());
+
+        // 3. Attacker attempts to inject environment variable LOCALFORGE_PO_PUBLIC_KEY
+        std::env::set_var("LOCALFORGE_PO_PUBLIC_KEY", &attacker_pubkey_hex);
+
+        let payload = MigrationApprovalPayload {
+            token_id: uuid::Uuid::new_v4().to_string(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: "abc".into(),
+            scope: "migrate-v2-loopback-ports".into(),
+            expected_projects: sample_assertions(),
+            issued_at: Utc::now().timestamp(),
+            expires_at: Utc::now().timestamp() + 3600,
+        };
+        let attacker_token =
+            MigrationApprovalToken::issue_with_signing_key(&attacker_signing_key, payload).unwrap();
+        let attacker_token_json = attacker_token.to_json().unwrap();
+
+        // Verification MUST fail closed because load_verified_trust_anchor explicitly rejects LOCALFORGE_PO_PUBLIC_KEY
+        let err = verify_and_consume_approval(
+            &attacker_token_json,
+            &db_path,
+            "abc",
+            "migrate-v2-loopback-ports",
+            &sample_assertions(),
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+
+        assert!(
+            err.to_string().contains("LOCALFORGE_PO_PUBLIC_KEY")
+                || err.to_string().contains("signature verification failed"),
+            "Expected env var rejection or signature verification failure, got: {err}"
+        );
+
+        // Clean up env var
+        std::env::remove_var("LOCALFORGE_PO_PUBLIC_KEY");
+
+        // 4. Attacker attempts to overwrite existing trust anchor without human replacement phrase
+        let replace_err = crate::trust_anchor::enroll_trust_anchor(
+            &anchor_path,
+            &attacker_pubkey_hex,
+            "ATTACKER UNAUTHORIZED OVERWRITE",
+            true,
+        )
+        .unwrap_err();
+        assert!(replace_err
+            .to_string()
+            .contains("Human authorization phrase"));
+
+        // 5. Attacker attempts to replace without --replace flag
+        let no_replace_err = crate::trust_anchor::enroll_trust_anchor(
+            &anchor_path,
+            &attacker_pubkey_hex,
+            crate::trust_anchor::HUMAN_ENROLLMENT_PHRASE,
+            false,
+        )
+        .unwrap_err();
+        assert!(no_replace_err.to_string().contains("already enrolled"));
+
+        // 6. Pointing to nonexistent trust anchor fails closed
+        let missing_anchor_path = dir.path().join("nonexistent_anchor.json");
+        let missing_err = verify_and_consume_approval(
+            &attacker_token_json,
+            &db_path,
+            "abc",
+            "migrate-v2-loopback-ports",
+            &sample_assertions(),
+            &ledger_path,
+            &missing_anchor_path,
+        )
+        .unwrap_err();
+        assert!(
+            missing_err
+                .to_string()
+                .contains("Trust anchor unconfigured")
+                || missing_err.to_string().contains("Trust anchor not found")
+        );
     }
 }

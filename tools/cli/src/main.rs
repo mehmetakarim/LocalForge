@@ -85,6 +85,36 @@ enum StorageCommands {
         /// Mandatory Product Owner human approval token required for live execution
         #[arg(long)]
         approval_token: Option<String>,
+
+        /// Custom path to Product Owner trust anchor (defaults to canonical Application Support path)
+        #[arg(long)]
+        trust_anchor_path: Option<PathBuf>,
+    },
+
+    /// Product Owner trust anchor enrollment for one-time cryptographic authorizations
+    EnrollTrustAnchor {
+        /// Product Owner public key in hex (64 chars / 32 bytes)
+        #[arg(long)]
+        public_key: String,
+
+        /// Mandatory human authorization phrase to prevent automated agent self-enrollment
+        #[arg(long)]
+        auth_phrase: String,
+
+        /// Explicit flag required to replace an existing trust anchor
+        #[arg(long)]
+        replace: bool,
+
+        /// Custom path to trust anchor (defaults to canonical Application Support path)
+        #[arg(long)]
+        anchor_path: Option<PathBuf>,
+    },
+
+    /// Inspect enrolled Product Owner trust anchor status and key fingerprint
+    ShowTrustAnchor {
+        /// Custom path to trust anchor (defaults to canonical Application Support path)
+        #[arg(long)]
+        anchor_path: Option<PathBuf>,
     },
 }
 
@@ -507,6 +537,69 @@ async fn main() -> Result<()> {
 
 async fn handle_storage_command(args: StorageArgs) -> Result<()> {
     match args.action {
+        StorageCommands::EnrollTrustAnchor {
+            public_key,
+            auth_phrase,
+            replace,
+            anchor_path,
+        } => {
+            let canonical_app_support = localforge_runtime::resolve_application_support_dir()?;
+            let target_path = anchor_path.unwrap_or_else(|| {
+                canonical_app_support
+                    .join("security")
+                    .join("trust_anchor.json")
+            });
+
+            println!(
+                "\x1b[1;36m=== LOCALFORGE GATE U5.F: PRODUCT OWNER TRUST ANCHOR ENROLLMENT ===\x1b[0m"
+            );
+            println!("Target Path: {}", target_path.display());
+
+            let anchor = localforge_storage::enroll_trust_anchor(
+                &target_path,
+                &public_key,
+                &auth_phrase,
+                replace,
+            )?;
+
+            println!("\x1b[1;32m[✓] Product Owner Trust Anchor Successfully Enrolled:\x1b[0m");
+            println!("  - Key ID:             {}", anchor.key_id);
+            println!("  - Algorithm:          {}", anchor.algorithm);
+            println!("  - Key Fingerprint:    {}", anchor.fingerprint_sha256);
+            println!("  - Enrolled At:        {}", anchor.enrolled_at);
+            println!("  - Enrolled By:        {}", anchor.enrolled_by);
+            println!("  - Anchor File:        {}", target_path.display());
+            println!("  - Mode:               0600 (owner-only read/write)");
+
+            Ok(())
+        }
+
+        StorageCommands::ShowTrustAnchor { anchor_path } => {
+            let canonical_app_support = localforge_runtime::resolve_application_support_dir()?;
+            let target_path = anchor_path.unwrap_or_else(|| {
+                canonical_app_support
+                    .join("security")
+                    .join("trust_anchor.json")
+            });
+
+            println!(
+                "\x1b[1;36m=== LOCALFORGE GATE U5.F: PRODUCT OWNER TRUST ANCHOR STATUS ===\x1b[0m"
+            );
+            println!("Anchor Path: {}", target_path.display());
+
+            let (_, anchor) = localforge_storage::load_verified_trust_anchor(&target_path)?;
+
+            println!("\x1b[1;32m[✓] Enrolled Product Owner Trust Anchor:\x1b[0m");
+            println!("  - Key ID:             {}", anchor.key_id);
+            println!("  - Algorithm:          {}", anchor.algorithm);
+            println!("  - Public Key (Hex):   {}", anchor.public_key_hex);
+            println!("  - Fingerprint SHA-256: {}", anchor.fingerprint_sha256);
+            println!("  - Enrolled At:        {}", anchor.enrolled_at);
+            println!("  - Enrolled By:        {}", anchor.enrolled_by);
+
+            Ok(())
+        }
+
         StorageCommands::MigrateV2 {
             db_path,
             backup_path,
@@ -514,10 +607,16 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
             port_project_b,
             execute,
             approval_token,
+            trust_anchor_path,
         } => {
             let canonical_app_support = localforge_runtime::resolve_application_support_dir()?;
             let canonical_db_path =
                 db_path.unwrap_or_else(|| canonical_app_support.join("localforge.db"));
+            let canonical_trust_anchor = trust_anchor_path.unwrap_or_else(|| {
+                canonical_app_support
+                    .join("security")
+                    .join("trust_anchor.json")
+            });
 
             if !canonical_db_path.exists() {
                 return Err(anyhow!(
@@ -674,12 +773,37 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                     }
                 }
 
+                println!("\nTrust Anchor Status (Verification Anchor):");
+                if canonical_trust_anchor.exists() {
+                    match localforge_storage::load_verified_trust_anchor(&canonical_trust_anchor) {
+                        Ok((_, anchor)) => {
+                            println!("  - Enrolled Key ID:   \x1b[1;32m{}\x1b[0m", anchor.key_id);
+                            println!("  - Key Fingerprint:   {}", anchor.fingerprint_sha256);
+                            println!("  - Algorithm:         {}", anchor.algorithm);
+                            println!("  - Enrolled By:       {}", anchor.enrolled_by);
+                            println!("  - Enrolled At:       {}", anchor.enrolled_at);
+                        }
+                        Err(e) => {
+                            println!("  - Status:            \x1b[1;31mINVALID ({e})\x1b[0m");
+                        }
+                    }
+                } else {
+                    println!(
+                        "  - Status:            \x1b[1;33mNOT ENROLLED\x1b[0m (Path: {})",
+                        canonical_trust_anchor.display()
+                    );
+                    println!("    Enrollment required before live execution:");
+                    println!("      localforge storage enroll-trust-anchor --public-key <PO_PUBLIC_KEY_HEX> --auth-phrase \"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR\"");
+                }
+
                 println!(
                     "\n\x1b[1;33m[!] PREFLIGHT COMPLETE: Zero modifications made to database. Zero WAL/SHM mutations.\x1b[0m"
                 );
                 println!("To execute live migration, explicit Product Owner cryptographic authorization is required:");
-                println!("  export LOCALFORGE_PO_PUBLIC_KEY=\"<PO_PUBLIC_KEY_HEX>\"");
-                println!("  localforge storage migrate-v2 --execute --approval-token <TOKEN_OR_@FILE> --backup-path <PATH>");
+                println!("  1. Enroll Trust Anchor (once, by Product Owner):");
+                println!("     localforge storage enroll-trust-anchor --public-key <PO_PUBLIC_KEY_HEX> --auth-phrase \"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR\"");
+                println!("  2. Run Migration:");
+                println!("     localforge storage migrate-v2 --execute --approval-token <TOKEN_OR_@FILE> --backup-path <PATH>");
                 return Ok(());
             }
 
@@ -805,7 +929,7 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                 "migrate-v2-loopback-ports",
                 &expected_assertions,
                 &ledger_path,
-                None,
+                &canonical_trust_anchor,
             )?;
 
             println!(
@@ -834,24 +958,88 @@ async fn handle_storage_command(args: StorageArgs) -> Result<()> {
                 localforge_storage::FailureInjectionPoint::None,
             )?;
 
-            // 8. Post-Migration Independent Index Integrity Validation
-            let check_conn = rusqlite::Connection::open_with_flags(
-                &canonical_db_path,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-            )?;
-            if localforge_storage::validate_loopback_port_index(&check_conn)?
-                != localforge_storage::IndexValidationStatus::Valid
-            {
-                drop(check_conn);
-                let _ = localforge_storage::execute_isolated_quarantine_and_restore(
+            // 8. Post-Migration Independent Verification (P0-02: Never swallow rollback errors)
+            let post_check_result: Result<()> = (|| {
+                let check_conn = rusqlite::Connection::open_with_flags(
+                    &canonical_db_path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                )?;
+                if localforge_storage::validate_loopback_port_index(&check_conn)?
+                    != localforge_storage::IndexValidationStatus::Valid
+                {
+                    return Err(anyhow!("Unique index validation failed: idx_projects_loopback_port missing or invalid"));
+                }
+                let proj_count: i64 =
+                    check_conn.query_row("SELECT count(*) FROM projects;", [], |r| r.get(0))?;
+                if proj_count != 2 {
+                    return Err(anyhow!(
+                        "Post-migration project count mismatch: expected 2, found {proj_count}"
+                    ));
+                }
+                let p2_php: String = check_conn.query_row(
+                    "SELECT php_version FROM projects WHERE name = 'Projetest';",
+                    [],
+                    |r| r.get(0),
+                )?;
+                if p2_php != "8.4" {
+                    return Err(anyhow!(
+                        "PO-U5-01 VIOLATION: Projetest PHP version mutated to '{p2_php}'"
+                    ));
+                }
+                Ok(())
+            })();
+
+            if let Err(post_err) = post_check_result {
+                eprintln!("\x1b[1;31m[!] Post-migration verification failed: {post_err}. Initiating atomic quarantine and restore...\x1b[0m");
+                let rollback_res = localforge_storage::execute_isolated_quarantine_and_restore(
                     &rollback_cfg,
-                    "Post-migration index validation failed",
+                    &post_err.to_string(),
                     2,
                     "8.4",
                 );
-                return Err(anyhow!("Unique index validation failed after migration"));
+                match rollback_res {
+                    Ok(quarantine_dir) => {
+                        // Validate restored database state
+                        let restored_conn = rusqlite::Connection::open_with_flags(
+                            &canonical_db_path,
+                            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                        )?;
+                        let r_integ: String =
+                            restored_conn.query_row("PRAGMA integrity_check;", [], |r| r.get(0))?;
+                        let r_has_port: i64 = restored_conn.query_row(
+                            "SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'loopback_port';",
+                            [],
+                            |r| r.get(0),
+                        )?;
+                        let r_count: i64 =
+                            restored_conn
+                                .query_row("SELECT count(*) FROM projects;", [], |r| r.get(0))?;
+                        let r_p2_php: String = restored_conn.query_row(
+                            "SELECT php_version FROM projects WHERE name = 'Projetest';",
+                            [],
+                            |r| r.get(0),
+                        )?;
+                        drop(restored_conn);
+
+                        if r_integ != "ok" || r_has_port != 0 || r_count != 2 || r_p2_php != "8.4" {
+                            return Err(anyhow!(
+                                "CRITICAL: Post-migration verification failed ({post_err}) AND restored state validation failed (integ: {r_integ}, has_port: {r_has_port}, count: {r_count}, Projetest PHP: {r_p2_php}). Failed live state quarantined at '{}'. Human intervention required immediately.",
+                                quarantine_dir.display()
+                            ));
+                        }
+
+                        return Err(anyhow!(
+                            "Post-migration verification failed ({post_err}). Database rolled back successfully and verified clean V1 (Projetest PHP 8.4 preserved). Failed live state quarantined at '{}'. All dependent activation steps halted.",
+                            quarantine_dir.display()
+                        ));
+                    }
+                    Err(rollback_err) => {
+                        return Err(anyhow!(
+                            "FATAL: Post-migration verification failed ({post_err}) AND rollback failed ({rollback_err}). Live database state may be inconsistent. All dependent activation steps halted immediately. Human intervention required."
+                        ));
+                    }
+                }
             }
-            drop(check_conn);
 
             println!("\x1b[1;32m=== LIVE MIGRATION AND PORT ALLOCATION COMPLETED SUCCESSFULLY ===\x1b[0m");
             println!(

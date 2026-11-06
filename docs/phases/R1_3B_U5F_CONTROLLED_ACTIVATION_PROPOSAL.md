@@ -286,10 +286,24 @@ If any verification fails after activation begins:
 
 ## 8. Final Product Owner Authorization Checkpoint
 
+### Trust Anchor Architecture (P0-01)
+- Product Owner independently enrolls their Ed25519 public key via `localforge storage enroll-trust-anchor`.
+- Enforces human authorization phrase (`"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"`).
+- Rejects arbitrary environment variable injection (`LOCALFORGE_PO_PUBLIC_KEY` is disallowed).
+- Trust anchor resides at `~Library/Application Support/LocalForge/security/trust_anchor.json` (`0600` permissions, UID check, cryptographic SHA-256 fingerprint verification).
+
+### Rollback Error Preservation (P0-02)
+- Post-migration verification covers independent index validation, project counts, and Projetest PHP 8.4 compliance.
+- Any verification failure triggers atomic quarantine and restore.
+- Rollback errors are NEVER swallowed (`let _ =` eliminated).
+- Diagnostics preserve both original execution failure and rollback outcome.
+- Restored database is independently validated for Schema V1 and metadata preservation before concluding.
+
 | Checkpoint | Target | Precondition | Verification Gate |
 |---|---|---|---|
+| **CP-0** | Trust Anchor | Human auth phrase | `enroll-trust-anchor` exits ok, 0600 permissions, fingerprint verified |
 | **CP-1** | Quiescence & Backup | No active writers | Backup integrity ok, SHA-256 recorded |
-| **CP-2** | V2 Migration | Backup verified | `migrate_to_v2_loopback_ports()` exits ok |
+| **CP-2** | V2 Migration | Backup & Anchor verified | `migrate_to_v2_loopback_ports()` exits ok |
 | **CP-3** | Port Allocation | Ports 18081/18082 free | `update_project_loopback_port()` exits ok |
 | **CP-4** | VHost & Syntax | VHost files written | `nginx -t` exits code 0 |
 | **CP-5** | Dynamic SIGHUP | Dynamic PID verified | Verified signal delivery, listeners Ready |
@@ -299,4 +313,4 @@ If any verification fails after activation begins:
 
 ---
 
-LOCALFORGE GATE U5.F — FINAL EXECUTION PROPOSAL READY. AWAITING PRODUCT OWNER EXPLICIT ACTIVATION AUTHORIZATION.
+LOCALFORGE GATE U5.F — FINAL ACCEPTANCE CORRECTIONS COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.
