@@ -1298,3 +1298,50 @@ This document records the chronological engineering log for all development sess
 
 ### 4. Mandatory Stop Phase
 `LOCALFORGE GATE U5.F-M — VERIFIED V1 BACKUP COMPLETE. LIVE MIGRATION AWAITING SEPARATE PRODUCT OWNER AUTHORIZATION.`
+
+---
+
+## Session: Gate U5.F-M Final Pre-Execution Verification & OpenSSL Fixture Test
+
+### 1. Context & Objectives
+- **Directive**: `# LOCALFORGE — GATE U5.F-M FINAL PRE-EXECUTION CHECK`
+- **Product Owner Decision**: Verified SQLite V1 backup report accepted (SHA-256: `2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694`). Live migration remains strictly unauthorized.
+- **Required Checks**:
+  1. Revalidate existing backup checksum, permissions (`0600`), and SQLite integrity (`ok`).
+  2. Compare current live WAL-aware SQLite snapshot against approved V1 backup (schema, project IDs, paths, UUIDs, docroots, domains, PHP versions, port absence).
+  3. Abort on material differences.
+  4. Recheck port availability for 18081 and 18082.
+  5. Verify trust anchor fingerprint remains unchanged (`7374d1100bee...`).
+  6. Correct token-generation script to read actual backup SHA-256 from manifest, match canonical byte serialization, and test signing/verification on disposable fixture.
+  7. Produce exact human-operated migration command and rollback instructions.
+
+### 2. Actions & Execution
+1. **Revalidated Backup**:
+   - Path: `/Users/mehmetakar/Library/Application Support/LocalForge/backups/u5f_v1_backup_20261107_225212/localforge_v1_atomic_backup.db`
+   - Permissions: directory `0700`, file `0600`, manifest `0600`.
+   - Checksum: `2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694` verified OK.
+   - Integrity: `PRAGMA integrity_check;` returned `ok`.
+2. **Snapshot vs Backup Comparison**:
+   - `Schema V1`: 100% match.
+   - Project Records: 100% match on IDs, names, paths, UUIDs, docroots, local domains, and PHP versions.
+   - `loopback_port`: absent on both (0 count).
+3. **Port Availability**:
+   - Ports 18081 and 18082 confirmed completely free (0 listeners).
+4. **Trust Anchor Verification**:
+   - Key ID: `po-ed25519-7374d1100bee`, fingerprint `7374d1100bee06a5364c0e193c485308065998ca65b3ac8822c25f8e52f42991` unchanged.
+5. **Token Generation Fixture Testing**:
+   - Added unit test `test_external_openssl_python_token_signature_verification` in `crates/storage/src/approval.rs`.
+   - Verified that canonical bytes generated via Python `json.dumps(payload, separators=(',', ':'))` signed via OpenSSL CLI (`openssl pkeyutl -sign -rawin`) verify cleanly in `localforge_storage::verify_and_consume_approval`.
+   - All 28 storage unit tests pass.
+6. **Safety Invariants Maintained**:
+   - Zero live database migrations executed.
+   - Zero real approval tokens minted; zero private key access.
+   - Zero live SQLite file mutations; zero Nginx reload; zero PHP/MariaDB installs; zero main merges.
+
+### 3. Verification Suite
+- 28/28 `localforge-storage` tests pass.
+- 15/15 `localforge-runtime` integration tests pass (`--test-threads=1`).
+- `cargo fmt --check`: 0 diffs.
+
+### 4. Mandatory Stop Phase
+`LOCALFORGE U5.F-M — READY FOR EXPLICIT LIVE MIGRATION DECISION.`

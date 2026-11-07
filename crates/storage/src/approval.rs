@@ -584,6 +584,166 @@ mod tests {
     }
 
     #[test]
+    fn test_external_openssl_python_token_signature_verification() {
+        let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("localforge.db");
+        std::fs::write(&db_path, b"dummy db bytes").unwrap();
+        let ledger_path = dir.path().join("security").join("consumed.jsonl");
+
+        // Generate disposable key via OpenSSL
+        let key_path = dir.path().join("disposable_key.pem");
+        let status = std::process::Command::new("openssl")
+            .args(["genpkey", "-algorithm", "Ed25519", "-out"])
+            .arg(&key_path)
+            .status()
+            .expect("Failed to execute openssl");
+        assert!(status.success());
+
+        // Extract pubkey hex via OpenSSL
+        let pubout = std::process::Command::new("openssl")
+            .args(["pkey", "-in"])
+            .arg(&key_path)
+            .args(["-pubout", "-outform", "DER"])
+            .output()
+            .expect("Failed to get pubkey");
+        assert!(pubout.status.success());
+        let der = pubout.stdout;
+        let raw_pub = &der[der.len() - 32..];
+        let pub_hex = hex::encode(raw_pub);
+
+        // Enroll trust anchor
+        let anchor_path = dir.path().join("security").join("trust_anchor.json");
+        std::fs::create_dir_all(anchor_path.parent().unwrap()).unwrap();
+        crate::trust_anchor::enroll_trust_anchor(
+            &anchor_path,
+            &pub_hex,
+            crate::trust_anchor::HUMAN_ENROLLMENT_PHRASE,
+            false,
+        )
+        .unwrap();
+
+        // Construct canonical JSON in Python, sign via OpenSSL, assemble token
+        let canonical_bin = dir.path().join("canonical.bin");
+        let token_sig_bin = dir.path().join("sig.bin");
+        let token_json_path = dir.path().join("token.json");
+
+        let py_script = format!(
+            r#"
+import json, time, uuid, subprocess
+
+payload = {{
+    'token_id': str(uuid.uuid4()),
+    'database_path': '{}',
+    'activation_snapshot_sha256': '2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694',
+    'scope': 'migrate-v2-loopback-ports',
+    'expected_projects': [
+        {{
+            'id': 'proj_db5472bb224c4fd0960ff69f793590a7',
+            'name': 'Projetest',
+            'path': '/Volumes/Mac Harici Disk/Projetest',
+            'volume_uuid': '7E26530E-5179-414C-81B5-6FBDB429FC65',
+            'document_root': 'public',
+            'php_version': '8.4',
+            'local_domain': 'projetest.test',
+            'assigned_loopback_port': 18082
+        }},
+        {{
+            'id': 'proj_e92e56cd0e0c4c36952804a35b3587a3',
+            'name': 'r1_acceptance_project',
+            'path': '/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project',
+            'volume_uuid': '7E26530E-5179-414C-81B5-6FBDB429FC65',
+            'document_root': 'public',
+            'php_version': '8.5',
+            'local_domain': 'r1_acceptance_project.test',
+            'assigned_loopback_port': 18081
+        }}
+    ],
+    'issued_at': int(time.time()),
+    'expires_at': int(time.time()) + 3600
+}}
+
+canonical_bytes = json.dumps(payload, separators=(',', ':')).encode('utf-8')
+with open('{}', 'wb') as f:
+    f.write(canonical_bytes)
+
+# Sign with OpenSSL
+subprocess.check_call([
+    'openssl', 'pkeyutl', '-sign',
+    '-inkey', '{}',
+    '-rawin',
+    '-in', '{}',
+    '-out', '{}'
+])
+
+with open('{}', 'rb') as f:
+    sig_hex = f.read().hex()
+
+token = {{
+    'payload': payload,
+    'signature': sig_hex
+}}
+
+with open('{}', 'w') as f:
+    json.dump(token, f, indent=2)
+"#,
+            db_path.display(),
+            canonical_bin.display(),
+            key_path.display(),
+            canonical_bin.display(),
+            token_sig_bin.display(),
+            token_sig_bin.display(),
+            token_json_path.display(),
+        );
+
+        let status = std::process::Command::new("python3")
+            .arg("-c")
+            .arg(&py_script)
+            .status()
+            .expect("Failed to run python script");
+        assert!(status.success());
+
+        let token_str = std::fs::read_to_string(&token_json_path).unwrap();
+        let expected_assertions = vec![
+            crate::approval::ProjectSnapshotAssertion {
+                id: "proj_db5472bb224c4fd0960ff69f793590a7".into(),
+                name: "Projetest".into(),
+                path: "/Volumes/Mac Harici Disk/Projetest".into(),
+                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+                document_root: "public".into(),
+                php_version: "8.4".into(),
+                local_domain: "projetest.test".into(),
+                assigned_loopback_port: 18082,
+            },
+            crate::approval::ProjectSnapshotAssertion {
+                id: "proj_e92e56cd0e0c4c36952804a35b3587a3".into(),
+                name: "r1_acceptance_project".into(),
+                path:
+                    "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project"
+                        .into(),
+                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+                document_root: "public".into(),
+                php_version: "8.5".into(),
+                local_domain: "r1_acceptance_project.test".into(),
+                assigned_loopback_port: 18081,
+            },
+        ];
+
+        let evidence = verify_and_consume_approval(
+            &token_str,
+            &db_path,
+            "2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694",
+            "migrate-v2-loopback-ports",
+            &expected_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .expect("OpenSSL-signed token MUST verify cleanly in verify_and_consume_approval");
+
+        assert_eq!(evidence.scope, "migrate-v2-loopback-ports");
+    }
+
+    #[test]
     fn test_concurrent_token_consumption_race_condition_protection() {
         let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
