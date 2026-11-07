@@ -1253,3 +1253,48 @@ This document records the chronological engineering log for all development sess
 
 ### 4. Mandatory Stop Phase
 `LOCALFORGE U5.F — ENROLLMENT PROCEDURE READY. AWAITING PRODUCT OWNER MANUAL ACTION.`
+
+---
+
+## Session: Gate U5.F-M Authorized SQLite V1 Backup Execution
+
+### 1. Context & Objectives
+- **Directive**: `# LOCALFORGE — GATE U5.F-M AUTHORIZED SQLITE V1 BACKUP EXECUTION`
+- **Product Owner Decision**: Explicit authorization granted ONLY for the creation and verification of a consistent SQLite V1 backup and its SHA-256 manifest. Bounded backup-only authorization. Actual migration, token issuance, and Nginx activation remain strictly prohibited.
+- **Source Database**: `/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db`
+- **Approved Pattern**: `/Users/mehmetakar/Library/Application Support/LocalForge/backups/u5f_v1_backup_<TIMESTAMP>/`
+
+### 2. Actions & Execution
+1. **Source Preflight & Quiescence**:
+   - Verified source file regular-file type, UID 501 `mehmetakar`, size 12288 bytes.
+   - Checked open file handles (`lsof`) -> 0 open handles.
+   - Checked running LocalForge processes (`pgrep -il localforge`) -> 0 processes.
+   - Checked source schema: Schema V1 (`loopback_port` absent), integrity `ok`, 2 projects (Projetest PHP 8.4, r1_acceptance_project PHP 8.5).
+2. **SQLite Online Backup Execution**:
+   - Created private directory: `/Users/mehmetakar/Library/Application Support/LocalForge/backups/u5f_v1_backup_20261107_225212/` with permissions `0700` (`drwx------`).
+   - Executed SQLite Online Backup API via `sqlite3 -readonly ... ".backup ..."` creating `localforge_v1_atomic_backup.db`.
+   - Set file permissions to `0600` (`-rw-------`).
+3. **Independent Backup Validation**:
+   - Integrity check: `PRAGMA integrity_check;` returned `ok`.
+   - Project count: exactly 2 projects present.
+   - Project A: ID `proj_e92e56cd0e0c4c36952804a35b3587a3`, PHP 8.5, path `/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project`, Volume UUID `7E26530E-5179-414C-81B5-6FBDB429FC65`.
+   - Project B: ID `proj_db5472bb224c4fd0960ff69f793590a7`, PHP 8.4 (**PO-U5-01 PRESERVED**), path `/Volumes/Mac Harici Disk/Projetest`, Volume UUID `7E26530E-5179-414C-81B5-6FBDB429FC65`.
+   - Schema check: `loopback_port` column absent (clean Schema V1).
+4. **Manifest Creation & Verification**:
+   - Calculated backup SHA-256: `2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694`.
+   - Generated `manifest.sha256` with mode `0600`.
+   - Verified manifest: `shasum -a 256 -c manifest.sha256` -> `OK`.
+5. **Safety Invariants Maintained**:
+   - Live source database: 0 writes, timestamp `Oct 22 21:45`, size 12288 bytes preserved.
+   - Live WAL/SHM files: 100% preserved.
+   - Product Owner private signing key: Never accessed, read, or inspected.
+   - Zero production approval tokens issued.
+   - Zero CLI `--execute` invocations; zero port allocations.
+   - Zero Nginx reload, zero PHP 8.4 installs, zero MariaDB inits, zero DNS/hosts edits, zero git merges to main.
+
+### 3. Verification Suite
+- 27/27 `localforge-storage` tests pass.
+- 88/88 workspace Rust tests pass; 33/33 desktop frontend tests pass.
+
+### 4. Mandatory Stop Phase
+`LOCALFORGE GATE U5.F-M — VERIFIED V1 BACKUP COMPLETE. LIVE MIGRATION AWAITING SEPARATE PRODUCT OWNER AUTHORIZATION.`

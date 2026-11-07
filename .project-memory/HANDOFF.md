@@ -6,33 +6,35 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.F Trust Anchor Enrollment Closeout Complete — Real Host Activation Remains Strict No-Go / Awaiting Product Owner Manual Action**
+- **Current State**: **Gate U5.F-M Authorized SQLite V1 Backup Complete — Live Migration Awaiting Separate Product Owner Authorization**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `4a165c2180bacd47088a25546a836bc54b905aa8`
+- **Baseline Commit**: `1b78a6129226445961e51f756a40c6203e384709`
 - **Previous Milestone Status**:
-  - **Gate U5.F Final Acceptance Corrections**: Implemented enrolled trust anchor architecture and rollback error preservation (Commit `4a165c2`).
-- **Completed in Gate U5.F Trust Anchor Enrollment Closeout**:
-  1. `Clarification of Static Authorization Phrases & Threat Boundary`:
-     - Explicitly documented that confirmation phrases are intent confirmation guards to prevent accidental CLI execution, not cryptographic human authentication.
-     - Documented macOS / POSIX DAC reality: Any process running as UID 501 (`mehmetakar`) has access to files in `~/Library/Application Support/LocalForge/security/`. We honestly state this OS boundary and residual risk.
-     - The real security boundary relies on: (a) offline Ed25519 private key custody, (b) out-of-band manual enrollment by PO, (c) independent fingerprint audit, and (d) fail-closed trust anchor verification.
-  2. `Independent Product Owner Key Generation & Enrollment Workflow`:
-     - Documented step-by-step keypair generation in `~/.localforge_secrets/po_ed25519_private.pem` (mode 0600) via OpenSSL / Python outside workspace.
-     - Documented raw 32-byte public key hex extraction and independent SHA-256 fingerprint computation.
-     - Strict rule: private key never enters workspace, repository, logs, or agent conversation.
-  3. `Two-Gate Authorization Architecture`:
-     - **Gate U5.F-E**: Explicit human authorization for manual trust anchor enrollment and fingerprint verification.
-     - **Gate U5.F-M**: Explicit human authorization for live database migration using an independently signed approval token.
-  4. `Proposal Runbook & Fail-Closed Matrix Update`:
-     - Updated Section 8 of `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md` with full workflows and fail-closed matrix (10 distinct failure cases).
-  5. `Verification Suite`:
-     - 27/27 `localforge-storage` tests pass.
-     - 88/88 workspace Rust tests pass.
-     - 33/33 desktop frontend tests pass (121 tests total).
-     - `cargo fmt --check`: 0 diffs.
-     - `cargo check --workspace`: Clean.
-- **Next Permitted Action**: Await explicit Product Owner manual action for Gate U5.F-E (Trust Anchor Enrollment) in native terminal. Real Mac activation remains STRICT NO-GO. Do NOT modify `localforge.db`, do NOT write vhosts, do NOT signal Nginx. Do NOT begin Gate U5.C, U5.D, or R1.3C. Do NOT merge into `main`.
+  - **Gate U5.F Trust Anchor Enrollment Closeout**: Enrolled trust anchor verified, threat boundary documented (Commit `1b78a61`).
+- **Completed in Gate U5.F-M Authorized SQLite V1 Backup Execution**:
+  1. `Quiescence & Source Preflight`:
+     - Verified source database `/Users/mehmetakar/Library/Application Support/LocalForge/localforge.db` (12288 bytes, UID 501 `mehmetakar`).
+     - Verified 0 open file handles (`lsof`) and 0 running `localforge` processes (`pgrep`).
+     - Verified live schema: Schema V1 (`loopback_port` absent), integrity `ok`, exactly 2 projects (Projetest PHP 8.4 preserved, r1_acceptance_project PHP 8.5).
+  2. `SQLite Online Backup Creation`:
+     - Created unique backup directory: `/Users/mehmetakar/Library/Application Support/LocalForge/backups/u5f_v1_backup_20261107_225212/` (`0700`, UID 501).
+     - Executed SQLite Online Backup API via `sqlite3 -readonly ... ".backup ..."` creating `localforge_v1_atomic_backup.db` (`0600`, UID 501, 12288 bytes).
+  3. `Independent Backup Validation`:
+     - `PRAGMA integrity_check;` equals `ok`.
+     - Exactly 2 projects present; Project IDs and metadata match snapshot 100%.
+     - Projetest PHP version equals `8.4` (PO-U5-01 PRESERVED).
+     - `loopback_port` column absent (clean Schema V1).
+  4. `Manifest Generation & Validation`:
+     - Calculated SHA-256: `2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694`.
+     - Created `manifest.sha256` (`0600`, UID 501); validated with `shasum -a 256 -c`.
+  5. `Safety Invariants Strictly Maintained`:
+     - Live source database: 0 writes, timestamp and size unchanged.
+     - Active WAL/SHM files: 100% preserved.
+     - PO private signing key: Never accessed or read.
+     - Zero approval tokens minted; zero `--execute` invocations; zero port allocations.
+     - Zero Nginx reload, PHP 8.4 installation, MariaDB init, DNS/hosts changes, or git merge.
+- **Next Permitted Action**: Await explicit, separate Product Owner authorization for live migration execution with an independently minted approval token. Real migration remains STRICT NO-GO until that explicit authorization is provided.
 
 ---
 
