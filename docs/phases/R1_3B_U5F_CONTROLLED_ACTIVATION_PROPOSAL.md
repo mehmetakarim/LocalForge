@@ -284,15 +284,134 @@ If any verification fails after activation begins:
 
 ---
 
-## 8. Final Product Owner Authorization Checkpoint
+## 8. Product Owner Trust Anchor, Key Custody & Authorization Architecture
 
-### Trust Anchor Architecture (P0-01)
-- Product Owner independently enrolls their Ed25519 public key via `localforge storage enroll-trust-anchor`.
-- Enforces human authorization phrase (`"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"`).
-- Rejects arbitrary environment variable injection (`LOCALFORGE_PO_PUBLIC_KEY` is disallowed).
-- Trust anchor resides at `~Library/Application Support/LocalForge/security/trust_anchor.json` (`0600` permissions, UID check, cryptographic SHA-256 fingerprint verification).
+### 8.1 Trust Anchor Intent Guard & Threat Boundary Clarification
 
-### Rollback Error Preservation (P0-02)
+The trust anchor enrollment command requires confirmation phrases:
+- First enrollment: `"I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"`
+- Replacement: `"I AUTHORIZE REPLACEMENT OF EXISTING PRODUCT OWNER TRUST ANCHOR"` with `--replace`
+
+**Important Clarification on Static Confirmation Phrases:**
+- These phrases are **intent confirmation guards** designed to prevent accidental, unthinking CLI execution.
+- They **do not prove Product Owner identity** and **do not cryptographically authenticate human presence** against an automated script or agent executing in the same OS session.
+- **Operating System Privilege Boundary & Residual Risk**: Under macOS / POSIX Discretionary Access Control (DAC), any process running under UID 501 (`mehmetakar`) possesses the filesystem permissions to read, write, or replace files in `~/Library/Application Support/LocalForge/security/`. An agent or process with local shell access could technically execute the CLI command with the phrase.
+- We explicitly acknowledge this OS-level architectural boundary rather than claiming it has been mathematically eliminated.
+- **Real Security Guarantees**:
+  1. **Strict Offline Key Custody**: The private Ed25519 signing key is generated and stored exclusively outside the workspace and repository. An agent cannot forge migration approval tokens without access to this key.
+  2. **Independent Out-of-Band Enrollment**: The Product Owner manually executes the enrollment in their own native terminal session.
+  3. **Fingerprint Verification**: The Product Owner independently computes and validates the SHA-256 fingerprint before authorizing any operation.
+  4. **Fail-Closed Execution**: Missing, corrupted, mismatched, or unauthorized trust anchors immediately abort migration without touching the database.
+
+---
+
+### 8.2 Independent Product Owner Key Generation & Custody Workflow
+
+The Product Owner generates their private/public keypair on their local Mac, outside the workspace and without exposing the private key to any AI agent, transcript, or git repository.
+
+#### Step 1: Secure Directory Setup & Private Key Generation (Native Terminal)
+
+```bash
+# Execute in native terminal outside LocalForge workspace:
+mkdir -p -m 0700 ~/.localforge_secrets
+openssl genpkey -algorithm Ed25519 -out ~/.localforge_secrets/po_ed25519_private.pem
+chmod 0600 ~/.localforge_secrets/po_ed25519_private.pem
+```
+
+*(Alternatively, Python 3 with the `cryptography` package may be used if OpenSSL Ed25519 derivation is unavailable).*
+
+#### Step 2: Extract Raw 32-Byte Public Key Hex (64 Characters)
+
+```bash
+# Extract the raw 32 bytes (64 hex characters) of the Ed25519 public key:
+PO_PUBKEY_HEX=$(openssl pkey -in ~/.localforge_secrets/po_ed25519_private.pem -pubout -outform DER | tail -c 32 | xxd -p -c 32)
+echo "Public Key (Hex): $PO_PUBKEY_HEX"
+```
+
+#### Step 3: Compute Independent Offline Fingerprint
+
+```bash
+# Calculate SHA-256 fingerprint of the raw 32-byte public key:
+OFFLINE_FINGERPRINT=$(echo -n "$PO_PUBKEY_HEX" | xxd -r -p | shasum -a 256 | awk '{print $1}')
+echo "Expected Fingerprint: $OFFLINE_FINGERPRINT"
+```
+
+> [!IMPORTANT]
+> **Strict Custody Rule**: `~/.localforge_secrets/po_ed25519_private.pem` must NEVER be copied into `/Volumes/Mac Harici Disk/VibeProject/LocalForge/`, checked into Git, pasted into LLM conversation prompts, or included in environment variables.
+
+---
+
+### 8.3 Independent Trust Anchor Enrollment & Fingerprint Verification
+
+Once the keypair is generated offline:
+
+#### Step 1: Product Owner Enrolls Trust Anchor Manually
+
+In their native terminal session:
+
+```bash
+localforge storage enroll-trust-anchor \
+  --public-key "<PO_PUBKEY_HEX>" \
+  --auth-phrase "I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR"
+```
+
+Expected output:
+```text
+Trust anchor enrolled successfully:
+  Path:        /Users/mehmetakar/Library/Application Support/LocalForge/security/trust_anchor.json
+  Fingerprint: <SHA-256 FINGERPRINT>
+  Enrolled At: <TIMESTAMP>
+```
+
+#### Step 2: Independent Fingerprint Audit
+
+The Product Owner verifies the recorded trust anchor:
+
+```bash
+localforge storage show-trust-anchor
+```
+
+The Product Owner compares the displayed `Fingerprint:` character-for-character with `$OFFLINE_FINGERPRINT` obtained in Section 8.2 Step 3. If they do not match exactly, enrollment is aborted.
+
+---
+
+### 8.4 Two Separate Explicit Human Authorization Gates
+
+To prevent conflation of key enrollment and live database mutation, the procedure enforces two independent human approval gates:
+
+1. **Gate U5.F-E (Trust Anchor Enrollment Authorization)**:
+   - Product Owner explicitly authorizes and manually executes the enrollment of their public key.
+   - Verification: `localforge storage show-trust-anchor` matches the independently computed fingerprint.
+   - Live migration remains **STRICT NO-GO**.
+
+2. **Gate U5.F-M (Live Migration Authorization)**:
+   - Evaluated only after Gate U5.F-E is completed and verified.
+   - Requires the Product Owner to independently sign an approval token using `~/.localforge_secrets/po_ed25519_private.pem` binding the exact scope (`localforge-db-migrate-v2`), database path, backup SHA-256, project IDs (`1` and `2`), loopback ports (`18081` and `18082`), and expiration.
+   - Live migration is executed with `--approval-token <TOKEN>`.
+
+---
+
+### 8.5 Fail-Closed Verification Matrix
+
+The trust anchor and authorization subsystem enforces fail-closed behavior across all failure modes:
+
+| Test Case / Condition | Behavior | Error Code / Exit |
+|---|---|---|
+| Trust anchor file does not exist | Abort migration | `TrustAnchorMissing` (Exit != 0) |
+| Environment injection (`LOCALFORGE_PO_PUBLIC_KEY`) | Ignored / Disallowed | Trust anchor file is the sole authority |
+| Trust anchor file modified / corrupted JSON | Abort migration | `TrustAnchorCorrupted` (Exit != 0) |
+| Trust anchor file permissions != 0600 (Unix) | Abort migration | `InvalidPermissions` (Exit != 0) |
+| Public key hex != 64 chars or invalid curve point | Abort enrollment/migration | `InvalidPublicKeyHex` / `InvalidKeyPoint` |
+| Attempted re-enrollment without `--replace` | Abort enrollment | `TrustAnchorAlreadyExists` |
+| Re-enrollment with incorrect confirmation phrase | Abort enrollment | `AuthorizationPhraseMismatch` |
+| Approval token signature forged / invalid | Abort migration | `ApprovalVerificationFailed` |
+| Approval token expired | Abort migration | `ApprovalTokenExpired` |
+| Approval token scope/port/backup mismatch | Abort migration | `ApprovalScopeMismatch` |
+
+---
+
+### 8.6 Rollback Error Preservation (P0-02)
+
 - Post-migration verification covers independent index validation, project counts, and Projetest PHP 8.4 compliance.
 - Any verification failure triggers atomic quarantine and restore.
 - Rollback errors are NEVER swallowed (`let _ =` eliminated).
@@ -301,16 +420,16 @@ If any verification fails after activation begins:
 
 | Checkpoint | Target | Precondition | Verification Gate |
 |---|---|---|---|
-| **CP-0** | Trust Anchor | Human auth phrase | `enroll-trust-anchor` exits ok, 0600 permissions, fingerprint verified |
+| **CP-0** | Trust Anchor | PO Manual Enrollment (Gate U5.F-E) | `show-trust-anchor` exits ok, 0600 permissions, fingerprint verified |
 | **CP-1** | Quiescence & Backup | No active writers | Backup integrity ok, SHA-256 recorded |
-| **CP-2** | V2 Migration | Backup & Anchor verified | `migrate_to_v2_loopback_ports()` exits ok |
+| **CP-2** | V2 Migration | Signed Token (Gate U5.F-M) | `migrate_to_v2_loopback_ports()` exits ok |
 | **CP-3** | Port Allocation | Ports 18081/18082 free | `update_project_loopback_port()` exits ok |
 | **CP-4** | VHost & Syntax | VHost files written | `nginx -t` exits code 0 |
 | **CP-5** | Dynamic SIGHUP | Dynamic PID verified | Verified signal delivery, listeners Ready |
 | **CP-6** | Project Acceptance | Host headers provided | `18081` 200 OK, `18082` 503 honest stopped |
 
-**MANDATORY HOLD:** Execution will NOT begin until the Product Owner explicitly confirms approval of this proposal.
+**MANDATORY HOLD:** Real Mac activation remains STRICT NO-GO until the Product Owner completes manual enrollment and explicitly authorizes execution.
 
 ---
 
-LOCALFORGE GATE U5.F — FINAL ACCEPTANCE CORRECTIONS COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.
+LOCALFORGE U5.F — ENROLLMENT PROCEDURE READY. AWAITING PRODUCT OWNER MANUAL ACTION.

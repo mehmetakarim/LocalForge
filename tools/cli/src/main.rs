@@ -97,7 +97,7 @@ enum StorageCommands {
         #[arg(long)]
         public_key: String,
 
-        /// Mandatory human authorization phrase to prevent automated agent self-enrollment
+        /// Intent confirmation phrase required for enrollment (guard against accidental CLI execution)
         #[arg(long)]
         auth_phrase: String,
 

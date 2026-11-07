@@ -29,11 +29,13 @@ impl PoTrustAnchor {
     }
 }
 
-/// Enrolls a new Product Owner trust anchor or replaces an existing one with explicit human authorization.
+/// Enrolls a new Product Owner trust anchor or replaces an existing one with explicit confirmation.
 ///
-/// Security constraints:
-/// 1. Enrollment requires the exact phrase: `I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR`.
+/// Operational constraints & threat boundary:
+/// 1. Enrollment requires the confirmation phrase: `I AUTHORIZE ENROLLMENT OF PRODUCT OWNER TRUST ANCHOR`.
 /// 2. Key replacement requires the explicit phrase: `I AUTHORIZE REPLACEMENT OF EXISTING PRODUCT OWNER TRUST ANCHOR` and `replace = true`.
+///    Note: These static confirmation phrases guard against accidental CLI invocation; they do NOT
+///    constitute cryptographic human authentication against adversarial actors sharing the same OS user process context.
 /// 3. Cannot be written to a symlink.
 /// 4. File permissions are strictly enforced as 0600 on unix.
 /// 5. Validates that the public key is exactly 32 bytes (64 hex characters) and forms a valid Ed25519 point.

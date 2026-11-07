@@ -1213,3 +1213,43 @@ This document records the chronological engineering log for all development sess
    - `localforge storage migrate-v2` dry-run preflight verified on live host database with zero writes.
 4. **Closeout Status**:
    - `LOCALFORGE GATE U5.F — FINAL ACCEPTANCE CORRECTIONS COMPLETE. AWAITING PRODUCT OWNER ACCEPTANCE.`
+
+---
+
+## Session: Gate U5.F Trust Anchor Enrollment Closeout & Threat Boundary Clarification
+
+### 1. Context & Objectives
+- **Directive**: `# LOCALFORGE — U5.F TRUST ANCHOR ENROLLMENT CLOSEOUT`
+- **Product Owner Decision**: Gate U5.F rollback correction accepted. Trust anchor first-enrollment not yet accepted as an independent human authorization mechanism. Real Mac activation remains **STRICT NO-GO**.
+- **Core Finding Addressed**: Static authorization phrases are public constants and do not mathematically prove Product Owner identity or authenticate human presence against an automated script or agent sharing the same macOS user session (UID 501).
+- **Required Actions**:
+  1. Remove any security claim that static phrases prove Product Owner identity or prevent agent self-enrollment.
+  2. Document an actual independent Product Owner key-generation and enrollment workflow.
+  3. Ensure the private signing key never enters the coding agent environment, logs, or workspace.
+  4. Define how the Product Owner independently verifies the enrolled public-key fingerprint.
+  5. Document the macOS UID 501 DAC privilege boundary and residual risks honestly.
+  6. Enforce a two-gate authorization model: Gate U5.F-E for enrollment, Gate U5.F-M for live migration.
+  7. Document the complete fail-closed verification matrix across all failure modes.
+
+### 2. Engineering Changes Completed
+1. **Codebase Docstring & CLI Help Alignment**:
+   - In `crates/storage/src/trust_anchor.rs`: Updated docstrings to explicitly state that confirmation phrases are intent confirmation guards against accidental CLI invocation, not cryptographic human authentication against actors sharing the same OS user process context.
+   - In `tools/cli/src/main.rs`: Clarified CLI argument doc comment from "Mandatory human authorization phrase to prevent automated agent self-enrollment" to "Intent confirmation phrase required for enrollment (guard against accidental CLI execution)".
+2. **Controlled Activation Proposal Overhaul**:
+   - In `docs/phases/R1_3B_U5F_CONTROLLED_ACTIVATION_PROPOSAL.md`: Expanded Section 8 into a comprehensive, multi-section architecture:
+     - **Section 8.1**: Threat boundary clarification, intent guard definition, and explicit acknowledgment of macOS UID 501 DAC limits.
+     - **Section 8.2**: Independent Product Owner key generation (OpenSSL / Python cryptography outside workspace) and offline SHA-256 fingerprint calculation.
+     - **Section 8.3**: Independent trust anchor enrollment via CLI and character-for-character fingerprint comparison with `show-trust-anchor`.
+     - **Section 8.4**: Two-gate authorization separation (Gate U5.F-E for enrollment vs Gate U5.F-M for live migration).
+     - **Section 8.5**: Complete fail-closed verification matrix covering 10 distinct error modes.
+     - **Section 8.6**: Rollback error preservation summary and final stop status.
+
+### 3. Verification & Governance
+- 88/88 automated Rust tests pass across workspace (27 storage unit, 19 runtime unit, 15 runtime integration, 13 mariadb integration, 6 platform, 5 deployment, 2 desktop lib, 1 project-manager).
+- 33/33 automated frontend tests pass (121 total).
+- `cargo fmt --check`: 0 diffs.
+- `cargo check --workspace`: Clean (0 errors).
+- Zero production keys or approval tokens minted; zero modifications to `localforge.db`; real host activation strictly blocked.
+
+### 4. Mandatory Stop Phase
+`LOCALFORGE U5.F — ENROLLMENT PROCEDURE READY. AWAITING PRODUCT OWNER MANUAL ACTION.`
