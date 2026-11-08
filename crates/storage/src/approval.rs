@@ -594,11 +594,16 @@ mod tests {
         ];
         for candidate in candidates {
             if let Ok(out) = std::process::Command::new(candidate)
-                .arg("version")
+                .arg("pkeyutl")
+                .arg("-help")
                 .output()
             {
-                let s = String::from_utf8_lossy(&out.stdout);
-                if s.contains("OpenSSL") {
+                let s = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&out.stdout),
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                if s.contains("-rawin") {
                     return Some(candidate.to_string());
                 }
             }
@@ -618,36 +623,15 @@ mod tests {
         let key_path = dir.path().join("disposable_key.pem");
         let openssl_bin = resolve_openssl_cli();
 
-        let (pub_hex, raw_seed): (String, Option<[u8; 32]>) = if let Some(ref bin) = openssl_bin {
-            let status = std::process::Command::new(bin)
-                .args(["genpkey", "-algorithm", "Ed25519", "-out"])
-                .arg(&key_path)
-                .status()
-                .expect("Failed to execute openssl genpkey");
-            assert!(status.success());
-
-            let pubout = std::process::Command::new(bin)
-                .args(["pkey", "-in"])
-                .arg(&key_path)
-                .args(["-pubout", "-outform", "DER"])
-                .output()
-                .expect("Failed to get pubkey via openssl");
-            assert!(pubout.status.success());
-            let der = pubout.stdout;
-            let raw_pub = &der[der.len() - 32..];
-            (hex::encode(raw_pub), None)
-        } else {
-            // Fallback: generate via ed25519-dalek from deterministic disposable seed
-            let disposable_seed: [u8; 32] = [
-                0x24, 0x5a, 0x71, 0x18, 0x90, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
-                0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
-                0xdd, 0xee, 0xff, 0x01,
-            ];
-            let signing_key = ed25519_dalek::SigningKey::from_bytes(&disposable_seed);
-            let verifying_key = signing_key.verifying_key();
-            let pub_hex = hex::encode(verifying_key.to_bytes());
-            (pub_hex, Some(disposable_seed))
-        };
+        let disposable_seed: [u8; 32] = [
+            0x24, 0x5a, 0x71, 0x18, 0x90, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
+            0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+            0xdd, 0xee, 0xff, 0x01,
+        ];
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&disposable_seed);
+        let verifying_key = signing_key.verifying_key();
+        let pub_hex = hex::encode(verifying_key.to_bytes());
+        let seed_hex = hex::encode(disposable_seed);
 
         // Enroll trust anchor with disposable public key
         let anchor_path = dir.path().join("security").join("trust_anchor.json");
@@ -715,7 +699,6 @@ mod tests {
 
         // 3. Canonicalize in Python (with project sorting and strict formatting)
         let openssl_arg = openssl_bin.unwrap_or_default();
-        let seed_hex = raw_seed.map(hex::encode).unwrap_or_default();
 
         let py_script = format!(
             r#"
@@ -775,6 +758,14 @@ def rfc8032_sign(m, sk_bytes):
 openssl_bin = "{}"
 key_pem = "{}"
 seed_hex = "{}"
+
+# Materialize PKCS#8 Ed25519 PEM from seed for OpenSSL interoperability
+import base64
+pkcs8_der = bytes.fromhex('302e020100300506032b657004220420') + bytes.fromhex(seed_hex)
+b64 = base64.b64encode(pkcs8_der).decode('ascii')
+pem = '-----BEGIN PRIVATE KEY-----\n' + '\n'.join([b64[i:i+64] for i in range(0, len(b64), 64)]) + '\n-----END PRIVATE KEY-----\n'
+with open(key_pem, 'w') as f:
+    f.write(pem)
 
 def sign_data(msg_bytes):
     if openssl_bin and os.path.exists(key_pem):
