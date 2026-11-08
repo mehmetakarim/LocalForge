@@ -9,7 +9,7 @@
 - **Current State**: **Gate U5.F-M Final Signature Interoperability & Execution Readiness Complete**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
-- **Baseline Commit**: `3af4f9d765fe5e29831be3ffbdba74f6a0efa9cd`
+- **Baseline Commit**: `05dea484661efde2ce678d1f1a1219b69e554186` (CI Run `42429156267` SUCCESS)
 - **Previous Milestone Status**:
   - **Gate U5.F-M Authorized SQLite V1 Backup Execution**: Verified V1 backup created and SHA-256 manifest recorded (Commit `abc7116`).
   - **Gate U5.F-M Final Pre-Execution Verification**: Preflight checks passed; disposable fixture test added (Commit `3af4f9d`).
