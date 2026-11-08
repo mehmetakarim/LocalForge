@@ -1399,3 +1399,51 @@ This document records the chronological engineering log for all development sess
 
 ### 4. Mandatory Stop Phase
 `LOCALFORGE GATE U5.F-M — FINAL SIGNATURE VERIFICATION COMPLETE. AWAITING EXPLICIT PRODUCT OWNER LIVE MIGRATION AUTHORIZATION.`
+
+---
+
+## Session: Gate U5.F-M Final Operator Runbook Correction & Native OpenSSL Verification
+
+### 1. Context & Objectives
+- **Directive**: `# LOCALFORGE — U5.F-M FINAL OPERATOR RUNBOOK CORRECTION`
+- **Product Owner Decision**: Python/Rust canonicalization and Ed25519 interoperability tests accepted. Live SQLite migration NOT YET authorized. Do not start new development phase.
+- **Required Corrections**:
+  1. Remove unsafe manual rollback recipe (`mv localforge.db* ... || true` and naive `cp`).
+  2. Document Rust isolated in-process rollback mechanism as primary recovery path; preserve all database, WAL, SHM and quarantine files if rollback fails.
+  3. Independently verify actual macOS OpenSSL executable (`/opt/homebrew/bin/openssl`) signs Ed25519 payload using `pkeyutl -sign -rawin` directly (no Python fallback).
+  4. Verify final token-generation instructions against Rust canonical serialization using disposable keys only.
+  5. Clean copyable shell commands without markdown formatting artifacts.
+  6. Confirm token files and temporary signing artifacts are never logged, committed or stored in workspace.
+  7. Recheck approved V1 backup SHA-256 (`2832b96f...`).
+  8. Produce final, concise operator runbook. Mark live migration NOT AUTHORIZED.
+
+### 2. Actions & Execution
+1. **Unsafe Shell Rollback Removed & Rust Isolated Engine Documented**:
+   - Replaced wildcard shell move recipe with authoritative documentation of Rust's `restore_from_backup_isolated_internal`.
+   - Documented explicit emergency stop & forensic preservation protocol: in case of dual failure, all database, WAL, SHM and quarantine files remain untouched for human analysis.
+2. **Native macOS OpenSSL Direct Execution & Verification**:
+   - Executed `/opt/homebrew/bin/openssl` (OpenSSL 4.0.3 29 Sep 2026) directly.
+   - Verified `-rawin` support via `pkeyutl -help` (True).
+   - Generated disposable Ed25519 key, signed payload via `pkeyutl -sign -rawin`, verified via `pkeyutl -verify -rawin` (Returncode 0, "Signature Verified Successfully").
+3. **Token Generation Script Copy-Paste Verification**:
+   - Tested exact bash + Python script in isolated `/tmp` directory using disposable key.
+   - Script created `approval_token.json` (`-rw-------`, 0600), cleaned up temporary `.bin` files, and verified against Rust canonical serialization.
+4. **Workspace & Secret Isolation Confirmed**:
+   - All signing actions execute strictly in `~/.localforge_secrets/` (`0700`). Zero tokens, secrets or keys exist in workspace or Git.
+5. **Backup SHA-256 Rechecked**:
+   - `shasum -a 256` confirmed `2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694` intact.
+6. **Safety Invariants Maintained**:
+   - Zero persistent SQLite writes.
+   - Zero real approval tokens minted.
+   - Zero access to PO private key.
+   - Zero Nginx reload; zero PHP/MariaDB changes; zero DNS/hosts edits; zero main merges.
+
+### 3. Verification Suite
+- 28/28 `localforge-storage` tests pass (`cargo test -p localforge-storage`).
+- `cargo fmt --check`: 0 diffs.
+- `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+- CI Run `42429156267` SUCCESS on macOS Apple Silicon.
+- Binary `target/debug/localforge` built cleanly (SHA-256: `79c8961f32b2eabec5ac26e87d9f403c03adce301b659181646b2cd49248574c`).
+
+### 4. Mandatory Stop Phase
+`LOCALFORGE U5.F-M — OPERATOR RUNBOOK VERIFIED. AWAITING EXPLICIT PRODUCT OWNER MIGRATION AUTHORIZATION.`

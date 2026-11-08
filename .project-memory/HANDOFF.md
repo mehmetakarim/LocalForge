@@ -6,13 +6,14 @@
 
 ## 1. Current Status
 
-- **Current State**: **Gate U5.F-M Final Signature Interoperability & Execution Readiness Complete**
+- **Current State**: **Gate U5.F-M Operator Runbook Verified — Awaiting Explicit Product Owner Migration Authorization**
 - **Active Git Branch**: `phase-r1/r1-3b-uat-recovery`
 - **Target Remote**: `origin/phase-r1/r1-3b-uat-recovery`
 - **Baseline Commit**: `05dea484661efde2ce678d1f1a1219b69e554186` (CI Run `42429156267` SUCCESS)
 - **Previous Milestone Status**:
   - **Gate U5.F-M Authorized SQLite V1 Backup Execution**: Verified V1 backup created and SHA-256 manifest recorded (Commit `abc7116`).
   - **Gate U5.F-M Final Pre-Execution Verification**: Preflight checks passed; disposable fixture test added (Commit `3af4f9d`).
+  - **Gate U5.F-M Final Signature Interoperability**: 10-point Ed25519 interoperability verified on disposable keys; CI SUCCESS (Commit `05dea48`).
 - **Completed in Gate U5.F-M Final Signature Interoperability & Execution Readiness**:
   1. `Task 1 (10-Point Ed25519 Interoperability Test)`:
      - Implemented `test_task1_disposable_ed25519_python_rust_interoperability` in `crates/storage/src/approval.rs`.
