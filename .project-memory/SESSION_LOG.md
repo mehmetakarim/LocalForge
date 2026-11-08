@@ -1345,3 +1345,57 @@ This document records the chronological engineering log for all development sess
 
 ### 4. Mandatory Stop Phase
 `LOCALFORGE U5.F-M — READY FOR EXPLICIT LIVE MIGRATION DECISION.`
+
+---
+
+## Session: Gate U5.F-M Final Signature Interoperability & Execution Readiness
+
+### 1. Context & Objectives
+- **Directive**: `# LOCALFORGE — GATE U5.F-M FINAL SIGNATURE INTEROPERABILITY & EXECUTION READINESS`
+- **Product Owner Decision**: Backup and operator preflight checks passed. Next authorized task strictly limited to Ed25519 signing interoperability verification and final execution documentation. Live SQLite migration NOT authorized.
+- **Tasks**:
+  1. Task 1: 10-point Ed25519 interoperability test on disposable keys/fixture (canonical byte equality Python/Rust, Python Ed25519 -> Rust dalek verification, 5 negative tests, project order determinism, actual output reporting).
+  2. Task 2: Read-only verification of existing backup (SHA-256 `2832b96f...`, Schema V1, Projetest PHP 8.4, trust anchor fingerprint `7374d1100bee...`, ports 18081/18082 free, SQLite writer quiescence, snapshot vs backup diff).
+  3. Task 3: Prepare comprehensive human execution package (verified backup path, production token payload, tested Python canonicalization & signing, PO instructions, CLI command marked NOT AUTHORIZED, post-migration verification, emergency rollback).
+
+### 2. Actions & Execution
+1. **Task 1 — 10-Point Ed25519 Interoperability Test**:
+   - Implemented `test_task1_disposable_ed25519_python_rust_interoperability` in `crates/storage/src/approval.rs`.
+   - Generated temporary Ed25519 key pair with OpenSSL 4.0.3 / Dalek disposable seed fallback.
+   - Constructed test `MigrationApprovalPayload` matching the Rust struct exactly.
+   - Canonicalized payload in Python (`json.dumps(..., separators=(',', ':'))`) and Rust (`to_canonical_bytes()`).
+   - Compared byte sequences: **PASS** (byte-for-byte identical, 950 bytes).
+   - Signed Python canonical bytes using disposable private key via OpenSSL CLI (`pkeyutl -sign -rawin`) with pure-Python RFC 8032 fallback.
+   - Verified signature using Rust `ed25519_dalek` (`verify_strict`) and full `verify_and_consume_approval` pipeline: **PASS**.
+   - Tested all 5 negative conditions:
+     - Wrong signature: **PASS** (fails closed with signature verification error).
+     - Changed project port (18082 -> 18099): **PASS** (fails closed with port mismatch error).
+     - Changed SHA-256 (`0000...`): **PASS** (fails closed with checksum mismatch error).
+     - Expired token: **PASS** (fails closed with expiration error).
+     - Altered scope (`unauthorized-scope`): **PASS** (fails closed with scope mismatch error).
+   - Deterministic project ordering by ID: **PASS** (shuffled declaration order in Rust and Python produces identical canonical bytes).
+2. **Task 2 — Backup and Live Snapshot Readiness**:
+   - Backup SHA-256 revalidated: `shasum -c manifest.sha256` returned `OK` (`2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694`).
+   - Backup integrity and Schema V1: `PRAGMA integrity_check` = `ok`; `loopback_port` absent.
+   - Projects confirmed: `proj_e92e56cd0e0c4c36952804a35b3587a3` (8.5), `proj_db5472bb224c4fd0960ff69f793590a7` (8.4 - **PO-U5-01 PRESERVED**).
+   - Trust anchor fingerprint rechecked: `7374d1100bee06a5364c0e193c485308065998ca65b3ac8822c25f8e52f42991` (active, unchanged).
+   - Ports 18081 and 18082 reconfirmed free (0 listeners).
+   - SQLite quiescence confirmed: 0 open file descriptors, 0 `localforge` processes.
+   - Live preflight audit (`localforge storage migrate-v2 --backup-path <PATH>` dry-run): 100% verified, 0 live modifications.
+3. **Task 3 — Human Execution Package Prepared**:
+   - Ready-to-review package with exact backup path, Python signing script, operator manual steps, CLI command marked NOT AUTHORIZED, post-migration queries, and emergency rollback.
+4. **Safety Invariants Maintained**:
+   - Real SQLite database: ZERO mutations.
+   - Real Product Owner private key: NEVER accessed, read, copied, or inspected.
+   - Zero production approval tokens issued.
+   - Zero CLI `--execute` invocations; zero port allocations.
+   - Zero Nginx reload; zero PHP/MariaDB installs; zero main merges.
+
+### 3. Verification Suite
+- 28/28 `localforge-storage` tests pass (`cargo test -p localforge-storage`).
+- `cargo fmt --check`: 0 diffs.
+- `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+- Binary `target/debug/localforge` built cleanly (SHA-256: `58bfd20fa04df530b71a9d801a55f9c5d72fa9776cf9b36076d8e1f646ae37da`).
+
+### 4. Mandatory Stop Phase
+`LOCALFORGE GATE U5.F-M — FINAL SIGNATURE VERIFICATION COMPLETE. AWAITING EXPLICIT PRODUCT OWNER LIVE MIGRATION AUTHORIZATION.`

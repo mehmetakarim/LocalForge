@@ -583,36 +583,73 @@ mod tests {
         assert!(replay_err.to_string().contains("already been consumed"));
     }
 
+    fn resolve_openssl_cli() -> Option<String> {
+        let candidates = [
+            "/opt/homebrew/bin/openssl",
+            "/opt/homebrew/opt/openssl@3/bin/openssl",
+            "/usr/local/opt/openssl@3/bin/openssl",
+            "/usr/local/bin/openssl",
+            "/usr/bin/openssl",
+            "openssl",
+        ];
+        for candidate in candidates {
+            if let Ok(out) = std::process::Command::new(candidate)
+                .arg("version")
+                .output()
+            {
+                let s = String::from_utf8_lossy(&out.stdout);
+                if s.contains("OpenSSL") {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+        None
+    }
+
     #[test]
-    fn test_external_openssl_python_token_signature_verification() {
+    fn test_task1_disposable_ed25519_python_rust_interoperability() {
         let _lock = crate::TEST_ENV_LOCK.lock().unwrap();
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("localforge.db");
         std::fs::write(&db_path, b"dummy db bytes").unwrap();
         let ledger_path = dir.path().join("security").join("consumed.jsonl");
 
-        // Generate disposable key via OpenSSL
+        // 1. Generate a temporary Ed25519 key pair
         let key_path = dir.path().join("disposable_key.pem");
-        let status = std::process::Command::new("openssl")
-            .args(["genpkey", "-algorithm", "Ed25519", "-out"])
-            .arg(&key_path)
-            .status()
-            .expect("Failed to execute openssl");
-        assert!(status.success());
+        let openssl_bin = resolve_openssl_cli();
 
-        // Extract pubkey hex via OpenSSL
-        let pubout = std::process::Command::new("openssl")
-            .args(["pkey", "-in"])
-            .arg(&key_path)
-            .args(["-pubout", "-outform", "DER"])
-            .output()
-            .expect("Failed to get pubkey");
-        assert!(pubout.status.success());
-        let der = pubout.stdout;
-        let raw_pub = &der[der.len() - 32..];
-        let pub_hex = hex::encode(raw_pub);
+        let (pub_hex, raw_seed): (String, Option<[u8; 32]>) = if let Some(ref bin) = openssl_bin {
+            let status = std::process::Command::new(bin)
+                .args(["genpkey", "-algorithm", "Ed25519", "-out"])
+                .arg(&key_path)
+                .status()
+                .expect("Failed to execute openssl genpkey");
+            assert!(status.success());
 
-        // Enroll trust anchor
+            let pubout = std::process::Command::new(bin)
+                .args(["pkey", "-in"])
+                .arg(&key_path)
+                .args(["-pubout", "-outform", "DER"])
+                .output()
+                .expect("Failed to get pubkey via openssl");
+            assert!(pubout.status.success());
+            let der = pubout.stdout;
+            let raw_pub = &der[der.len() - 32..];
+            (hex::encode(raw_pub), None)
+        } else {
+            // Fallback: generate via ed25519-dalek from deterministic disposable seed
+            let disposable_seed: [u8; 32] = [
+                0x24, 0x5a, 0x71, 0x18, 0x90, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
+                0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+                0xdd, 0xee, 0xff, 0x01,
+            ];
+            let signing_key = ed25519_dalek::SigningKey::from_bytes(&disposable_seed);
+            let verifying_key = signing_key.verifying_key();
+            let pub_hex = hex::encode(verifying_key.to_bytes());
+            (pub_hex, Some(disposable_seed))
+        };
+
+        // Enroll trust anchor with disposable public key
         let anchor_path = dir.path().join("security").join("trust_anchor.json");
         std::fs::create_dir_all(anchor_path.parent().unwrap()).unwrap();
         crate::trust_anchor::enroll_trust_anchor(
@@ -623,124 +660,365 @@ mod tests {
         )
         .unwrap();
 
-        // Construct canonical JSON in Python, sign via OpenSSL, assemble token
-        let canonical_bin = dir.path().join("canonical.bin");
-        let token_sig_bin = dir.path().join("sig.bin");
+        // 2. Construct test MigrationApprovalPayload matching Rust struct exactly
+        let token_id = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let activation_sha =
+            "2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694".to_string();
+        let scope = "migrate-v2-loopback-ports".to_string();
+        let now = chrono::Utc::now().timestamp();
+        let issued_at = now;
+        let expires_at = now + 3600;
+
+        let proj1 = crate::approval::ProjectSnapshotAssertion {
+            id: "proj_db5472bb224c4fd0960ff69f793590a7".into(),
+            name: "Projetest".into(),
+            path: "/Volumes/Mac Harici Disk/Projetest".into(),
+            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+            document_root: "public".into(),
+            php_version: "8.4".into(),
+            local_domain: "projetest.test".into(),
+            assigned_loopback_port: 18082,
+        };
+
+        let proj2 = crate::approval::ProjectSnapshotAssertion {
+            id: "proj_e92e56cd0e0c4c36952804a35b3587a3".into(),
+            name: "r1_acceptance_project".into(),
+            path: "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project"
+                .into(),
+            volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
+            document_root: "public".into(),
+            php_version: "8.5".into(),
+            local_domain: "r1_acceptance_project.test".into(),
+            assigned_loopback_port: 18081,
+        };
+
+        // Notice: pass projects intentionally in REVERSE order to test deterministic sorting
+        let rust_payload = MigrationApprovalPayload {
+            token_id: token_id.clone(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: activation_sha.clone(),
+            scope: scope.clone(),
+            expected_projects: vec![proj2.clone(), proj1.clone()],
+            issued_at,
+            expires_at,
+        };
+
+        // 3. Canonicalize the payload in Python & 4. Canonicalize in Rust
+        let py_canonical_bin = dir.path().join("py_canonical.bin");
+        let rust_canonical_bin = dir.path().join("rust_canonical.bin");
         let token_json_path = dir.path().join("token.json");
+        let expired_token_json_path = dir.path().join("expired_token.json");
+
+        // 4. Canonicalize in Rust using MigrationApprovalPayload::to_canonical_bytes()
+        let rust_canonical_bytes = rust_payload.to_canonical_bytes().unwrap();
+        std::fs::write(&rust_canonical_bin, &rust_canonical_bytes).unwrap();
+
+        // 3. Canonicalize in Python (with project sorting and strict formatting)
+        let openssl_arg = openssl_bin.unwrap_or_default();
+        let seed_hex = raw_seed.map(hex::encode).unwrap_or_default();
 
         let py_script = format!(
             r#"
-import json, time, uuid, subprocess
+import json, subprocess, hashlib, os, tempfile
 
+# RFC 8032 pure-Python fallback for Ed25519 signing
+q = 2**255 - 19
+l = 2**252 + 27742317777372353535851937790883648493
+d = -121665 * pow(121666, q - 2, q)
+I = pow(2, (q - 1) // 4, q)
+
+def xrecover(y):
+    xx = (y * y - 1) * pow(d * y * y + 1, q - 2, q)
+    x = pow(xx, (q + 3) // 8, q)
+    if (x * x - xx) % q != 0:
+        x = (x * I) % q
+    if x % 2 != 0:
+        x = q - x
+    return x
+
+By = 4 * pow(5, q - 2, q)
+Bx = xrecover(By)
+B = [Bx % q, By % q]
+
+def edwards(P, Q):
+    x1, y1 = P[0], P[1]
+    x2, y2 = Q[0], Q[1]
+    x3 = (x1 * y2 + x2 * y1) * pow(1 + d * x1 * x2 * y1 * y2, q - 2, q)
+    y3 = (y1 * y2 + x1 * x2) * pow(1 - d * x1 * x2 * y1 * y2, q - 2, q)
+    return [x3 % q, y3 % q]
+
+def scalarmult(P, e):
+    if e == 0:
+        return [0, 1]
+    Q = scalarmult(P, e // 2)
+    Q = edwards(Q, Q)
+    if e & 1:
+        Q = edwards(Q, P)
+    return Q
+
+def encodepoint(P):
+    x, y = P[0], P[1]
+    bits = [(y >> i) & 1 for i in range(255)] + [x & 1]
+    return bytes(sum([bits[i * 8 + j] << j for j in range(8)]) for i in range(32))
+
+def rfc8032_sign(m, sk_bytes):
+    h = hashlib.sha512(sk_bytes).digest()
+    a = 2**254 + sum(2**i * ((h[i // 8] >> (i % 8)) & 1) for i in range(3, 254))
+    A = scalarmult(B, a)
+    pk = encodepoint(A)
+    r = int.from_bytes(hashlib.sha512(h[32:] + m).digest(), 'little')
+    R = scalarmult(B, r)
+    k = int.from_bytes(hashlib.sha512(encodepoint(R) + pk + m).digest(), 'little')
+    S = (r + k * a) % l
+    return (encodepoint(R) + S.to_bytes(32, 'little')).hex()
+
+openssl_bin = "{}"
+key_pem = "{}"
+seed_hex = "{}"
+
+def sign_data(msg_bytes):
+    if openssl_bin and os.path.exists(key_pem):
+        try:
+            with tempfile.NamedTemporaryFile('wb', delete=False) as tf:
+                tf.write(msg_bytes)
+                tf_in = tf.name
+            tf_out = tf_in + '.sig'
+            subprocess.check_call([
+                openssl_bin, 'pkeyutl', '-sign',
+                '-inkey', key_pem,
+                '-rawin',
+                '-in', tf_in,
+                '-out', tf_out
+            ])
+            with open(tf_out, 'rb') as f:
+                s = f.read().hex()
+            os.unlink(tf_in)
+            os.unlink(tf_out)
+            return s
+        except Exception:
+            pass
+    if seed_hex:
+        return rfc8032_sign(msg_bytes, bytes.fromhex(seed_hex))
+    raise RuntimeError("Cannot sign")
+
+# Input projects in REVERSE order to test canonical sorting
+input_projects = [
+    {{
+        "id": "proj_e92e56cd0e0c4c36952804a35b3587a3",
+        "name": "r1_acceptance_project",
+        "path": "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project",
+        "volume_uuid": "7E26530E-5179-414C-81B5-6FBDB429FC65",
+        "document_root": "public",
+        "php_version": "8.5",
+        "local_domain": "r1_acceptance_project.test",
+        "assigned_loopback_port": 18081
+    }},
+    {{
+        "id": "proj_db5472bb224c4fd0960ff69f793590a7",
+        "name": "Projetest",
+        "path": "/Volumes/Mac Harici Disk/Projetest",
+        "volume_uuid": "7E26530E-5179-414C-81B5-6FBDB429FC65",
+        "document_root": "public",
+        "php_version": "8.4",
+        "local_domain": "projetest.test",
+        "assigned_loopback_port": 18082
+    }}
+]
+
+# Canonicalize exactly matching Rust contract
+sorted_projects = sorted(input_projects, key=lambda p: p["id"])
 payload = {{
-    'token_id': str(uuid.uuid4()),
-    'database_path': '{}',
-    'activation_snapshot_sha256': '2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694',
-    'scope': 'migrate-v2-loopback-ports',
-    'expected_projects': [
-        {{
-            'id': 'proj_db5472bb224c4fd0960ff69f793590a7',
-            'name': 'Projetest',
-            'path': '/Volumes/Mac Harici Disk/Projetest',
-            'volume_uuid': '7E26530E-5179-414C-81B5-6FBDB429FC65',
-            'document_root': 'public',
-            'php_version': '8.4',
-            'local_domain': 'projetest.test',
-            'assigned_loopback_port': 18082
-        }},
-        {{
-            'id': 'proj_e92e56cd0e0c4c36952804a35b3587a3',
-            'name': 'r1_acceptance_project',
-            'path': '/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project',
-            'volume_uuid': '7E26530E-5179-414C-81B5-6FBDB429FC65',
-            'document_root': 'public',
-            'php_version': '8.5',
-            'local_domain': 'r1_acceptance_project.test',
-            'assigned_loopback_port': 18081
-        }}
-    ],
-    'issued_at': int(time.time()),
-    'expires_at': int(time.time()) + 3600
+    "token_id": "{}",
+    "database_path": "{}",
+    "activation_snapshot_sha256": "{}".lower(),
+    "scope": "{}",
+    "expected_projects": sorted_projects,
+    "issued_at": {},
+    "expires_at": {}
 }}
 
 canonical_bytes = json.dumps(payload, separators=(',', ':')).encode('utf-8')
 with open('{}', 'wb') as f:
     f.write(canonical_bytes)
 
-# Sign with OpenSSL
-subprocess.check_call([
-    'openssl', 'pkeyutl', '-sign',
-    '-inkey', '{}',
-    '-rawin',
-    '-in', '{}',
-    '-out', '{}'
-])
-
-with open('{}', 'rb') as f:
-    sig_hex = f.read().hex()
-
 token = {{
-    'payload': payload,
-    'signature': sig_hex
+    "payload": payload,
+    "signature": sign_data(canonical_bytes)
 }}
 
 with open('{}', 'w') as f:
     json.dump(token, f, indent=2)
+
+# Also generate properly signed expired token
+expired_payload = dict(payload)
+expired_payload["issued_at"] = payload["issued_at"] - 7200
+expired_payload["expires_at"] = payload["issued_at"] - 3600
+expired_bytes = json.dumps(expired_payload, separators=(',', ':')).encode('utf-8')
+expired_token = {{
+    "payload": expired_payload,
+    "signature": sign_data(expired_bytes)
+}}
+
+with open('{}', 'w') as f:
+    json.dump(expired_token, f, indent=2)
 "#,
-            db_path.display(),
-            canonical_bin.display(),
+            openssl_arg,
             key_path.display(),
-            canonical_bin.display(),
-            token_sig_bin.display(),
-            token_sig_bin.display(),
+            seed_hex,
+            token_id,
+            db_path.display(),
+            activation_sha,
+            scope,
+            issued_at,
+            expires_at,
+            py_canonical_bin.display(),
             token_json_path.display(),
+            expired_token_json_path.display(),
         );
 
-        let status = std::process::Command::new("python3")
+        let py_output = std::process::Command::new("python3")
             .arg("-c")
             .arg(&py_script)
-            .status()
-            .expect("Failed to run python script");
-        assert!(status.success());
+            .output()
+            .expect("Failed to run python canonicalization and signing");
 
+        if !py_output.status.success() {
+            panic!(
+                "Python script failed: {}",
+                String::from_utf8_lossy(&py_output.stderr)
+            );
+        }
+
+        // 5. Compare both byte sequences for exact equality
+        let py_canonical_bytes = std::fs::read(&py_canonical_bin).unwrap();
+        assert_eq!(
+            py_canonical_bytes, rust_canonical_bytes,
+            "Python and Rust canonical JSON byte sequences MUST be byte-for-byte identical"
+        );
+
+        // 6. Read signed token and verify signature using Rust ed25519_dalek directly
         let token_str = std::fs::read_to_string(&token_json_path).unwrap();
-        let expected_assertions = vec![
-            crate::approval::ProjectSnapshotAssertion {
-                id: "proj_db5472bb224c4fd0960ff69f793590a7".into(),
-                name: "Projetest".into(),
-                path: "/Volumes/Mac Harici Disk/Projetest".into(),
-                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
-                document_root: "public".into(),
-                php_version: "8.4".into(),
-                local_domain: "projetest.test".into(),
-                assigned_loopback_port: 18082,
-            },
-            crate::approval::ProjectSnapshotAssertion {
-                id: "proj_e92e56cd0e0c4c36952804a35b3587a3".into(),
-                name: "r1_acceptance_project".into(),
-                path:
-                    "/Volumes/Mac Harici Disk/VibeProject/LocalForge/scratch/r1_acceptance_project"
-                        .into(),
-                volume_uuid: "7E26530E-5179-414C-81B5-6FBDB429FC65".into(),
-                document_root: "public".into(),
-                php_version: "8.5".into(),
-                local_domain: "r1_acceptance_project.test".into(),
-                assigned_loopback_port: 18081,
-            },
-        ];
+        let token: MigrationApprovalToken = serde_json::from_str(&token_str).unwrap();
 
+        // 7. Verify signature using Rust ed25519_dalek
+        let raw_pubkey = hex::decode(&pub_hex).expect("Valid pubkey hex");
+        let pubkey_bytes: [u8; 32] = raw_pubkey.as_slice().try_into().unwrap();
+        let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(&pubkey_bytes).unwrap();
+
+        let sig_bytes = hex::decode(&token.signature).expect("Valid sig hex");
+        let sig_arr: [u8; 64] = sig_bytes.as_slice().try_into().unwrap();
+        let dalek_sig = ed25519_dalek::Signature::from_bytes(&sig_arr);
+
+        verifying_key
+            .verify_strict(&rust_canonical_bytes, &dalek_sig)
+            .expect("Rust ed25519_dalek MUST verify the signature generated by Python/OpenSSL");
+
+        let expected_assertions = vec![proj1.clone(), proj2.clone()];
+
+        // Full end-to-end verification and consumption through verify_and_consume_approval
         let evidence = verify_and_consume_approval(
             &token_str,
             &db_path,
-            "2832b96f7a69fbb56d866cbe9bc259d379a6582a777bd45a333f161496f1e694",
-            "migrate-v2-loopback-ports",
+            &activation_sha,
+            &scope,
             &expected_assertions,
             &ledger_path,
             &anchor_path,
         )
-        .expect("OpenSSL-signed token MUST verify cleanly in verify_and_consume_approval");
-
+        .expect("Full verification pipeline MUST accept the valid token");
         assert_eq!(evidence.scope, "migrate-v2-loopback-ports");
+
+        // 8. Test negative cases
+        // 8a. Wrong signature
+        let mut tampered_sig_token = token.clone();
+        let mut bad_sig_bytes = sig_bytes.clone();
+        bad_sig_bytes[0] ^= 0xff;
+        tampered_sig_token.signature = hex::encode(bad_sig_bytes);
+        let err = verify_and_consume_approval(
+            &serde_json::to_string(&tampered_sig_token).unwrap(),
+            &db_path,
+            &activation_sha,
+            &scope,
+            &expected_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Authorization signature verification failed"));
+
+        // 8b. Changed project port (18082 -> 18099)
+        let mut altered_port_assertions = expected_assertions.clone();
+        altered_port_assertions[0].assigned_loopback_port = 18099;
+        let err = verify_and_consume_approval(
+            &token_str,
+            &db_path,
+            &activation_sha,
+            &scope,
+            &altered_port_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("port mismatch"));
+
+        // 8c. Changed SHA-256
+        let err = verify_and_consume_approval(
+            &token_str,
+            &db_path,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            &scope,
+            &expected_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("Authorization checksum mismatch"));
+
+        // 8d. Expired token
+        let expired_token_str = std::fs::read_to_string(&expired_token_json_path).unwrap();
+        let err = verify_and_consume_approval(
+            &expired_token_str,
+            &db_path,
+            &activation_sha,
+            &scope,
+            &expected_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("Authorization expired"));
+
+        // 8e. Altered scope
+        let err = verify_and_consume_approval(
+            &token_str,
+            &db_path,
+            &activation_sha,
+            "unauthorized-scope",
+            &expected_assertions,
+            &ledger_path,
+            &anchor_path,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("Authorization scope mismatch"));
+
+        // 9. Verify deterministic project ordering by ID
+        // Shuffling the input order in Rust must yield the exact same bytes
+        let shuffled_rust_payload = MigrationApprovalPayload {
+            token_id: token_id.clone(),
+            database_path: db_path.display().to_string(),
+            activation_snapshot_sha256: activation_sha.clone(),
+            scope: scope.clone(),
+            expected_projects: vec![proj1.clone(), proj2.clone()], // proj1 first
+            issued_at,
+            expires_at,
+        };
+        assert_eq!(
+            shuffled_rust_payload.to_canonical_bytes().unwrap(),
+            rust_canonical_bytes,
+            "Deterministic sorting must guarantee identical canonical bytes regardless of project declaration order"
+        );
     }
 
     #[test]
